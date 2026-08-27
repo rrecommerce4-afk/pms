@@ -1,0 +1,59 @@
+<%- include('partials/header') %>
+<div class="container">
+  <div class="page-head">
+    <div>
+      <div class="eyebrow-date">VIEWER</div>
+      <h1><%= heading %></h1>
+      <p><%= subheading %></p>
+    </div>
+    <div class="legend">
+      <span class="legend-item"><span class="legend-dot completed"></span> All completed</span>
+      <span class="legend-item"><span class="legend-dot red"></span> Missed one or more</span>
+      <span class="legend-item"><span class="legend-dot none"></span> No tasks that day</span>
+    </div>
+  </div>
+
+  <div class="table-card">
+    <% if (days.length === 0) { %>
+      <div class="empty-row" style="padding:40px 20px; text-align:center; color:var(--text-faint);">
+        No completed days yet this month &mdash; check back tomorrow.
+      </div>
+    <% } else if (rows.length === 0) { %>
+      <div class="empty-row" style="padding:40px 20px; text-align:center; color:var(--text-faint);">
+        No employees yet.
+      </div>
+    <% } else { %>
+      <div class="month-grid-scroll">
+        <table class="month-grid">
+          <thead>
+            <tr>
+              <th class="emp-head">Employee</th>
+              <% days.forEach(function(d) { %>
+                <th><%= d %></th>
+              <% }) %>
+            </tr>
+          </thead>
+          <tbody>
+            <% rows.forEach(function(r) { %>
+              <tr>
+                <td class="emp-cell">
+                  <div class="name-cell">
+                    <div class="avatar"><%= r.name.trim().charAt(0).toUpperCase() %></div>
+                    <div>
+                      <div class="cell-name"><%= r.name %></div>
+                      <div class="cell-dept"><%= r.department %></div>
+                    </div>
+                  </div>
+                </td>
+                <% r.cells.forEach(function(c) { %>
+                  <td><span class="day-dot <%= c.status %>" title="Day <%= c.day %>: <%= c.status === 'green' ? 'all tasks completed' : c.status === 'red' ? 'missed one or more tasks' : 'no tasks assigned' %>"></span></td>
+                <% }) %>
+              </tr>
+            <% }) %>
+          </tbody>
+        </table>
+      </div>
+    <% } %>
+  </div>
+</div>
+<%- include('partials/footer') %>

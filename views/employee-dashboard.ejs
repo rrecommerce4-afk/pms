@@ -1,0 +1,102 @@
+<%- include('partials/header') %>
+<div class="container">
+  <div class="dashboard-head">
+    <div>
+      <div class="eyebrow-date"><%= topDate %></div>
+      <h1><%= heading %></h1>
+      <p><%= subheading %></p>
+    </div>
+    <div class="date-card">
+      <div class="dc-label">TODAY</div>
+      <div class="dc-day"><%= dateBadge.day %></div>
+      <div class="dc-month"><%= dateBadge.month %></div>
+    </div>
+  </div>
+
+  <div class="cards">
+    <div class="card total">
+      <div class="icon-badge">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none"><path d="M9 6h11M9 12h11M9 18h11M4 6h.01M4 12h.01M4 18h.01" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/></svg>
+      </div>
+      <div>
+        <div class="label">Total Tasks</div>
+        <div class="num"><%= String(total).padStart(2, '0') %></div>
+        <div class="subtext">Aaj assign hue</div>
+      </div>
+    </div>
+    <div class="card completed">
+      <div class="icon-badge">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none"><path d="M20 6L9 17l-5-5" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </div>
+      <div>
+        <div class="label">Completed</div>
+        <div class="num"><%= String(completed).padStart(2, '0') %></div>
+        <div class="subtext">Bahut badhiya!</div>
+      </div>
+    </div>
+    <div class="card pending">
+      <div class="icon-badge">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="2.2"/><path d="M12 7v5l3.5 2" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </div>
+      <div>
+        <div class="label">Pending</div>
+        <div class="num"><%= String(pending).padStart(2, '0') %></div>
+        <div class="subtext">Complete karna baki</div>
+      </div>
+    </div>
+    <div class="card missed">
+      <div class="icon-badge">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none"><path d="M12 9v4M12 17h.01" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/><circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="2.2"/></svg>
+      </div>
+      <div>
+        <div class="label">Missed (All-time)</div>
+        <div class="num"><%= String(missedCount).padStart(2, '0') %></div>
+        <div class="subtext">Yeh miss ho gaye</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="section-card">
+    <div class="eyebrow">TODAY'S PROGRESS</div>
+    <div class="section-card-head">
+      <h2>Daily Task Progress</h2>
+      <span class="pct"><%= pct %>%</span>
+    </div>
+    <span class="progress-track large"><span class="progress-fill" style="width:<%= pct %>%"></span></span>
+    <div class="progress-stats">
+      <span><%= completed %> of <%= total %> tasks completed</span>
+      <span><%= pending %> tasks remaining</span>
+    </div>
+  </div>
+
+  <div class="section-card">
+    <div class="eyebrow">QUICK VIEW</div>
+    <div class="section-card-head">
+      <h2>Today's Tasks</h2>
+      <a class="view-all" href="/employee/tasks">View all tasks &rsaquo;</a>
+    </div>
+    <div class="task-list-head"><span>Task Name</span><span>Status</span></div>
+    <div class="task-list">
+      <% quickRows.forEach(function(r) { %>
+        <% const done = r.log.status === 'completed'; %>
+        <div class="task-row <%= done ? 'is-complete' : '' %>">
+          <span class="status-dot <%= done ? 'completed' : 'pending' %>">
+            <% if (done) { %><svg width="11" height="11" viewBox="0 0 24 24" fill="none"><path d="M20 6L9 17l-5-5" stroke="#fff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg><% } %>
+          </span>
+          <span class="task-name"><%= r.task.title %></span>
+          <span class="badge icon-pill <%= done ? 'completed' : 'pending' %>">
+            <% if (done) { %>
+              <svg width="11" height="11" viewBox="0 0 24 24" fill="none"><path d="M20 6L9 17l-5-5" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg> Complete
+            <% } else { %>
+              <svg width="11" height="11" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="2.4"/><path d="M12 7v5l3.5 2" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg> Pending
+            <% } %>
+          </span>
+        </div>
+      <% }) %>
+      <% if (quickRows.length === 0) { %>
+        <div class="task-row"><span class="task-name" style="color:var(--text-faint);">No tasks assigned for today.</span></div>
+      <% } %>
+    </div>
+  </div>
+</div>
+<%- include('partials/footer') %>

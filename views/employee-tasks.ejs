@@ -1,0 +1,71 @@
+<%- include('partials/header') %>
+<div class="container">
+  <div class="page-head">
+    <div>
+      <div class="eyebrow-date">MY WORK</div>
+      <h1><%= heading %></h1>
+      <p><%= subheading %></p>
+    </div>
+    <div class="count-pill">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M9 6h11M9 12h11M9 18h11M4 6h.01M4 12h.01M4 18h.01" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/></svg>
+      <%= String(total).padStart(2, '0') %> Tasks
+    </div>
+  </div>
+
+  <div class="list-card">
+    <div class="list-card-head section-card-head">
+      <div>
+        <div class="eyebrow"><%= listDate %></div>
+        <h2>Task List</h2>
+      </div>
+      <div class="legend">
+        <span class="legend-item"><span class="legend-dot completed"></span> <%= completed %> Complete</span>
+        <span class="legend-item"><span class="legend-dot pending"></span> <%= pending %> Pending</span>
+      </div>
+    </div>
+
+    <table>
+      <thead>
+        <tr><th style="width:50px;">No.</th><th>Task Name</th><th>Status</th><th></th></tr>
+      </thead>
+      <tbody>
+        <% rows.forEach(function(r, i) { %>
+          <% const done = r.log.status === 'completed'; %>
+          <tr>
+            <td class="row-num"><%= String(i + 1).padStart(2, '0') %></td>
+            <td>
+              <div class="name-cell">
+                <form class="inline" method="POST" action="/employee/tasks/<%= r.log.id %>/toggle">
+                  <button type="submit" class="status-dot <%= done ? 'completed' : 'pending' %>" title="<%= done ? 'Mark as pending' : 'Mark as complete' %>">
+                    <% if (done) { %><svg width="11" height="11" viewBox="0 0 24 24" fill="none"><path d="M20 6L9 17l-5-5" stroke="#fff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg><% } %>
+                  </button>
+                </form>
+                <span class="<%= done ? 'is-complete' : '' %>" style="<%= done ? 'color:var(--text-faint); text-decoration:line-through;' : '' %>"><%= r.task.title %></span>
+              </div>
+            </td>
+            <td>
+              <span class="badge icon-pill <%= done ? 'completed' : 'pending' %>">
+                <% if (done) { %>
+                  <svg width="11" height="11" viewBox="0 0 24 24" fill="none"><path d="M20 6L9 17l-5-5" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg> Complete
+                <% } else { %>
+                  <svg width="11" height="11" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="2.4"/><path d="M12 7v5l3.5 2" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg> Pending
+                <% } %>
+              </span>
+            </td>
+            <td>
+              <% if (r.task.detail) { %>
+                <button type="button" class="btn small outline details-btn" data-title="<%= r.task.title %>" data-detail="<%= r.task.detail %>">Details</button>
+              <% } %>
+            </td>
+          </tr>
+        <% }) %>
+        <% if (rows.length === 0) { %>
+          <tr class="empty-row"><td colspan="4">No tasks assigned for today.</td></tr>
+        <% } %>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<%- include('partials/task-detail-modal') %>
+<%- include('partials/footer') %>

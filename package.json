@@ -1,0 +1,16 @@
+{
+  "name": "pms",
+  "version": "1.0.0",
+  "description": "Simple daily task management system",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "bcryptjs": "^2.4.3",
+    "ejs": "^3.1.10",
+    "express": "^4.19.2",
+    "express-session": "^1.18.0",
+    "node-cron": "^3.0.3"
+  }
+}

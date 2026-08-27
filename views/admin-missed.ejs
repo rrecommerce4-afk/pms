@@ -1,0 +1,47 @@
+<%- include('partials/header') %>
+<div class="container">
+  <div class="page-head">
+    <div>
+      <div class="eyebrow-date">ADMIN OVERVIEW</div>
+      <h1><%= heading %><% if (filteredEmployee) { %> &mdash; <%= filteredEmployee.name %><% } %></h1>
+      <p><%= subheading %></p>
+    </div>
+    <% if (filteredEmployee) { %>
+      <a class="count-pill" href="/admin/missed">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M18 6L6 18M6 6l12 12" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/></svg>
+        Clear filter
+      </a>
+    <% } %>
+  </div>
+
+  <div class="list-card">
+    <table>
+      <thead>
+        <tr><th>Employee</th><th>Task</th><th>Date Missed</th></tr>
+      </thead>
+      <tbody>
+        <% rows.forEach(function(r) { %>
+          <tr>
+            <td>
+              <a class="name-cell" style="text-decoration:none; color:inherit;" href="/admin/missed?employee=<%= r.employee.id %>">
+                <div class="avatar"><%= r.employee.name.trim().charAt(0).toUpperCase() %></div>
+                <%= r.employee.name %>
+              </a>
+            </td>
+            <td><%= r.task.title %></td>
+            <td>
+              <span class="badge icon-pill pending">
+                <svg width="11" height="11" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="2.4"/><path d="M12 7v5l3.5 2" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                <%= r.dateLabel %>
+              </span>
+            </td>
+          </tr>
+        <% }) %>
+        <% if (rows.length === 0) { %>
+          <tr class="empty-row"><td colspan="3">No missed tasks &mdash; nice and clean!</td></tr>
+        <% } %>
+      </tbody>
+    </table>
+  </div>
+</div>
+<%- include('partials/footer') %>

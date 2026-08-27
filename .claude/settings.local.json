@@ -1,0 +1,31 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(rm -f v.txt)",
+      "Bash(curl -s -c v.txt -b v.txt -X POST http://localhost:3000/login -d \"email=viewer_delete_me@test.com&password=x\" -o /dev/null -w \"viewer login: %{http_code}\\\\n\")",
+      "Bash(curl -s -c v.txt -b v.txt http://localhost:3000/viewer/dashboard -o /dev/null -w \"viewer dashboard: %{http_code}\\\\n\")",
+      "Bash(curl -s -c v.txt -b v.txt http://localhost:3000/admin/dashboard -o /dev/null -w \"admin dashboard access attempt: %{http_code}\\\\n\")",
+      "Bash(curl -s -c v.txt -b v.txt http://localhost:3000/employee/dashboard -o /dev/null -w \"employee dashboard access attempt: %{http_code}\\\\n\")",
+      "Bash(curl -s -c v.txt -b v.txt http://localhost:3000/admin/dashboard -o /dev/null -w \"admin route \\(should 403\\): %{http_code}\\\\n\")",
+      "Bash(curl -s -c v.txt -b v.txt http://localhost:3000/employee/dashboard -o /dev/null -w \"employee route \\(should 403 now\\): %{http_code}\\\\n\")",
+      "Bash(curl -s -c v.txt -b v.txt http://localhost:3000/viewer/dashboard)",
+      "Bash(curl -s -c v.txt -b v.txt http://localhost:3000/viewer/dashboard -o \"C:/Users/Rushal/AppData/Local/Temp/claude/c--Projects-Pms/83f2fc44-be52-46c9-b19f-cc42754d523a/scratchpad/viewer_page.html\")",
+      "Bash(awk '/History Test/{found=1} found' C:/Users/Rushal/AppData/Local/Temp/claude/c--Projects-Pms/83f2fc44-be52-46c9-b19f-cc42754d523a/scratchpad/viewer_page.html)",
+      "Bash(node -e ' *)",
+      "Bash(rm -f __TRACKED_VAR__/viewer_page.html)",
+      "Bash('/c/Program Files/Google/Chrome/Application/chrome.exe' --headless=new --disable-gpu --user-data-dir=C:/Users/Rushal/AppData/Local/Temp/claude/c--Projects-Pms/83f2fc44-be52-46c9-b19f-cc42754d523a/scratchpad/chrome-profile-viewer --virtual-time-budget=3000 file:///C:/Users/Rushal/AppData/Local/Temp/claude/c--Projects-Pms/83f2fc44-be52-46c9-b19f-cc42754d523a/scratchpad/autologin_viewer.html)",
+      "Bash(rm -rf __TRACKED_VAR__/chrome-profile-viewer __TRACKED_VAR__/autologin_viewer.html __TRACKED_VAR__/viewer_dash.png)",
+      "Bash(rm -f a.txt)",
+      "Bash(curl -s -c a.txt -b a.txt -X POST http://localhost:3000/admin/tasks --data-urlencode 'title=Publish Instagram Reel' --data-urlencode 'description=Final edit and post' --data-urlencode 'detail=Step 1: Export the video in 1080p. *)",
+      "Bash('/c/Program Files/Google/Chrome/Application/chrome.exe' --headless=new --disable-gpu --user-data-dir=C:/Users/Rushal/AppData/Local/Temp/claude/c--Projects-Pms/83f2fc44-be52-46c9-b19f-cc42754d523a/scratchpad/chrome-profile-detail --virtual-time-budget=3000 file:///C:/Users/Rushal/AppData/Local/Temp/claude/c--Projects-Pms/83f2fc44-be52-46c9-b19f-cc42754d523a/scratchpad/autologin_detail.html)",
+      "Bash('/c/Program Files/Google/Chrome/Application/chrome.exe' --headless=new --disable-gpu --user-data-dir=C:/Users/Rushal/AppData/Local/Temp/claude/c--Projects-Pms/83f2fc44-be52-46c9-b19f-cc42754d523a/scratchpad/chrome-profile-detail --window-size=1400,700 --run-all-compositor-stages-before-draw --virtual-time-budget=3000 --screenshot=C:/Users/Rushal/AppData/Local/Temp/claude/c--Projects-Pms/83f2fc44-be52-46c9-b19f-cc42754d523a/scratchpad/modal_open.png --evaluate-script-before-screenshot)",
+      "Bash(curl -s -c a.txt -b a.txt http://localhost:3000/employee/tasks)",
+      "Bash(rm -f e.txt)",
+      "Bash(curl -s -c e.txt -b e.txt -X POST http://localhost:3000/login -d \"email=detail_check_delete_me@test.com&password=x\" -o /dev/null -w \"login: %{http_code}\\\\n\")",
+      "Bash(rm -f a.txt e.txt)",
+      "Bash(rm -rf __TRACKED_VAR__/chrome-profile-detail __TRACKED_VAR__/autologin_detail.html __TRACKED_VAR__/emp_tasks_with_details.png __TRACKED_VAR__/modal_open.png __TRACKED_VAR__/modal_clicked.png __TRACKED_VAR__/cdp_click_test.js __TRACKED_VAR__/chrome_cdp.log __TRACKED_VAR__/click_details.js)",
+      "Bash(nslookup pms.rajaraniproduct.tech)",
+      "Bash(ping -n 1 pms.rajaraniproduct.tech)"
+    ]
+  }
+}

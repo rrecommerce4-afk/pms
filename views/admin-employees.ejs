@@ -1,0 +1,151 @@
+<%- include('partials/header') %>
+<div class="container">
+  <div class="page-head">
+    <div>
+      <div class="eyebrow-date">ADMIN OVERVIEW</div>
+      <h1><%= heading %></h1>
+      <p><%= subheading %></p>
+    </div>
+    <div class="count-pill">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><circle cx="9" cy="8" r="3.2" stroke="currentColor" stroke-width="2"/><path d="M2.5 20c0-3.5 2.9-6 6.5-6s6.5 2.5 6.5 6" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><circle cx="17" cy="8.5" r="2.6" stroke="currentColor" stroke-width="2"/><path d="M15.3 14.2c2.4.3 5.2 2.4 5.2 5.8" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+      <%= String(userCount).padStart(2, '0') %> Users
+    </div>
+  </div>
+
+  <div class="form-card wide">
+    <div class="form-card-head">
+      <div class="live-avatar" id="liveAvatar">?</div>
+      <div>
+        <h2>Add New User</h2>
+        <p class="form-sub">They'll be able to log in with the email and password below.</p>
+      </div>
+    </div>
+    <% if (error) { %>
+      <div class="error"><%= error %></div>
+    <% } %>
+    <form method="POST" action="/admin/employees" id="addUserForm">
+      <div class="form-grid-2">
+        <div class="field">
+          <label>Full Name</label>
+          <input type="text" name="name" id="newUserName" placeholder="Jane Smith" required />
+        </div>
+        <div class="field">
+          <label>Email</label>
+          <input type="email" name="email" placeholder="jane@company.com" required />
+        </div>
+      </div>
+
+      <div class="field">
+        <label>Role</label>
+        <div class="role-options">
+          <label class="role-card selected" id="roleCardEmployee">
+            <input type="radio" name="role" value="employee" checked />
+            <span class="role-icon">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M9 6h11M9 12h11M9 18h11" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><path d="M4 6l.8.8L6.2 5.2" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M4 12l.8.8 1.4-1.6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M4 18l.8.8 1.4-1.6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            </span>
+            <span class="role-title">Employee</span>
+            <span class="role-desc">Gets assigned daily tasks and tracks their own progress.</span>
+          </label>
+          <label class="role-card" id="roleCardAdmin">
+            <input type="radio" name="role" value="admin" />
+            <span class="role-icon">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M12 3l7 4v5c0 5-3.5 8.5-7 9-3.5-.5-7-4-7-9V7l7-4z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            </span>
+            <span class="role-title">Admin</span>
+            <span class="role-desc">Full access &mdash; can manage users, tasks, and see everything.</span>
+          </label>
+          <label class="role-card" id="roleCardViewer">
+            <input type="radio" name="role" value="viewer" />
+            <span class="role-icon">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><circle cx="12" cy="12" r="3" stroke="currentColor" stroke-width="2"/></svg>
+            </span>
+            <span class="role-title">Viewer</span>
+            <span class="role-desc">Read-only &mdash; sees only the monthly completion overview.</span>
+          </label>
+        </div>
+      </div>
+
+      <div class="form-grid-2">
+        <div class="field" id="departmentField">
+          <label>Department (employees only, optional)</label>
+          <input type="text" name="department" placeholder="e.g. Marketing, Dispatch, Operations" />
+        </div>
+        <div class="field">
+          <label>Password</label>
+          <input type="password" name="password" placeholder="••••••••" required />
+        </div>
+      </div>
+
+      <button class="btn" type="submit">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none"><path d="M12 5v14M5 12h14" stroke="#fff" stroke-width="2.3" stroke-linecap="round"/></svg>
+        Add User
+      </button>
+    </form>
+  </div>
+
+  <script>
+    (function () {
+      var nameInput = document.getElementById('newUserName');
+      var liveAvatar = document.getElementById('liveAvatar');
+      nameInput.addEventListener('input', function () {
+        var parts = nameInput.value.trim().split(/\s+/).filter(Boolean);
+        var initials = parts.slice(0, 2).map(function (p) { return p.charAt(0).toUpperCase(); }).join('');
+        liveAvatar.textContent = initials || '?';
+      });
+
+      var roleCards = {
+        employee: document.getElementById('roleCardEmployee'),
+        admin: document.getElementById('roleCardAdmin'),
+        viewer: document.getElementById('roleCardViewer')
+      };
+      var departmentField = document.getElementById('departmentField');
+
+      Object.keys(roleCards).forEach(function (key) {
+        var card = roleCards[key];
+        card.querySelector('input[type="radio"]').addEventListener('change', function () {
+          Object.values(roleCards).forEach(function (c) { c.classList.remove('selected'); });
+          card.classList.add('selected');
+          departmentField.classList.toggle('disabled', key !== 'employee');
+        });
+      });
+    })();
+  </script>
+
+  <p class="section-title">All Users</p>
+  <div class="table-card">
+    <table>
+      <thead>
+        <tr><th>Name</th><th>Role</th><th>Department</th><th>Email</th><th>Status</th><th></th></tr>
+      </thead>
+      <tbody>
+        <% users.forEach(function(u) { %>
+          <tr>
+            <td>
+              <div class="name-cell">
+                <div class="avatar"><%= u.name.trim().charAt(0).toUpperCase() %></div>
+                <%= u.name %>
+              </div>
+            </td>
+            <% const roleBadgeClass = u.role === 'admin' ? 'completed' : u.role === 'viewer' ? 'info' : 'pending'; %>
+            <% const roleLabel = u.role === 'admin' ? 'Admin' : u.role === 'viewer' ? 'Viewer' : 'Employee'; %>
+            <td><span class="badge icon-pill <%= roleBadgeClass %>"><%= roleLabel %></span></td>
+            <td class="desc-cell"><%= u.role === 'employee' ? (u.department || 'Team Member') : '—' %></td>
+            <td><%= u.email %></td>
+            <td><span class="badge <%= u.active ? 'completed' : 'pending' %>"><%= u.active ? 'Active' : 'Removed' %></span></td>
+            <td>
+              <% if (u.active) { %>
+                <form class="inline" method="POST" action="/admin/employees/<%= u.id %>/delete" onsubmit="return confirm('Remove this user?');">
+                  <button class="btn small danger" type="submit">Remove</button>
+                </form>
+              <% } %>
+            </td>
+          </tr>
+        <% }) %>
+        <% if (users.length === 0) { %>
+          <tr class="empty-row"><td colspan="6">No users yet.</td></tr>
+        <% } %>
+      </tbody>
+    </table>
+  </div>
+</div>
+<%- include('partials/footer') %>

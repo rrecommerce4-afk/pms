@@ -1,0 +1,162 @@
+<%- include('partials/header') %>
+<div class="container">
+  <div class="page-head">
+    <div>
+      <div class="eyebrow-date">ADMIN OVERVIEW</div>
+      <h1><%= heading %></h1>
+      <p><%= subheading %></p>
+    </div>
+    <div class="count-pill">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M12 3l7 4v5c0 5-3.5 8.5-7 9-3.5-.5-7-4-7-9V7l7-4z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      Admin Access
+    </div>
+  </div>
+
+  <div class="cards">
+    <div class="card total">
+      <div class="icon-badge">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none"><circle cx="9" cy="8" r="3.2" stroke="currentColor" stroke-width="2"/><path d="M2.5 20c0-3.5 2.9-6 6.5-6s6.5 2.5 6.5 6" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><circle cx="17" cy="8.5" r="2.6" stroke="currentColor" stroke-width="2"/><path d="M15.3 14.2c2.4.3 5.2 2.4 5.2 5.8" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+      </div>
+      <div>
+        <div class="label">Team Members</div>
+        <div class="num"><%= String(employeeCount).padStart(2, '0') %></div>
+      </div>
+    </div>
+    <div class="card info">
+      <div class="icon-badge">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none"><rect x="5" y="4" width="14" height="17" rx="2" stroke="currentColor" stroke-width="2"/><path d="M9 3.5h6a1 1 0 011 1V6H8V4.5a1 1 0 011-1z" stroke="currentColor" stroke-width="2"/><path d="M8.5 12.5l2 2 4-4.5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </div>
+      <div>
+        <div class="label">Total Tasks</div>
+        <div class="num"><%= String(total).padStart(2, '0') %></div>
+      </div>
+    </div>
+    <div class="card completed">
+      <div class="icon-badge">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none"><path d="M20 6L9 17l-5-5" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </div>
+      <div>
+        <div class="label">Completed</div>
+        <div class="num"><%= String(completed).padStart(2, '0') %></div>
+      </div>
+    </div>
+    <div class="card pending">
+      <div class="icon-badge">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="2.2"/><path d="M12 7v5l3.5 2" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </div>
+      <div>
+        <div class="label">Pending</div>
+        <div class="num"><%= String(pending).padStart(2, '0') %></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="split-row">
+    <div class="section-card col-main">
+      <div class="section-card-head">
+        <div>
+          <div class="eyebrow">TEAM PERFORMANCE</div>
+          <h2>Employee-wise Progress</h2>
+        </div>
+        <span class="mini-chip"><%= chipDate %></span>
+      </div>
+      <div class="perf-list">
+        <% perEmployee.forEach(function(e) { %>
+          <div class="perf-row">
+            <div class="perf-who">
+              <div class="avatar-wrap">
+                <div class="avatar"><%= e.name.trim().charAt(0).toUpperCase() %></div>
+                <% if (e.missed > 0) { %><a class="missed-badge" href="/admin/missed?employee=<%= e.id %>" title="<%= e.missed %> missed task(s) &mdash; click to view"><%= e.missed %></a><% } %>
+              </div>
+              <div>
+                <div class="perf-name"><%= e.name %></div>
+                <div class="perf-dept"><%= e.department %></div>
+              </div>
+            </div>
+            <div class="perf-counts">
+              <span><b><%= e.total %></b> Total</span>
+              <span class="c-complete"><b><%= e.completed %></b> Complete</span>
+              <span class="c-pending"><b><%= e.pending %></b> Pending</span>
+            </div>
+            <div class="perf-bar-wrap">
+              <span class="progress-track"><span class="progress-fill" style="width:<%= e.pct %>%"></span></span>
+              <span class="pct-label"><%= e.pct %>%</span>
+            </div>
+          </div>
+        <% }) %>
+        <% if (perEmployee.length === 0) { %>
+          <div class="perf-row" style="color:var(--text-faint);">No employees yet. Add one from the Employees page.</div>
+        <% } %>
+      </div>
+    </div>
+
+    <div class="section-card col-side">
+      <div class="eyebrow">TODAY'S COMPLETION</div>
+      <div class="donut-wrap">
+        <% const r = 40, circumference = 2 * Math.PI * r, dash = (donutPct / 100) * circumference; %>
+        <svg width="160" height="160" viewBox="0 0 100 100">
+          <circle cx="50" cy="50" r="<%= r %>" fill="none" style="stroke: var(--primary-soft);" stroke-width="10" />
+          <circle cx="50" cy="50" r="<%= r %>" fill="none" style="stroke: var(--primary);" stroke-width="10"
+            stroke-dasharray="<%= dash.toFixed(2) %> <%= circumference.toFixed(2) %>"
+            stroke-linecap="round" transform="rotate(-90 50 50)" />
+          <text x="50" y="56" text-anchor="middle" class="donut-center" style="fill: var(--text);"><%= donutPct %>%</text>
+        </svg>
+        <div class="donut-legend">
+          <span class="legend-item"><span class="legend-dot completed"></span> <%= completed %> Completed</span>
+          <span class="legend-item"><span class="legend-dot pending"></span> <%= pending %> Pending</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="section-card">
+    <div class="section-card-head">
+      <div>
+        <div class="eyebrow">RECENT TASKS</div>
+        <h2>Today's Team Tasks</h2>
+      </div>
+      <a class="view-all" href="/admin/tasks">View all tasks &rsaquo;</a>
+    </div>
+    <div class="table-card" style="box-shadow:none; border:1px solid var(--border);">
+      <table>
+        <thead>
+          <tr><th>Task Name</th><th>Assigned To</th><th>Status</th></tr>
+        </thead>
+        <tbody>
+          <% recentTasks.forEach(function(r) { %>
+            <% const done = r.log.status === 'completed'; %>
+            <tr>
+              <td>
+                <div class="name-cell">
+                  <span class="status-dot <%= done ? 'completed' : 'pending' %>">
+                    <% if (done) { %><svg width="11" height="11" viewBox="0 0 24 24" fill="none"><path d="M20 6L9 17l-5-5" stroke="#fff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg><% } %>
+                  </span>
+                  <span style="<%= done ? 'color:var(--text-faint); text-decoration:line-through;' : '' %>"><%= r.task.title %></span>
+                </div>
+              </td>
+              <td>
+                <div class="name-cell">
+                  <div class="avatar" style="width:26px;height:26px;font-size:11px;"><%= r.employeeName.trim().charAt(0).toUpperCase() %></div>
+                  <%= r.employeeName %>
+                </div>
+              </td>
+              <td>
+                <span class="badge icon-pill <%= done ? 'completed' : 'pending' %>">
+                  <% if (done) { %>
+                    <svg width="11" height="11" viewBox="0 0 24 24" fill="none"><path d="M20 6L9 17l-5-5" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg> Complete
+                  <% } else { %>
+                    <svg width="11" height="11" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="2.4"/><path d="M12 7v5l3.5 2" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg> Pending
+                  <% } %>
+                </span>
+              </td>
+            </tr>
+          <% }) %>
+          <% if (recentTasks.length === 0) { %>
+            <tr class="empty-row"><td colspan="3">No tasks yet today.</td></tr>
+          <% } %>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+<%- include('partials/footer') %>

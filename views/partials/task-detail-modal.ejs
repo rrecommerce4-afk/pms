@@ -1,0 +1,41 @@
+<div class="modal-backdrop" id="taskDetailModal">
+  <div class="modal-box">
+    <div class="modal-head">
+      <h3 id="taskDetailTitle"></h3>
+      <button type="button" class="modal-close" id="taskDetailClose">&times;</button>
+    </div>
+    <div class="modal-body" id="taskDetailBody"></div>
+  </div>
+</div>
+
+<script>
+  (function () {
+    var modal = document.getElementById('taskDetailModal');
+    var titleEl = document.getElementById('taskDetailTitle');
+    var bodyEl = document.getElementById('taskDetailBody');
+    if (!modal) return;
+
+    function open(title, detail) {
+      titleEl.textContent = title;
+      bodyEl.textContent = detail;
+      modal.classList.add('open');
+    }
+    function close() {
+      modal.classList.remove('open');
+    }
+
+    document.querySelectorAll('.details-btn').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        open(btn.getAttribute('data-title'), btn.getAttribute('data-detail'));
+      });
+    });
+
+    document.getElementById('taskDetailClose').addEventListener('click', close);
+    modal.addEventListener('click', function (e) {
+      if (e.target === modal) close();
+    });
+    document.addEventListener('keydown', function (e) {
+      if (e.key === 'Escape') close();
+    });
+  })();
+</script>

@@ -1,0 +1,118 @@
+<%- include('partials/header') %>
+<div class="container">
+  <div class="page-head">
+    <div>
+      <div class="eyebrow-date">ADMIN OVERVIEW</div>
+      <h1><%= heading %></h1>
+      <p><%= subheading %></p>
+    </div>
+    <div class="count-pill">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M9 6h11M9 12h11M9 18h11M4 6h.01M4 12h.01M4 18h.01" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/></svg>
+      <%= String(taskCount).padStart(2, '0') %> Tasks
+    </div>
+  </div>
+  <div class="form-card wide">
+    <div class="form-card-head">
+      <div class="live-avatar">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none"><rect x="5" y="4" width="14" height="17" rx="2" stroke="#fff" stroke-width="2"/><path d="M9 3.5h6a1 1 0 011 1V6H8V4.5a1 1 0 011-1z" stroke="#fff" stroke-width="2"/><path d="M8.5 12.5l2 2 4-4.5" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </div>
+      <div>
+        <h2>Assign New Task</h2>
+        <p class="form-sub">This task will repeat every day and reset at midnight.</p>
+      </div>
+    </div>
+    <% if (error) { %>
+      <div class="error"><%= error %></div>
+    <% } %>
+    <form method="POST" action="/admin/tasks">
+      <div class="field">
+        <label>Title</label>
+        <input type="text" name="title" placeholder="e.g. Update client report" required />
+      </div>
+      <div class="field">
+        <label>Description</label>
+        <textarea name="description" rows="3" placeholder="Optional details..."></textarea>
+      </div>
+      <div class="field">
+        <label>Detailed Instructions (optional)</label>
+        <textarea name="detail" rows="5" placeholder="Step 1: ...&#10;Step 2: ...&#10;Step 3: ..."></textarea>
+      </div>
+      <div class="field">
+        <label>Assign To</label>
+        <% if (employees.length === 0) { %>
+          <div class="empty-picker-hint">No active employees yet. Add one from the Employees page first.</div>
+        <% } else { %>
+          <div class="employee-picker" id="employeePicker">
+            <% employees.forEach(function(emp, i) { %>
+              <label class="employee-card" data-emp="<%= emp.id %>">
+                <input type="radio" name="assignedTo" value="<%= emp.id %>" required />
+                <div class="avatar"><%= emp.name.trim().charAt(0).toUpperCase() %></div>
+                <div class="emp-info">
+                  <div class="emp-name"><%= emp.name %></div>
+                  <div class="emp-dept"><%= emp.department || 'Team Member' %></div>
+                </div>
+              </label>
+            <% }) %>
+          </div>
+        <% } %>
+      </div>
+      <button class="btn" type="submit">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none"><path d="M12 5v14M5 12h14" stroke="#fff" stroke-width="2.3" stroke-linecap="round"/></svg>
+        Add Task
+      </button>
+    </form>
+  </div>
+
+  <script>
+    (function () {
+      var picker = document.getElementById('employeePicker');
+      if (!picker) return;
+      var cards = picker.querySelectorAll('.employee-card');
+      cards.forEach(function (card) {
+        card.querySelector('input[type="radio"]').addEventListener('change', function () {
+          cards.forEach(function (c) { c.classList.remove('selected'); });
+          card.classList.add('selected');
+        });
+      });
+    })();
+  </script>
+
+  <p class="section-title">All Tasks</p>
+  <div class="table-card">
+    <table>
+      <thead>
+        <tr><th>Title</th><th>Description</th><th>Assigned To</th><th></th></tr>
+      </thead>
+      <tbody>
+        <% tasks.forEach(function(t) { %>
+          <tr>
+            <td><strong><%= t.title %></strong></td>
+            <td class="desc-cell"><%= t.description || '—' %></td>
+            <td>
+              <div class="name-cell">
+                <div class="avatar"><%= t.employeeName.trim().charAt(0).toUpperCase() %></div>
+                <%= t.employeeName %>
+              </div>
+            </td>
+            <td>
+              <div style="display:flex; gap:8px;">
+                <% if (t.detail) { %>
+                  <button type="button" class="btn small outline details-btn" data-title="<%= t.title %>" data-detail="<%= t.detail %>">Details</button>
+                <% } %>
+                <form class="inline" method="POST" action="/admin/tasks/<%= t.id %>/delete" onsubmit="return confirm('Remove this task?');">
+                  <button class="btn small danger" type="submit">Remove</button>
+                </form>
+              </div>
+            </td>
+          </tr>
+        <% }) %>
+        <% if (tasks.length === 0) { %>
+          <tr class="empty-row"><td colspan="4">No tasks yet.</td></tr>
+        <% } %>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<%- include('partials/task-detail-modal') %>
+<%- include('partials/footer') %>
