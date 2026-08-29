@@ -4,7 +4,16 @@
       <h3 id="taskDetailTitle"></h3>
       <button type="button" class="modal-close" id="taskDetailClose">&times;</button>
     </div>
-    <div class="modal-body" id="taskDetailBody"></div>
+    <div class="modal-body">
+      <div class="modal-section" id="taskDetailDescSection">
+        <div class="modal-section-label">Description</div>
+        <div id="taskDetailDescription"></div>
+      </div>
+      <div class="modal-section" id="taskDetailInstrSection">
+        <div class="modal-section-label">Detailed Instructions</div>
+        <div id="taskDetailInstructions"></div>
+      </div>
+    </div>
   </div>
 </div>
 
@@ -12,12 +21,26 @@
   (function () {
     var modal = document.getElementById('taskDetailModal');
     var titleEl = document.getElementById('taskDetailTitle');
-    var bodyEl = document.getElementById('taskDetailBody');
+    var descSection = document.getElementById('taskDetailDescSection');
+    var descEl = document.getElementById('taskDetailDescription');
+    var instrSection = document.getElementById('taskDetailInstrSection');
+    var instrEl = document.getElementById('taskDetailInstructions');
     if (!modal) return;
 
-    function open(title, detail) {
+    function open(title, description, detail) {
       titleEl.textContent = title;
-      bodyEl.textContent = detail;
+      if (description) {
+        descEl.textContent = description;
+        descSection.style.display = '';
+      } else {
+        descSection.style.display = 'none';
+      }
+      if (detail) {
+        instrEl.textContent = detail;
+        instrSection.style.display = '';
+      } else {
+        instrSection.style.display = 'none';
+      }
       modal.classList.add('open');
     }
     function close() {
@@ -26,7 +49,7 @@
 
     document.querySelectorAll('.details-btn').forEach(function (btn) {
       btn.addEventListener('click', function () {
-        open(btn.getAttribute('data-title'), btn.getAttribute('data-detail'));
+        open(btn.getAttribute('data-title'), btn.getAttribute('data-description'), btn.getAttribute('data-detail'));
       });
     });
 

@@ -1,5 +1,31 @@
     </main>
   </div>
 </div>
+<script>
+  (function () {
+    var sidebar = document.getElementById('sidebar');
+    var overlay = document.getElementById('sidebarOverlay');
+    var toggle = document.getElementById('menuToggle');
+    if (!sidebar || !overlay || !toggle) return;
+
+    function openMenu() {
+      sidebar.classList.add('open');
+      overlay.classList.add('open');
+    }
+    function closeMenu() {
+      sidebar.classList.remove('open');
+      overlay.classList.remove('open');
+    }
+
+    toggle.addEventListener('click', openMenu);
+    overlay.addEventListener('click', closeMenu);
+    sidebar.querySelectorAll('.nav-link').forEach(function (link) {
+      link.addEventListener('click', closeMenu);
+    });
+    document.addEventListener('keydown', function (e) {
+      if (e.key === 'Escape') closeMenu();
+    });
+  })();
+</script>
 </body>
 </html>

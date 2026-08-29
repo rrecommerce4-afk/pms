@@ -24,6 +24,7 @@
       </div>
     </div>
 
+    <div class="table-scroll">
     <table>
       <thead>
         <tr><th style="width:50px;">No.</th><th>Task Name</th><th>Status</th><th></th></tr>
@@ -53,8 +54,8 @@
               </span>
             </td>
             <td>
-              <% if (r.task.detail) { %>
-                <button type="button" class="btn small outline details-btn" data-title="<%= r.task.title %>" data-detail="<%= r.task.detail %>">Details</button>
+              <% if (r.task.detail || r.task.description) { %>
+                <button type="button" class="btn small outline details-btn" data-title="<%= r.task.title %>" data-description="<%= r.task.description %>" data-detail="<%= r.task.detail %>">Details</button>
               <% } %>
             </td>
           </tr>
@@ -64,6 +65,7 @@
         <% } %>
       </tbody>
     </table>
+    </div>
   </div>
 </div>
 

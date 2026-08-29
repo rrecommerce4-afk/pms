@@ -171,33 +171,36 @@ router.post('/tasks', (req, res) => {
   const { title, description, assignedTo, detail } = req.body;
   const db = load();
   const employees = db.users.filter((u) => u.role === 'employee' && u.active);
+  const assigneeIds = (Array.isArray(assignedTo) ? assignedTo : [assignedTo]).filter(Boolean).map(Number);
 
-  if (!title || !assignedTo) {
+  if (!title || assigneeIds.length === 0) {
     const tasks = db.tasks
       .filter((t) => t.active)
       .map((t) => ({ ...t, employeeName: (db.users.find((u) => u.id === t.assignedTo) || {}).name || 'Unknown' }));
-    return res.render('admin-tasks', { ...taskPageLocals, tasks, employees, taskCount: tasks.length, error: 'Title and assigned employee are required' });
+    return res.render('admin-tasks', { ...taskPageLocals, tasks, employees, taskCount: tasks.length, error: 'Title and at least one assigned employee are required' });
   }
 
-  const newTask = {
-    id: db.nextId.tasks++,
-    title,
-    description: description || '',
-    detail: detail || '',
-    assignedTo: Number(assignedTo),
-    active: true,
-    createdAt: new Date().toISOString()
-  };
-  db.tasks.push(newTask);
-
-  // create today's pending log immediately so it shows up right away
   const today = todayStr();
-  db.taskLogs.push({
-    id: db.nextId.taskLogs++,
-    taskId: newTask.id,
-    date: today,
-    status: 'pending',
-    completedAt: null
+  assigneeIds.forEach((empId) => {
+    const newTask = {
+      id: db.nextId.tasks++,
+      title,
+      description: description || '',
+      detail: detail || '',
+      assignedTo: empId,
+      active: true,
+      createdAt: new Date().toISOString()
+    };
+    db.tasks.push(newTask);
+
+    // create today's pending log immediately so it shows up right away
+    db.taskLogs.push({
+      id: db.nextId.taskLogs++,
+      taskId: newTask.id,
+      date: today,
+      status: 'pending',
+      completedAt: null
+    });
   });
 
   save(db);
