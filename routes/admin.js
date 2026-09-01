@@ -2,7 +2,7 @@ const express = require('express');
 const bcrypt = require('bcryptjs');
 const { load, save, todayStr, ensureTodayLogs, getMissedCount, getMissedTasks, clearMissedTasks } = require('../db');
 const { requireAdmin } = require('../middleware/auth');
-const { chipDateStr, formatIsoDate } = require('../utils');
+const { chipDateStr, formatIsoDate, yesterdayStr } = require('../utils');
 
 const router = express.Router();
 router.use(requireAdmin);
@@ -40,23 +40,32 @@ router.get('/dashboard', (req, res) => {
   const pending = total - completed;
   const donutPct = total ? Math.round((completed / total) * 100) : 0;
 
+  const needsAttention = [...perEmployee].sort((a, b) => b.pending - a.pending);
+
   const recentTasks = perEmployee
     .flatMap((e) => e.logsToday.map((x) => ({ task: x.task, log: x.log, employeeName: e.name })))
     .slice(0, 5);
 
+  const adminCount = db.users.filter((u) => u.role === 'admin' && u.active).length;
+  const totalDailyTasks = db.tasks.filter((t) => t.active).length;
+  const missedYesterday = db.taskLogs.filter((l) => l.date === yesterdayStr(today) && l.status === 'pending').length;
+
   res.render('admin-dashboard', {
     crumb: 'Dashboard',
-    heading: 'Team Dashboard',
-    subheading: 'Aaj ke sabhi team members ke tasks aur progress ka overview.',
+    heading: 'Dashboard',
     chipDate: chipDateStr(),
     today,
     perEmployee,
+    needsAttention,
     total,
     completed,
     pending,
     donutPct,
     recentTasks,
-    employeeCount: employees.length
+    employeeCount: employees.length,
+    adminCount,
+    totalDailyTasks,
+    missedYesterday
   });
 });
 

@@ -55,4 +55,15 @@ function formatIsoDate(isoDate) {
   return `${day} ${month} ${y}`;
 }
 
-module.exports = { greetingWord, topDateStr, firstName, dateBadge, listDateStr, chipDateStr, formatIsoDate, dashboardPathForRole };
+// Given a YYYY-MM-DD string, returns the day before it in the same format.
+function yesterdayStr(todayIso) {
+  const [y, m, d] = todayIso.split('-').map(Number);
+  const dt = new Date(y, m - 1, d);
+  dt.setDate(dt.getDate() - 1);
+  const yy = dt.getFullYear();
+  const mm = String(dt.getMonth() + 1).padStart(2, '0');
+  const dd = String(dt.getDate()).padStart(2, '0');
+  return `${yy}-${mm}-${dd}`;
+}
+
+module.exports = { greetingWord, topDateStr, firstName, dateBadge, listDateStr, chipDateStr, formatIsoDate, yesterdayStr, dashboardPathForRole };
