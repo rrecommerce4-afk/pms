@@ -1,5 +1,5 @@
 <%- include('partials/header') %>
-<div class="container">
+<div class="container container-wide">
   <div class="page-head">
     <div>
       <div class="eyebrow-date">ADMIN OVERVIEW</div>
@@ -14,36 +14,52 @@
     <% } %>
   </div>
 
-  <div class="list-card">
-    <div class="table-scroll">
-    <table>
-      <thead>
-        <tr><th>Employee</th><th>Task</th><th>Date Missed</th></tr>
-      </thead>
-      <tbody>
-        <% rows.forEach(function(r) { %>
-          <tr>
-            <td>
-              <a class="name-cell" style="text-decoration:none; color:inherit;" href="/admin/missed?employee=<%= r.employee.id %>">
-                <div class="avatar"><%= r.employee.name.trim().charAt(0).toUpperCase() %></div>
-                <%= r.employee.name %>
-              </a>
-            </td>
-            <td><%= r.task.title %></td>
-            <td>
-              <span class="badge icon-pill pending">
-                <svg width="11" height="11" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="2.4"/><path d="M12 7v5l3.5 2" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
-                <%= r.dateLabel %>
-              </span>
-            </td>
-          </tr>
-        <% }) %>
-        <% if (rows.length === 0) { %>
-          <tr class="empty-row"><td colspan="3">No missed tasks &mdash; nice and clean!</td></tr>
-        <% } %>
-      </tbody>
-    </table>
-    </div>
+  <div class="missed-summary">
+    <span class="missed-summary-count"><%= rows.length %> missed task<%= rows.length === 1 ? '' : 's' %></span>
+    <span class="missed-summary-sub">Grouped by employee, most recent first.</span>
   </div>
+
+  <% groups.forEach(function(g) { %>
+    <div class="missed-group">
+      <button type="button" class="missed-group-head">
+        <svg class="missed-chevron" width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M6 9l6 6 6-6" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        <div class="avatar"><%= g.employee.name.trim().charAt(0).toUpperCase() %></div>
+        <span class="missed-group-name"><%= g.employee.name %></span>
+        <span class="badge missed-count-pill"><%= g.tasks.length %> missed</span>
+      </button>
+      <div class="missed-group-body">
+        <% g.tasks.forEach(function(r) { %>
+          <div class="missed-task-row">
+            <span class="missed-task-title"><%= r.task.title %></span>
+            <span class="badge icon-pill pending">
+              <svg width="11" height="11" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="2.4"/><path d="M12 7v5l3.5 2" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
+              <%= r.dateLabel %>
+            </span>
+          </div>
+        <% }) %>
+      </div>
+    </div>
+  <% }) %>
+
+  <% if (groups.length === 0) { %>
+    <div class="list-card">
+      <div class="table-scroll">
+        <table>
+          <tbody>
+            <tr class="empty-row"><td>No missed tasks &mdash; nice and clean!</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  <% } %>
 </div>
+<script>
+  (function () {
+    document.querySelectorAll('.missed-group-head').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        btn.closest('.missed-group').classList.toggle('collapsed');
+      });
+    });
+  })();
+</script>
 <%- include('partials/footer') %>

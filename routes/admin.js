@@ -70,6 +70,19 @@ router.get('/missed', (req, res) => {
   const rows = getMissedTasks(db, today, employeeId).map((r) => ({ ...r, dateLabel: formatIsoDate(r.log.date) }));
   const filteredEmployee = employeeId ? db.users.find((u) => u.id === employeeId) : null;
 
+  // Group rows by employee, preserving the most-recent-first order already applied to `rows`.
+  const groups = [];
+  const groupByEmployeeId = new Map();
+  rows.forEach((r) => {
+    let group = groupByEmployeeId.get(r.employee.id);
+    if (!group) {
+      group = { employee: r.employee, tasks: [] };
+      groupByEmployeeId.set(r.employee.id, group);
+      groups.push(group);
+    }
+    group.tasks.push(r);
+  });
+
   res.render('admin-missed', {
     crumb: 'Missed Tasks',
     heading: 'Missed Tasks',
@@ -77,7 +90,9 @@ router.get('/missed', (req, res) => {
       ? `${filteredEmployee.name} ke incomplete tasks jo unke din khatam hone tak complete nahi hue.`
       : 'Sabhi employees ke incomplete tasks jo unke din khatam hone tak complete nahi hue.',
     rows,
-    filteredEmployee
+    groups,
+    filteredEmployee,
+    asOfDate: chipDateStr()
   });
 });
 
@@ -91,11 +106,11 @@ const employeesPageLocals = {
 
 router.get('/employees', (req, res) => {
   const db = load();
-  const users = db.users;
+  const users = db.users.filter((u) => u.active);
   res.render('admin-employees', {
     ...employeesPageLocals,
     users,
-    userCount: users.filter((u) => u.active).length,
+    userCount: users.length,
     error: req.query.error || null
   });
 });
@@ -106,14 +121,12 @@ router.post('/employees', (req, res) => {
   const finalRole = role === 'admin' || role === 'viewer' ? role : 'employee';
 
   if (!name || !email || !password) {
-    const users = db.users;
-    return res.render('admin-employees', { ...employeesPageLocals, users, userCount: users.filter((u) => u.active).length, error: 'All fields are required' });
+    return res.redirect('/admin/employees?error=' + encodeURIComponent('Full name, email, and password are required.'));
   }
 
   const exists = db.users.some((u) => u.email.toLowerCase() === email.toLowerCase());
   if (exists) {
-    const users = db.users;
-    return res.render('admin-employees', { ...employeesPageLocals, users, userCount: users.filter((u) => u.active).length, error: 'Email already in use' });
+    return res.redirect('/admin/employees?error=' + encodeURIComponent('Email already in use.'));
   }
 
   db.users.push({
@@ -125,6 +138,41 @@ router.post('/employees', (req, res) => {
     department: finalRole === 'employee' ? (department || 'Team Member') : undefined,
     active: true
   });
+  save(db);
+  res.redirect('/admin/employees');
+});
+
+router.post('/employees/:id/edit', (req, res) => {
+  const { name, email, password, department, role } = req.body;
+  const db = load();
+  const targetId = Number(req.params.id);
+  const user = db.users.find((u) => u.id === targetId);
+
+  if (!user) return res.redirect('/admin/employees?error=' + encodeURIComponent('User not found.'));
+  if (!name || !email) {
+    return res.redirect('/admin/employees?error=' + encodeURIComponent('Full name and email are required.'));
+  }
+
+  const finalRole = role === 'admin' || role === 'viewer' ? role : 'employee';
+
+  const emailTaken = db.users.some((u) => u.id !== targetId && u.email.toLowerCase() === email.toLowerCase());
+  if (emailTaken) {
+    return res.redirect('/admin/employees?error=' + encodeURIComponent('Email already in use.'));
+  }
+
+  if (user.role === 'admin' && finalRole !== 'admin') {
+    const activeAdmins = db.users.filter((u) => u.role === 'admin' && u.active);
+    if (activeAdmins.length <= 1) {
+      return res.redirect('/admin/employees?error=' + encodeURIComponent('At least one admin must remain.'));
+    }
+  }
+
+  user.name = name;
+  user.email = email;
+  user.role = finalRole;
+  user.department = finalRole === 'employee' ? (department || 'Team Member') : undefined;
+  if (password) user.passwordHash = bcrypt.hashSync(password, 10);
+
   save(db);
   res.redirect('/admin/employees');
 });
@@ -156,28 +204,33 @@ router.post('/employees/:id/delete', (req, res) => {
 
 // ---- Tasks ----
 
-const taskPageLocals = { crumb: 'Tasks', heading: 'Daily Tasks', subheading: 'Employees ko daily tasks assign karein.' };
+const taskPageLocals = { crumb: 'Tasks', heading: 'Tasks', subheading: 'Employees ko daily tasks assign karein.' };
 
-router.get('/tasks', (req, res) => {
-  const db = load();
+function buildTasksViewData(db) {
   const employees = db.users.filter((u) => u.role === 'employee' && u.active);
   const tasks = db.tasks
     .filter((t) => t.active)
     .map((t) => ({ ...t, employeeName: (db.users.find((u) => u.id === t.assignedTo) || {}).name || 'Unknown' }));
-  res.render('admin-tasks', { ...taskPageLocals, tasks, employees, taskCount: tasks.length, error: null });
+  const groups = employees
+    .map((emp) => ({ employee: emp, tasks: tasks.filter((t) => t.assignedTo === emp.id) }))
+    .filter((g) => g.tasks.length > 0);
+  return { employees, tasks, groups };
+}
+
+router.get('/tasks', (req, res) => {
+  const db = load();
+  const { employees, tasks, groups } = buildTasksViewData(db);
+  res.render('admin-tasks', { ...taskPageLocals, tasks, employees, groups, taskCount: tasks.length, error: null });
 });
 
 router.post('/tasks', (req, res) => {
   const { title, description, assignedTo, detail } = req.body;
   const db = load();
-  const employees = db.users.filter((u) => u.role === 'employee' && u.active);
   const assigneeIds = (Array.isArray(assignedTo) ? assignedTo : [assignedTo]).filter(Boolean).map(Number);
 
   if (!title || assigneeIds.length === 0) {
-    const tasks = db.tasks
-      .filter((t) => t.active)
-      .map((t) => ({ ...t, employeeName: (db.users.find((u) => u.id === t.assignedTo) || {}).name || 'Unknown' }));
-    return res.render('admin-tasks', { ...taskPageLocals, tasks, employees, taskCount: tasks.length, error: 'Title and at least one assigned employee are required' });
+    const { employees, tasks, groups } = buildTasksViewData(db);
+    return res.render('admin-tasks', { ...taskPageLocals, tasks, employees, groups, taskCount: tasks.length, error: 'Title and at least one assigned employee are required' });
   }
 
   const today = todayStr();
