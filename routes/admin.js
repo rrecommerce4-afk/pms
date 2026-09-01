@@ -1,6 +1,6 @@
 const express = require('express');
 const bcrypt = require('bcryptjs');
-const { load, save, todayStr, ensureTodayLogs, getMissedCount, getMissedTasks } = require('../db');
+const { load, save, todayStr, ensureTodayLogs, getMissedCount, getMissedTasks, clearMissedTasks } = require('../db');
 const { requireAdmin } = require('../middleware/auth');
 const { chipDateStr, formatIsoDate } = require('../utils');
 
@@ -94,6 +94,15 @@ router.get('/missed', (req, res) => {
     filteredEmployee,
     asOfDate: chipDateStr()
   });
+});
+
+router.post('/missed/clear', (req, res) => {
+  const db = load();
+  const today = todayStr();
+  const employeeId = req.body.employee ? Number(req.body.employee) : null;
+
+  clearMissedTasks(db, today, employeeId);
+  res.redirect(employeeId ? `/admin/missed?employee=${employeeId}` : '/admin/missed');
 });
 
 // ---- Employees / Users (admin can add more admins here too) ----

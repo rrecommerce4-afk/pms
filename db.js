@@ -93,6 +93,23 @@ function getMissedTasks(db, today, userId) {
     .sort((a, b) => (a.log.date < b.log.date ? 1 : -1));
 }
 
+// Wipes out the missed-task backlog: deletes every past-day "pending" log so it
+// stops counting toward getMissedCount/getMissedTasks and the calendar dot for
+// that day goes back to "none" instead of red. Pass userId to clear just one
+// employee's backlog, or leave it null to clear everyone's. Returns how many
+// logs were removed.
+function clearMissedTasks(db, today, userId) {
+  const before = db.taskLogs.length;
+  db.taskLogs = db.taskLogs.filter((l) => {
+    if (l.date >= today || l.status !== 'pending') return true;
+    if (!userId) return false;
+    const task = db.tasks.find((t) => t.id === l.taskId);
+    return !(task && task.assignedTo === userId);
+  });
+  save(db);
+  return before - db.taskLogs.length;
+}
+
 function seedAdminIfNeeded() {
   const db = load();
   if (db.users.length === 0) {
@@ -110,4 +127,4 @@ function seedAdminIfNeeded() {
   }
 }
 
-module.exports = { load, save, todayStr, ensureTodayLogs, getMissedCount, getMissedTasks, seedAdminIfNeeded };
+module.exports = { load, save, todayStr, ensureTodayLogs, getMissedCount, getMissedTasks, clearMissedTasks, seedAdminIfNeeded };

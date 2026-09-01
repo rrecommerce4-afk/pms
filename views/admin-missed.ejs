@@ -6,12 +6,23 @@
       <h1><%= heading %><% if (filteredEmployee) { %> &mdash; <%= filteredEmployee.name %><% } %></h1>
       <p><%= subheading %></p>
     </div>
-    <% if (filteredEmployee) { %>
-      <a class="count-pill" href="/admin/missed">
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M18 6L6 18M6 6l12 12" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/></svg>
-        Clear filter
-      </a>
-    <% } %>
+    <div style="display:flex; gap:10px; align-items:center;">
+      <% if (filteredEmployee) { %>
+        <a class="count-pill" href="/admin/missed">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M18 6L6 18M6 6l12 12" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/></svg>
+          Clear filter
+        </a>
+      <% } %>
+      <% if (groups.length > 0) { %>
+        <form method="POST" action="/admin/missed/clear" id="clear-missed-form">
+          <% if (filteredEmployee) { %><input type="hidden" name="employee" value="<%= filteredEmployee.id %>"><% } %>
+          <button type="submit" class="count-pill" style="border:none; cursor:pointer;">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            <%= filteredEmployee ? `Clear ${filteredEmployee.name}'s missed` : 'Clear all missed' %>
+          </button>
+        </form>
+      <% } %>
+    </div>
   </div>
 
   <div class="missed-summary">
@@ -60,6 +71,15 @@
         btn.closest('.missed-group').classList.toggle('collapsed');
       });
     });
+
+    var clearForm = document.getElementById('clear-missed-form');
+    if (clearForm) {
+      clearForm.addEventListener('submit', function (e) {
+        if (!confirm('This permanently deletes this missed-task history. Continue?')) {
+          e.preventDefault();
+        }
+      });
+    }
   })();
 </script>
 <%- include('partials/footer') %>
