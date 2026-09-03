@@ -22,6 +22,10 @@
         <span class="legend-item"><span class="legend-dot completed"></span> <%= completed %> Complete</span>
         <span class="legend-item"><span class="legend-dot pending"></span> <%= pending %> Pending</span>
       </div>
+      <button type="button" class="btn" id="openAdditionalTaskModal">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none"><path d="M12 5v14M5 12h14" stroke="#fff" stroke-width="2.3" stroke-linecap="round"/></svg>
+        Add Additional Task
+      </button>
     </div>
 
     <div class="table-scroll">
@@ -42,6 +46,9 @@
                   </button>
                 </form>
                 <span class="<%= done ? 'is-complete' : '' %>" style="<%= done ? 'color:var(--text-faint); text-decoration:line-through;' : '' %>"><%= r.task.title %></span>
+                <% if (r.task.source === 'employee') { %>
+                  <span class="badge info">Additional</span>
+                <% } %>
               </div>
             </td>
             <td>
@@ -68,6 +75,53 @@
     </div>
   </div>
 </div>
+
+<div class="modal-backdrop <%= error ? 'open' : '' %>" id="additionalTaskModal">
+  <div class="modal-box">
+    <div class="modal-head">
+      <h3>Add Additional Task</h3>
+      <button type="button" class="modal-close" id="additionalTaskClose">&times;</button>
+    </div>
+    <div class="modal-body">
+      <p class="form-sub" style="margin:-8px 0 16px;">Log a task you worked on that wasn't formally assigned to you.</p>
+      <% if (error) { %>
+        <div class="error"><%= error %></div>
+      <% } %>
+      <form method="POST" action="/employee/tasks/additional">
+        <div class="field">
+          <label>Title</label>
+          <input type="text" name="title" placeholder="e.g. Helped onboard a new client" required />
+        </div>
+        <div class="field">
+          <label>Description</label>
+          <textarea name="description" rows="3" placeholder="Optional details..."></textarea>
+        </div>
+        <div class="field">
+          <label>Detailed Notes (optional)</label>
+          <textarea name="detail" rows="5" placeholder="Any extra notes..."></textarea>
+        </div>
+        <button class="btn block" type="submit">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none"><path d="M12 5v14M5 12h14" stroke="#fff" stroke-width="2.3" stroke-linecap="round"/></svg>
+          Add Task
+        </button>
+      </form>
+    </div>
+  </div>
+</div>
+
+<script>
+  (function () {
+    var modal = document.getElementById('additionalTaskModal');
+    var openBtn = document.getElementById('openAdditionalTaskModal');
+    var closeBtn = document.getElementById('additionalTaskClose');
+    if (modal && openBtn) {
+      openBtn.addEventListener('click', function () { modal.classList.add('open'); });
+      closeBtn.addEventListener('click', function () { modal.classList.remove('open'); });
+      modal.addEventListener('click', function (e) { if (e.target === modal) modal.classList.remove('open'); });
+      document.addEventListener('keydown', function (e) { if (e.key === 'Escape') modal.classList.remove('open'); });
+    }
+  })();
+</script>
 
 <%- include('partials/task-detail-modal') %>
 <%- include('partials/footer') %>

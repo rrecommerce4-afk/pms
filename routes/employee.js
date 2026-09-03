@@ -66,8 +66,42 @@ router.get('/tasks', requireEmployee, (req, res) => {
     total,
     completed,
     pending,
-    missedCount
+    missedCount,
+    error: req.query.error || null
   });
+});
+
+router.post('/tasks/additional', requireEmployee, (req, res) => {
+  const { title, description, detail } = req.body;
+  const db = load();
+
+  if (!title || !title.trim()) {
+    return res.redirect('/employee/tasks?error=' + encodeURIComponent('Title is required.'));
+  }
+
+  const today = todayStr();
+  const newTask = {
+    id: db.nextId.tasks++,
+    title: title.trim(),
+    description: description || '',
+    detail: detail || '',
+    assignedTo: req.session.userId,
+    source: 'employee',
+    active: true,
+    createdAt: new Date().toISOString()
+  };
+  db.tasks.push(newTask);
+
+  db.taskLogs.push({
+    id: db.nextId.taskLogs++,
+    taskId: newTask.id,
+    date: today,
+    status: 'pending',
+    completedAt: null
+  });
+
+  save(db);
+  res.redirect('/employee/tasks');
 });
 
 router.post('/tasks/:logId/toggle', requireEmployee, (req, res) => {

@@ -30,7 +30,12 @@
         <div class="task-board-card-body">
           <% g.tasks.forEach(function(t) { %>
             <div class="task-board-item">
-              <div class="task-board-item-title"><%= t.title %></div>
+              <div class="task-board-item-title">
+                <%= t.title %>
+                <% if (t.source === 'employee') { %>
+                  <span class="badge info" style="margin-left:8px;">Additional</span>
+                <% } %>
+              </div>
               <% if (t.description) { %><div class="task-board-item-desc"><%= t.description %></div><% } %>
               <div class="task-board-item-actions">
                 <% if (t.detail) { %>

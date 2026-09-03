@@ -259,6 +259,7 @@ router.post('/tasks', (req, res) => {
       description: description || '',
       detail: detail || '',
       assignedTo: empId,
+      source: 'admin',
       active: true,
       createdAt: new Date().toISOString()
     };
