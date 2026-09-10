@@ -1,0 +1,70 @@
+<%- include('partials/header') %>
+<div class="container container-wide">
+  <div class="page-head">
+    <div>
+      <div class="eyebrow-date">ADMIN OVERVIEW</div>
+      <h1><%= heading %></h1>
+      <p>Task completion aur team performance ka summary.</p>
+    </div>
+  </div>
+
+  <div class="report-grid">
+    <div class="report-card">
+      <div class="report-card-title">Tasks by Status</div>
+      <% reports.byStatus.forEach(function (r) { %>
+        <% var colorMap = { todo: 'var(--text-faint)', progress: 'var(--info)', review: 'var(--purple)', changes: 'var(--warning)', blocked: 'var(--danger)', completed: 'var(--success)' }; %>
+        <div class="bar-row">
+          <div class="bar-row-label"><%= r.label %></div>
+          <div class="bar-row-track"><div class="bar-row-fill" style="width:<%= r.pct %>%;background:<%= colorMap[r.key] %>;"></div></div>
+          <div class="bar-row-val"><%= r.count %></div>
+        </div>
+      <% }) %>
+    </div>
+
+    <div class="report-card">
+      <div class="report-card-title">Completed Tasks by Employee</div>
+      <% if (reports.completedByEmployee.length) { %>
+        <% reports.completedByEmployee.forEach(function (r) { %>
+          <div class="bar-row">
+            <div class="bar-row-label"><%= r.label %></div>
+            <div class="bar-row-track"><div class="bar-row-fill" style="width:<%= r.pct %>%;background:var(--primary);"></div></div>
+            <div class="bar-row-val"><%= r.count %></div>
+          </div>
+        <% }) %>
+      <% } else { %>
+        <div class="empty-state-sub">No employees yet.</div>
+      <% } %>
+    </div>
+
+    <div class="report-card">
+      <div class="report-card-title">Task Health</div>
+      <div class="bar-row">
+        <div class="bar-row-label">Completed</div>
+        <div class="bar-row-track"><div class="bar-row-fill" style="width:<%= reports.completedPct %>%;background:var(--success);"></div></div>
+        <div class="bar-row-val"><%= reports.completedCount %></div>
+      </div>
+      <div class="bar-row">
+        <div class="bar-row-label">Overdue now</div>
+        <div class="bar-row-track"><div class="bar-row-fill" style="width:<%= reports.overduePct %>%;background:var(--danger);"></div></div>
+        <div class="bar-row-val"><%= reports.overdueCount %></div>
+      </div>
+    </div>
+
+    <div class="report-card">
+      <div class="report-card-title">Active Load by Employee</div>
+      <% if (reports.activeByEmployee.length) { %>
+        <% reports.activeByEmployee.forEach(function (r) { %>
+          <div class="bar-row">
+            <div class="bar-row-label"><%= r.label %></div>
+            <div class="bar-row-track"><div class="bar-row-fill" style="width:<%= r.pct %>%;background:var(--info);"></div></div>
+            <div class="bar-row-val"><%= r.count %></div>
+          </div>
+        <% }) %>
+      <% } else { %>
+        <div class="empty-state-sub">No employees yet.</div>
+      <% } %>
+    </div>
+  </div>
+</div>
+<%- include('partials/task-modal') %>
+<%- include('partials/footer') %>

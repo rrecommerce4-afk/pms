@@ -1,59 +1,58 @@
 <%- include('partials/header') %>
-<div class="container">
+<div class="container container-wide">
   <div class="page-head">
     <div>
       <div class="eyebrow-date">VIEWER</div>
       <h1><%= heading %></h1>
       <p><%= subheading %></p>
     </div>
-    <div class="legend">
-      <span class="legend-item"><span class="legend-dot completed"></span> All completed</span>
-      <span class="legend-item"><span class="legend-dot red"></span> Missed one or more</span>
-      <span class="legend-item"><span class="legend-dot none"></span> No tasks that day</span>
+  </div>
+
+  <div class="summary-row">
+    <div class="sum-card">
+      <div class="sum-card-top"><span class="sum-label">Total Tasks</span><div class="sum-icon" style="background:var(--info-soft);"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--info)" stroke-width="2"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"/></svg></div></div>
+      <div class="sum-value"><%= summary.total %></div><div class="sum-sub"><%= summary.employeeCount %> employees</div>
+    </div>
+    <div class="sum-card">
+      <div class="sum-card-top"><span class="sum-label">In Progress</span><div class="sum-icon" style="background:var(--info-soft);"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--info)" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 3"/></svg></div></div>
+      <div class="sum-value"><%= summary.inProgress %></div><div class="sum-sub">Active right now</div>
+    </div>
+    <div class="sum-card">
+      <div class="sum-card-top"><span class="sum-label">Pending Review</span><div class="sum-icon" style="background:var(--purple-soft);"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--purple)" stroke-width="2"><path d="M12 20h9M16.5 3.5a2.1 2.1 0 013 3L7 19l-4 1 1-4z"/></svg></div></div>
+      <div class="sum-value"><%= summary.pendingReview %></div><div class="sum-sub">Awaiting admin</div>
+    </div>
+    <div class="sum-card<%= summary.overdue ? ' warn' : '' %>">
+      <div class="sum-card-top"><span class="sum-label">Overdue</span><div class="sum-icon" style="background:var(--danger-soft);"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--danger)" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 8v5M12 16h.01"/></svg></div></div>
+      <div class="sum-value"><%= summary.overdue %></div><div class="sum-sub">Past due date</div>
+    </div>
+    <div class="sum-card">
+      <div class="sum-card-top"><span class="sum-label">Completed</span><div class="sum-icon" style="background:var(--success-soft);"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--success)" stroke-width="2"><path d="M20 6L9 17l-5-5"/></svg></div></div>
+      <div class="sum-value"><%= summary.completed %></div><div class="sum-sub">All time</div>
     </div>
   </div>
 
-  <div class="table-card">
-    <% if (days.length === 0) { %>
-      <div class="empty-row" style="padding:40px 20px; text-align:center; color:var(--text-faint);">
-        No completed days yet this month &mdash; check back tomorrow.
+  <div class="split-row">
+    <div class="section-card col-main" style="padding:0;">
+      <div class="list-card-head section-card-head"><h2>All Tasks <span class="tag-count"><%= filtered.length %></span></h2></div>
+      <%- include('partials/task-table', { tasks: filtered, showAssignee: true, showDelete: false, pageUrl: pageUrl, emptyTitle: 'No tasks found.' }) %>
+    </div>
+    <div class="section-card col-side" style="padding:0;">
+      <div class="list-card-head section-card-head"><h2>Team Workload</h2></div>
+      <div class="workload-list">
+        <% if (workload.length) { %>
+          <% workload.forEach(function (r) { %>
+            <div class="wl-row">
+              <div class="wl-avatar"><%= r.employee.name.trim().split(/\s+/).map(function (w) { return w[0]; }).join('').slice(0, 2).toUpperCase() %></div>
+              <div><div class="wl-name"><%= r.employee.name %></div><div class="wl-role"><%= r.employee.department || 'Team Member' %></div></div>
+              <div class="wl-bar-wrap"><div class="wl-bar-track"><div class="wl-bar-fill" style="width:<%= r.pct %>%;"></div></div><div class="wl-bar-label"><%= r.active %> active</div></div>
+            </div>
+          <% }) %>
+        <% } else { %>
+          <div class="empty-state"><div class="empty-state-title">No employees yet.</div></div>
+        <% } %>
       </div>
-    <% } else if (rows.length === 0) { %>
-      <div class="empty-row" style="padding:40px 20px; text-align:center; color:var(--text-faint);">
-        No employees yet.
-      </div>
-    <% } else { %>
-      <div class="month-grid-scroll">
-        <table class="month-grid">
-          <thead>
-            <tr>
-              <th class="emp-head">Employee</th>
-              <% days.forEach(function(d) { %>
-                <th><%= d %></th>
-              <% }) %>
-            </tr>
-          </thead>
-          <tbody>
-            <% rows.forEach(function(r) { %>
-              <tr>
-                <td class="emp-cell">
-                  <div class="name-cell">
-                    <div class="avatar"><%= r.name.trim().charAt(0).toUpperCase() %></div>
-                    <div>
-                      <div class="cell-name"><%= r.name %></div>
-                      <div class="cell-dept"><%= r.department %></div>
-                    </div>
-                  </div>
-                </td>
-                <% r.cells.forEach(function(c) { %>
-                  <td><span class="day-dot <%= c.status %>" title="Day <%= c.day %>: <%= c.status === 'green' ? 'all tasks completed' : c.status === 'red' ? 'missed one or more tasks' : 'no tasks assigned' %>"></span></td>
-                <% }) %>
-              </tr>
-            <% }) %>
-          </tbody>
-        </table>
-      </div>
-    <% } %>
+    </div>
   </div>
 </div>
+<%- include('partials/task-detail') %>
 <%- include('partials/footer') %>

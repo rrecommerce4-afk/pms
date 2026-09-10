@@ -1,0 +1,15 @@
+<%
+  var __vtParams = new URLSearchParams();
+  if (typeof filters !== 'undefined' && filters.q) __vtParams.set('q', filters.q);
+  if (typeof filters !== 'undefined' && filters.due && filters.due !== 'all') __vtParams.set('due', filters.due);
+  if (typeof filters !== 'undefined' && filters.employee && filters.employee !== 'all') __vtParams.set('employee', filters.employee);
+  function __vtUrl(mode) {
+    var p = new URLSearchParams(__vtParams);
+    p.set('view', mode);
+    return basePath + '?' + p.toString();
+  }
+%>
+<div class="view-toggle">
+  <a class="<%= (!filters.view || filters.view === 'list') ? 'active' : '' %>" href="<%= __vtUrl('list') %>">List</a>
+  <a class="<%= filters.view === 'kanban' ? 'active' : '' %>" href="<%= __vtUrl('kanban') %>">Kanban</a>
+</div>

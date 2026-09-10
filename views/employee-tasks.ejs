@@ -1,127 +1,24 @@
 <%- include('partials/header') %>
-<div class="container">
+<div class="container container-wide">
   <div class="page-head">
     <div>
       <div class="eyebrow-date">MY WORK</div>
       <h1><%= heading %></h1>
-      <p><%= subheading %></p>
-    </div>
-    <div class="count-pill">
-      <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M9 6h11M9 12h11M9 18h11M4 6h.01M4 12h.01M4 18h.01" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/></svg>
-      <%= String(total).padStart(2, '0') %> Tasks
+      <p>Aapko assign kiye gaye saare tasks &mdash; repeat schedule ke hisab se grouped.</p>
     </div>
   </div>
 
   <div class="list-card">
     <div class="list-card-head section-card-head">
-      <div>
-        <div class="eyebrow"><%= listDate %></div>
-        <h2>Task List</h2>
-      </div>
-      <div class="legend">
-        <span class="legend-item"><span class="legend-dot completed"></span> <%= completed %> Complete</span>
-        <span class="legend-item"><span class="legend-dot pending"></span> <%= pending %> Pending</span>
-      </div>
-      <button type="button" class="btn" id="openAdditionalTaskModal">
-        <svg width="15" height="15" viewBox="0 0 24 24" fill="none"><path d="M12 5v14M5 12h14" stroke="#fff" stroke-width="2.3" stroke-linecap="round"/></svg>
-        Add Additional Task
-      </button>
+      <h2>Assigned to Me <span class="tag-count"><%= filtered.length %></span></h2>
+      <%- include('partials/view-toggle', { basePath: '/employee/tasks' }) %>
     </div>
-
-    <div class="table-scroll">
-    <table>
-      <thead>
-        <tr><th style="width:50px;">No.</th><th>Task Name</th><th>Status</th><th></th></tr>
-      </thead>
-      <tbody>
-        <% rows.forEach(function(r, i) { %>
-          <% const done = r.log.status === 'completed'; %>
-          <tr>
-            <td class="row-num"><%= String(i + 1).padStart(2, '0') %></td>
-            <td>
-              <div class="name-cell">
-                <form class="inline" method="POST" action="/employee/tasks/<%= r.log.id %>/toggle">
-                  <button type="submit" class="status-dot <%= done ? 'completed' : 'pending' %>" title="<%= done ? 'Mark as pending' : 'Mark as complete' %>">
-                    <% if (done) { %><svg width="11" height="11" viewBox="0 0 24 24" fill="none"><path d="M20 6L9 17l-5-5" stroke="#fff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg><% } %>
-                  </button>
-                </form>
-                <span class="<%= done ? 'is-complete' : '' %>" style="<%= done ? 'color:var(--text-faint); text-decoration:line-through;' : '' %>"><%= r.task.title %></span>
-                <% if (r.task.source === 'employee') { %>
-                  <span class="badge info">Additional</span>
-                <% } %>
-              </div>
-            </td>
-            <td>
-              <span class="badge icon-pill <%= done ? 'completed' : 'pending' %>">
-                <% if (done) { %>
-                  <svg width="11" height="11" viewBox="0 0 24 24" fill="none"><path d="M20 6L9 17l-5-5" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg> Complete
-                <% } else { %>
-                  <svg width="11" height="11" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="2.4"/><path d="M12 7v5l3.5 2" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg> Pending
-                <% } %>
-              </span>
-            </td>
-            <td>
-              <% if (r.task.detail || r.task.description) { %>
-                <button type="button" class="btn small outline details-btn" data-title="<%= r.task.title %>" data-description="<%= r.task.description %>" data-detail="<%= r.task.detail %>">Details</button>
-              <% } %>
-            </td>
-          </tr>
-        <% }) %>
-        <% if (rows.length === 0) { %>
-          <tr class="empty-row"><td colspan="4">No tasks assigned for today.</td></tr>
-        <% } %>
-      </tbody>
-    </table>
-    </div>
+    <% if (filters.view === 'kanban') { %>
+      <%- include('partials/kanban', { tasks: filtered, showAssignee: false, pageUrl: pageUrl }) %>
+    <% } else { %>
+      <%- include('partials/task-groups', { groups: groups, pageUrl: pageUrl }) %>
+    <% } %>
   </div>
 </div>
-
-<div class="modal-backdrop <%= error ? 'open' : '' %>" id="additionalTaskModal">
-  <div class="modal-box">
-    <div class="modal-head">
-      <h3>Add Additional Task</h3>
-      <button type="button" class="modal-close" id="additionalTaskClose">&times;</button>
-    </div>
-    <div class="modal-body">
-      <p class="form-sub" style="margin:-8px 0 16px;">Log a task you worked on that wasn't formally assigned to you.</p>
-      <% if (error) { %>
-        <div class="error"><%= error %></div>
-      <% } %>
-      <form method="POST" action="/employee/tasks/additional">
-        <div class="field">
-          <label>Title</label>
-          <input type="text" name="title" placeholder="e.g. Helped onboard a new client" required />
-        </div>
-        <div class="field">
-          <label>Description</label>
-          <textarea name="description" rows="3" placeholder="Optional details..."></textarea>
-        </div>
-        <div class="field">
-          <label>Detailed Notes (optional)</label>
-          <textarea name="detail" rows="5" placeholder="Any extra notes..."></textarea>
-        </div>
-        <button class="btn block" type="submit">
-          <svg width="15" height="15" viewBox="0 0 24 24" fill="none"><path d="M12 5v14M5 12h14" stroke="#fff" stroke-width="2.3" stroke-linecap="round"/></svg>
-          Add Task
-        </button>
-      </form>
-    </div>
-  </div>
-</div>
-
-<script>
-  (function () {
-    var modal = document.getElementById('additionalTaskModal');
-    var openBtn = document.getElementById('openAdditionalTaskModal');
-    var closeBtn = document.getElementById('additionalTaskClose');
-    if (modal && openBtn) {
-      openBtn.addEventListener('click', function () { modal.classList.add('open'); });
-      closeBtn.addEventListener('click', function () { modal.classList.remove('open'); });
-      modal.addEventListener('click', function (e) { if (e.target === modal) modal.classList.remove('open'); });
-      document.addEventListener('keydown', function (e) { if (e.key === 'Escape') modal.classList.remove('open'); });
-    }
-  })();
-</script>
-
-<%- include('partials/task-detail-modal') %>
+<%- include('partials/task-detail') %>
 <%- include('partials/footer') %>

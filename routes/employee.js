@@ -1,128 +1,188 @@
 const express = require('express');
-const { load, save, todayStr, ensureTodayLogs, getMissedCount } = require('../db');
+const { load, save, todayStr, logActivity } = require('../db');
 const { requireEmployee } = require('../middleware/auth');
-const { greetingWord, firstName, listDateStr } = require('../utils');
+const { greetingWord, firstName } = require('../utils');
+const T = require('../lib/tasks');
 
 const router = express.Router();
+router.use(requireEmployee);
 
-function getMyRows(db, userId, today) {
-  const myTasks = db.tasks.filter((t) => t.assignedTo === userId && t.active);
-  return myTasks
-    .map((task) => {
-      const log = db.taskLogs.find((l) => l.taskId === task.id && l.date === today);
-      return { task, log };
-    })
-    .filter((r) => r.log);
+function pageUrl(req) {
+  const params = new URLSearchParams();
+  ['q', 'view'].forEach((k) => { if (req.query[k]) params.set(k, req.query[k]); });
+  const qs = params.toString();
+  return req.baseUrl + req.path + (qs ? '?' + qs : '');
 }
 
-router.get('/dashboard', requireEmployee, (req, res) => {
-  ensureTodayLogs();
+function loadCommon(req) {
   const db = load();
   const today = todayStr();
-  const rows = getMyRows(db, req.session.userId, today);
+  const mine = db.tasks.filter((t) => t.assignedTo === req.session.userId);
+  const decorated = T.decorateAll(mine, db.users, today);
+  return { db, today, decorated };
+}
 
-  const total = rows.length;
-  const completed = rows.filter((r) => r.log.status === 'completed').length;
-  const pending = total - completed;
-  const missedCount = getMissedCount(db, req.session.userId, today);
-  const pct = total ? Math.round((completed / total) * 100) : 0;
-  const quickRows = rows.slice(0, 5);
+function openTask(req, db, today) {
+  const id = req.query.task ? Number(req.query.task) : null;
+  if (!id) return null;
+  const t = db.tasks.find((x) => x.id === id && x.assignedTo === req.session.userId);
+  return t ? T.decorate(t, db.users, today) : null;
+}
+
+function myTask(db, id, userId) {
+  const t = db.tasks.find((x) => x.id === Number(id));
+  return t && t.assignedTo === userId ? t : null;
+}
+
+router.use((req, res, next) => {
+  const db = load();
+  res.locals.navCounts = { myTasks: db.tasks.filter((t) => t.assignedTo === req.session.userId).length };
+  next();
+});
+
+router.get('/dashboard', (req, res) => {
+  const { db, today, decorated } = loadCommon(req);
+  const q = (req.query.q || '').trim();
+  const filters = { q, view: req.query.view === 'kanban' ? 'kanban' : 'list' };
+  const taskListTasks = T.filterTasks(decorated, { q }, today);
 
   res.render('employee-dashboard', {
-    name: req.session.name,
     crumb: 'Dashboard',
     heading: `${greetingWord()}, ${firstName(req.session.name)}`,
-    subheading: 'Yeh raha aapke tasks ka aaj ka overview.',
-    today,
-    total,
-    completed,
-    pending,
-    missedCount,
-    pct,
-    quickRows,
-    hasMore: rows.length > quickRows.length
+    filters, pageUrl: pageUrl(req),
+    summary: T.employeeSummaryCards(decorated),
+    focus: decorated.filter((t) => t.status === 'todo' || t.status === 'changes' || t.priority === 'high').slice(0, 4),
+    groups: T.groupByRecurrence(taskListTasks),
+    taskListTasks,
+    reviewUpdates: decorated.filter((t) => t.status === 'changes' || t.status === 'completed').slice(0, 4),
+    upcoming: decorated.filter((t) => t.status === 'todo').slice(0, 4),
+    detailTask: openTask(req, db, today),
+    showSearch: true, searchPlaceholder: 'Search my tasks...'
   });
 });
 
-router.get('/tasks', requireEmployee, (req, res) => {
-  ensureTodayLogs();
-  const db = load();
-  const today = todayStr();
-  const rows = getMyRows(db, req.session.userId, today);
-
-  const total = rows.length;
-  const completed = rows.filter((r) => r.log.status === 'completed').length;
-  const pending = total - completed;
-  const missedCount = getMissedCount(db, req.session.userId, today);
+router.get('/tasks', (req, res) => {
+  const { db, today, decorated } = loadCommon(req);
+  const filters = { q: (req.query.q || '').trim(), view: req.query.view === 'kanban' ? 'kanban' : 'list' };
+  const filtered = T.filterTasks(decorated, { q: filters.q }, today);
 
   res.render('employee-tasks', {
-    name: req.session.name,
-    crumb: 'Tasks',
-    heading: "Today's Tasks",
-    subheading: 'Aaj ke assigned tasks aur unka current status.',
-    listDate: listDateStr(),
-    today,
-    rows,
-    total,
-    completed,
-    pending,
-    missedCount,
-    error: req.query.error || null
+    crumb: 'My Tasks', heading: 'My Tasks',
+    filters, pageUrl: pageUrl(req), filtered,
+    groups: T.groupByRecurrence(filtered),
+    detailTask: openTask(req, db, today),
+    showSearch: true, searchPlaceholder: 'Search my tasks...'
   });
 });
 
-router.post('/tasks/additional', requireEmployee, (req, res) => {
-  const { title, description, detail } = req.body;
+router.get('/submitted', (req, res) => {
+  const { db, today, decorated } = loadCommon(req);
+  res.render('employee-submitted', {
+    crumb: 'Submitted for Review', heading: 'Submitted for Review',
+    filtered: decorated.filter((t) => t.status === 'review'),
+    pageUrl: pageUrl(req), detailTask: openTask(req, db, today)
+  });
+});
+
+router.get('/completed', (req, res) => {
+  const { db, today, decorated } = loadCommon(req);
+  res.render('employee-completed', {
+    crumb: 'Completed Tasks', heading: 'Completed Tasks',
+    filtered: decorated.filter((t) => t.status === 'completed'),
+    pageUrl: pageUrl(req), detailTask: openTask(req, db, today)
+  });
+});
+
+// ---- Task status actions ----
+
+router.post('/tasks/:id/start', (req, res) => {
   const db = load();
-
-  if (!title || !title.trim()) {
-    return res.redirect('/employee/tasks?error=' + encodeURIComponent('Title is required.'));
+  const task = myTask(db, req.params.id, req.session.userId);
+  if (task && task.status === 'todo') {
+    task.status = 'progress';
+    logActivity(db, `<b>${T.escapeHtml(req.session.name)}</b> started "${T.escapeHtml(task.title)}"`);
+    save(db);
   }
+  res.redirect(T.reopenUrl(req.body.back, req.params.id));
+});
 
+router.post('/tasks/:id/submit-review', (req, res) => {
+  const db = load();
+  const task = myTask(db, req.params.id, req.session.userId);
+  if (task && (task.status === 'progress' || task.status === 'changes')) {
+    task.status = 'review';
+    logActivity(db, `<b>${T.escapeHtml(req.session.name)}</b> submitted "${T.escapeHtml(task.title)}" for review`);
+    save(db);
+  }
+  res.redirect(T.reopenUrl(req.body.back, req.params.id));
+});
+
+router.post('/tasks/:id/complete-direct', (req, res) => {
+  const db = load();
   const today = todayStr();
-  const newTask = {
-    id: db.nextId.tasks++,
-    title: title.trim(),
-    description: description || '',
-    detail: detail || '',
-    assignedTo: req.session.userId,
-    source: 'employee',
-    active: true,
-    createdAt: new Date().toISOString()
-  };
-  db.tasks.push(newTask);
-
-  db.taskLogs.push({
-    id: db.nextId.taskLogs++,
-    taskId: newTask.id,
-    date: today,
-    status: 'pending',
-    completedAt: null
-  });
-
-  save(db);
-  res.redirect('/employee/tasks');
+  const task = myTask(db, req.params.id, req.session.userId);
+  if (task && task.status === 'progress' && T.isReviewFreeRecurring(task)) {
+    task.status = 'completed';
+    task.completedAt = new Date().toISOString();
+    const spawned = T.spawnRecurrence(db, task, today);
+    logActivity(db, `<b>${T.escapeHtml(req.session.name)}</b> completed "${T.escapeHtml(task.title)}" (no review needed)` + (spawned ? ' — next occurrence created' : ''));
+    save(db);
+  }
+  res.redirect(T.reopenUrl(req.body.back, req.params.id));
 });
 
-router.post('/tasks/:logId/toggle', requireEmployee, (req, res) => {
+router.post('/tasks/:id/block', (req, res) => {
   const db = load();
-  const log = db.taskLogs.find((l) => l.id === Number(req.params.logId));
-
-  if (log) {
-    const task = db.tasks.find((t) => t.id === log.taskId);
-    if (task && task.assignedTo === req.session.userId) {
-      if (log.status === 'completed') {
-        log.status = 'pending';
-        log.completedAt = null;
-      } else {
-        log.status = 'completed';
-        log.completedAt = new Date().toISOString();
-      }
-      save(db);
-    }
+  const task = myTask(db, req.params.id, req.session.userId);
+  const reason = (req.body.reason || '').trim();
+  if (task && reason && ['todo', 'progress', 'changes'].indexOf(task.status) !== -1) {
+    task.status = 'blocked';
+    task.blocked = true;
+    task.blockedReason = reason;
+    logActivity(db, `<b>${T.escapeHtml(req.session.name)}</b> marked "${T.escapeHtml(task.title)}" as Blocked`);
+    save(db);
   }
+  res.redirect(T.reopenUrl(req.body.back, req.params.id));
+});
 
-  res.redirect('/employee/tasks');
+router.post('/tasks/:id/unblock', (req, res) => {
+  const db = load();
+  const task = myTask(db, req.params.id, req.session.userId);
+  if (task && task.status === 'blocked') {
+    task.status = 'progress';
+    task.blocked = false;
+    save(db);
+  }
+  res.redirect(T.reopenUrl(req.body.back, req.params.id));
+});
+
+// ---- Checklist / comments (employee can't remove checklist items — admin only) ----
+
+router.post('/tasks/:id/checklist/add', (req, res) => {
+  const db = load();
+  const task = myTask(db, req.params.id, req.session.userId);
+  const text = (req.body.text || '').trim();
+  if (task && text) { task.checklist.push({ text, done: false }); save(db); }
+  res.redirect(T.reopenUrl(req.body.back, req.params.id));
+});
+
+router.post('/tasks/:id/checklist/:idx/toggle', (req, res) => {
+  const db = load();
+  const task = myTask(db, req.params.id, req.session.userId);
+  const item = task && task.checklist[Number(req.params.idx)];
+  if (item) { item.done = !item.done; save(db); }
+  res.redirect(T.reopenUrl(req.body.back, req.params.id));
+});
+
+router.post('/tasks/:id/comment', (req, res) => {
+  const db = load();
+  const task = myTask(db, req.params.id, req.session.userId);
+  const text = (req.body.text || '').trim();
+  if (task && text) {
+    task.comments.push({ name: req.session.name, time: new Date().toISOString(), text, feedback: false });
+    save(db);
+  }
+  res.redirect(T.reopenUrl(req.body.back, req.params.id));
 });
 
 module.exports = router;

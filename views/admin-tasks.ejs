@@ -4,136 +4,22 @@
     <div>
       <div class="eyebrow-date">ADMIN OVERVIEW</div>
       <h1><%= heading %></h1>
-      <p><%= taskCount %> active daily task<%= taskCount === 1 ? '' : 's' %> &middot; <%= groups.length %> assignee<%= groups.length === 1 ? '' : 's' %> &middot; resets at midnight</p>
+      <p>Company ke saare tasks, ek jagah par.</p>
     </div>
   </div>
 
-  <div class="section-summary-row">
-    <div class="missed-summary">
-      <span class="missed-summary-count"><%= taskCount %> daily task<%= taskCount === 1 ? '' : 's' %></span>
-      <span class="missed-summary-sub">Grouped by assignee &mdash; resets every midnight.</span>
+  <div class="list-card">
+    <div class="list-card-head section-card-head">
+      <h2>Task List <span class="tag-count"><%= filtered.length %></span></h2>
+      <%- include('partials/view-toggle', { basePath: '/admin/tasks' }) %>
     </div>
-    <button type="button" class="btn" id="openAssignModal">
-      <svg width="15" height="15" viewBox="0 0 24 24" fill="none"><path d="M12 5v14M5 12h14" stroke="#fff" stroke-width="2.3" stroke-linecap="round"/></svg>
-      Assign task
-    </button>
-  </div>
-
-  <div class="task-board">
-    <% groups.forEach(function(g) { %>
-      <div class="task-board-card">
-        <div class="task-board-card-head">
-          <div class="avatar"><%= g.employee.name.trim().charAt(0).toUpperCase() %></div>
-          <span class="task-board-name"><%= g.employee.name %></span>
-          <span class="task-count-badge"><%= g.tasks.length %></span>
-        </div>
-        <div class="task-board-card-body">
-          <% g.tasks.forEach(function(t) { %>
-            <div class="task-board-item">
-              <div class="task-board-item-title">
-                <%= t.title %>
-                <% if (t.source === 'employee') { %>
-                  <span class="badge info" style="margin-left:8px;">Additional</span>
-                <% } %>
-              </div>
-              <% if (t.description) { %><div class="task-board-item-desc"><%= t.description %></div><% } %>
-              <div class="task-board-item-actions">
-                <% if (t.detail) { %>
-                  <button type="button" class="btn small outline details-btn" data-title="<%= t.title %>" data-description="<%= t.description %>" data-detail="<%= t.detail %>">Details</button>
-                <% } %>
-                <form class="inline" method="POST" action="/admin/tasks/<%= t.id %>/delete" onsubmit="return confirm('Remove this task?');">
-                  <button class="btn small soft-danger" type="submit">Remove</button>
-                </form>
-              </div>
-            </div>
-          <% }) %>
-        </div>
-      </div>
-    <% }) %>
-    <% if (groups.length === 0) { %>
-      <div class="list-card">
-        <div class="table-scroll">
-          <table><tbody><tr class="empty-row"><td>No tasks yet &mdash; assign one to get started.</td></tr></tbody></table>
-        </div>
-      </div>
+    <% if (filters.view === 'kanban') { %>
+      <%- include('partials/kanban', { tasks: filtered, showAssignee: true, pageUrl: pageUrl }) %>
+    <% } else { %>
+      <%- include('partials/task-table', { tasks: filtered, showAssignee: true, showDelete: true, pageUrl: pageUrl, emptyTitle: 'Koi task nahi mila' }) %>
     <% } %>
   </div>
 </div>
-
-<div class="modal-backdrop <%= error ? 'open' : '' %>" id="assignTaskModal">
-  <div class="modal-box">
-    <div class="modal-head">
-      <h3>Assign New Task</h3>
-      <button type="button" class="modal-close" id="assignTaskClose">&times;</button>
-    </div>
-    <div class="modal-body">
-      <p class="form-sub" style="margin:-8px 0 16px;">This task will repeat every day and reset at midnight.</p>
-      <% if (error) { %>
-        <div class="error"><%= error %></div>
-      <% } %>
-      <form method="POST" action="/admin/tasks">
-        <div class="field">
-          <label>Title</label>
-          <input type="text" name="title" placeholder="e.g. Update client report" required />
-        </div>
-        <div class="field">
-          <label>Description</label>
-          <textarea name="description" rows="3" placeholder="Optional details..."></textarea>
-        </div>
-        <div class="field">
-          <label>Detailed Instructions (optional)</label>
-          <textarea name="detail" rows="5" placeholder="Step 1: ...&#10;Step 2: ...&#10;Step 3: ..."></textarea>
-        </div>
-        <div class="field">
-          <label>Assign To (select one or more)</label>
-          <% if (employees.length === 0) { %>
-            <div class="empty-picker-hint">No active employees yet. Add one from the Employees page first.</div>
-          <% } else { %>
-            <div class="employee-picker" id="employeePicker">
-              <% employees.forEach(function(emp) { %>
-                <label class="employee-card" data-emp="<%= emp.id %>">
-                  <input type="checkbox" name="assignedTo" value="<%= emp.id %>" />
-                  <div class="avatar"><%= emp.name.trim().charAt(0).toUpperCase() %></div>
-                  <div class="emp-info">
-                    <div class="emp-name"><%= emp.name %></div>
-                    <div class="emp-dept"><%= emp.department || 'Team Member' %></div>
-                  </div>
-                </label>
-              <% }) %>
-            </div>
-          <% } %>
-        </div>
-        <button class="btn block" type="submit">
-          <svg width="15" height="15" viewBox="0 0 24 24" fill="none"><path d="M12 5v14M5 12h14" stroke="#fff" stroke-width="2.3" stroke-linecap="round"/></svg>
-          Add Task
-        </button>
-      </form>
-    </div>
-  </div>
-</div>
-
-<script>
-  (function () {
-    var picker = document.getElementById('employeePicker');
-    if (picker) {
-      picker.querySelectorAll('.employee-card').forEach(function (card) {
-        card.querySelector('input[type="checkbox"]').addEventListener('change', function (e) {
-          card.classList.toggle('selected', e.target.checked);
-        });
-      });
-    }
-
-    var modal = document.getElementById('assignTaskModal');
-    var openBtn = document.getElementById('openAssignModal');
-    var closeBtn = document.getElementById('assignTaskClose');
-    if (modal && openBtn) {
-      openBtn.addEventListener('click', function () { modal.classList.add('open'); });
-      closeBtn.addEventListener('click', function () { modal.classList.remove('open'); });
-      modal.addEventListener('click', function (e) { if (e.target === modal) modal.classList.remove('open'); });
-      document.addEventListener('keydown', function (e) { if (e.key === 'Escape') modal.classList.remove('open'); });
-    }
-  })();
-</script>
-
-<%- include('partials/task-detail-modal') %>
+<%- include('partials/task-detail') %>
+<%- include('partials/task-modal') %>
 <%- include('partials/footer') %>

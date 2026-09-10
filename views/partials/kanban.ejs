@@ -1,0 +1,42 @@
+<%
+  var KANBAN_COLUMNS = ['todo', 'progress', 'review', 'changes', 'blocked', 'completed'];
+  var KANBAN_LABELS = { todo: 'To Do', progress: 'In Progress', review: 'In Review', changes: 'Changes Requested', blocked: 'Blocked', completed: 'Completed' };
+  var __byStatus = {};
+  KANBAN_COLUMNS.forEach(function (s) { __byStatus[s] = []; });
+  (tasks || []).forEach(function (t) { (__byStatus[t.status] = __byStatus[t.status] || []).push(t); });
+%>
+<% if (!(tasks || []).length) { %>
+  <div class="empty-state">
+    <svg width="34" height="34" viewBox="0 0 24 24" fill="none"><path d="M9 11l3 3L22 4" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+    <div class="empty-state-title">Koi task nahi mila</div>
+  </div>
+<% } else { %>
+  <div class="kanban-board">
+    <% KANBAN_COLUMNS.forEach(function (status) { %>
+      <% var colTasks = __byStatus[status] || []; %>
+      <div class="kanban-col">
+        <div class="kanban-col-head"><%= KANBAN_LABELS[status] %><span class="kc-count"><%= colTasks.length %></span></div>
+        <div class="kanban-col-body">
+          <% if (!colTasks.length) { %>
+            <div class="kanban-empty-col">Khali</div>
+          <% } else { %>
+            <% colTasks.forEach(function (t) { %>
+              <a class="kanban-card" href="<%= taskUrl(pageUrl, t.id) %>">
+                <div class="kanban-card-title"><%= t.title %><% if (t.recurText) { %><span class="recur-badge"><svg width="11" height="11" viewBox="0 0 24 24" fill="none"><path d="M17 2.1l4 4-4 4M3 12.6v-1a4 4 0 014-4h14M7 21.9l-4-4 4-4M21 11.4v1a4 4 0 01-4 4H3" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg><%= t.recurText %></span><% } %></div>
+                <div class="kanban-card-meta">
+                  <span class="badge p-<%= t.priority %>"><%= t.priorityText %></span>
+                  <% if (typeof showAssignee !== 'undefined' && showAssignee) { %><span class="mini-avatar" title="<%= t.assigneeName %>"><%= t.assigneeInitials %></span><% } %>
+                </div>
+                <% if (t.overdue) { %>
+                  <div class="kanban-card-due overdue"><%= t.dueLabel %> · <%= t.overdueDaysCount %>d overdue</div>
+                <% } else { %>
+                  <div class="kanban-card-due">Due <%= t.dueLabel %></div>
+                <% } %>
+              </a>
+            <% }) %>
+          <% } %>
+        </div>
+      </div>
+    <% }) %>
+  </div>
+<% } %>

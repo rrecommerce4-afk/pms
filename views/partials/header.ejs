@@ -4,6 +4,9 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Raja Rani PMS</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Inter+Tight:wght@600;700;800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="/style.css" />
 </head>
 <body>
@@ -15,7 +18,7 @@
       <span class="logo-badge">RR</span>
       <span class="brand-text">
         <div class="brand-name">Raja Rani</div>
-        <div class="brand-sub">Product PMS</div>
+        <div class="brand-sub">Workflow</div>
       </span>
     </div>
     <div class="nav-section-label">MAIN MENU</div>
@@ -24,49 +27,72 @@
         <a class="nav-link <%= path && path.startsWith('/admin/dashboard') ? 'active' : '' %>" href="/admin/dashboard">
           <svg width="17" height="17" viewBox="0 0 24 24" fill="none"><rect x="3" y="3" width="7" height="9" rx="1.5" stroke="currentColor" stroke-width="2"/><rect x="14" y="3" width="7" height="5" rx="1.5" stroke="currentColor" stroke-width="2"/><rect x="14" y="12" width="7" height="9" rx="1.5" stroke="currentColor" stroke-width="2"/><rect x="3" y="16" width="7" height="5" rx="1.5" stroke="currentColor" stroke-width="2"/></svg>
           Dashboard
-          <svg class="chevron" width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M9 6l6 6-6 6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </a>
+        <a class="nav-link <%= path && path.startsWith('/admin/tasks') ? 'active' : '' %>" href="/admin/tasks">
+          <svg width="17" height="17" viewBox="0 0 24 24" fill="none"><path d="M9 6h11M9 12h11M9 18h11M4 6h.01M4 12h.01M4 18h.01" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+          All Tasks
+          <% if (typeof navCounts !== 'undefined' && navCounts.all) { %><span class="tag-count"><%= navCounts.all %></span><% } %>
+        </a>
+        <a class="nav-link <%= path && path.startsWith('/admin/review') ? 'active' : '' %>" href="/admin/review">
+          <svg width="17" height="17" viewBox="0 0 24 24" fill="none"><path d="M9 11l3 3L22 4" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          Review &amp; Approval
+          <% if (typeof navCounts !== 'undefined' && navCounts.review) { %><span class="tag-count"><%= navCounts.review %></span><% } %>
+        </a>
+        <a class="nav-link <%= path && path.startsWith('/admin/workload') ? 'active' : '' %>" href="/admin/workload">
+          <svg width="17" height="17" viewBox="0 0 24 24" fill="none"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><circle cx="9" cy="7" r="4" stroke="currentColor" stroke-width="2"/><path d="M23 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          Team Workload
+        </a>
+        <a class="nav-link <%= path && path.startsWith('/admin/reports') ? 'active' : '' %>" href="/admin/reports">
+          <svg width="17" height="17" viewBox="0 0 24 24" fill="none"><path d="M3 3v18h18" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M18 17V9M13 17V5M8 17v-3" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          Reports
         </a>
         <a class="nav-link <%= path && path.startsWith('/admin/employees') ? 'active' : '' %>" href="/admin/employees">
           <svg width="17" height="17" viewBox="0 0 24 24" fill="none"><circle cx="9" cy="8" r="3.2" stroke="currentColor" stroke-width="2"/><path d="M3.5 20c0-3.5 2.7-6 5.5-6s5.5 2.5 5.5 6" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><circle cx="17.5" cy="8.5" r="2.6" stroke="currentColor" stroke-width="2"/><path d="M15.8 14.2c2.4.3 4.7 2.5 4.7 5.8" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
           Employees
-          <svg class="chevron" width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M9 6l6 6-6 6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
-        </a>
-        <a class="nav-link <%= path && path.startsWith('/admin/tasks') ? 'active' : '' %>" href="/admin/tasks">
-          <svg width="17" height="17" viewBox="0 0 24 24" fill="none"><path d="M9 6h11M9 12h11M9 18h11" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><path d="M4 6l.8.8L6.2 5.2" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M4 12l.8.8 1.4-1.6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M4 18l.8.8 1.4-1.6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
-          Tasks
-          <svg class="chevron" width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M9 6l6 6-6 6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
-        </a>
-        <a class="nav-link <%= path && path.startsWith('/admin/missed') ? 'active' : '' %>" href="/admin/missed">
-          <svg width="17" height="17" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="2"/><path d="M12 8v5M12 16h.01" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
-          Missed Tasks
-          <svg class="chevron" width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M9 6l6 6-6 6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
         </a>
       <% } else if (role === 'viewer') { %>
         <a class="nav-link <%= path && path.startsWith('/viewer/dashboard') ? 'active' : '' %>" href="/viewer/dashboard">
           <svg width="17" height="17" viewBox="0 0 24 24" fill="none"><rect x="3" y="3" width="7" height="9" rx="1.5" stroke="currentColor" stroke-width="2"/><rect x="14" y="3" width="7" height="5" rx="1.5" stroke="currentColor" stroke-width="2"/><rect x="14" y="12" width="7" height="9" rx="1.5" stroke="currentColor" stroke-width="2"/><rect x="3" y="16" width="7" height="5" rx="1.5" stroke="currentColor" stroke-width="2"/></svg>
-          Dashboard
-          <svg class="chevron" width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M9 6l6 6-6 6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          Overview
         </a>
       <% } else { %>
         <a class="nav-link <%= path && path.startsWith('/employee/dashboard') ? 'active' : '' %>" href="/employee/dashboard">
           <svg width="17" height="17" viewBox="0 0 24 24" fill="none"><rect x="3" y="3" width="7" height="9" rx="1.5" stroke="currentColor" stroke-width="2"/><rect x="14" y="3" width="7" height="5" rx="1.5" stroke="currentColor" stroke-width="2"/><rect x="14" y="12" width="7" height="9" rx="1.5" stroke="currentColor" stroke-width="2"/><rect x="3" y="16" width="7" height="5" rx="1.5" stroke="currentColor" stroke-width="2"/></svg>
-          Dashboard
-          <svg class="chevron" width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M9 6l6 6-6 6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          My Dashboard
         </a>
         <a class="nav-link <%= path && path.startsWith('/employee/tasks') ? 'active' : '' %>" href="/employee/tasks">
-          <svg width="17" height="17" viewBox="0 0 24 24" fill="none"><path d="M9 6h11M9 12h11M9 18h11" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><path d="M4 6l.8.8L6.2 5.2" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M4 12l.8.8 1.4-1.6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M4 18l.8.8 1.4-1.6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
-          Tasks
-          <svg class="chevron" width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M9 6l6 6-6 6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          <svg width="17" height="17" viewBox="0 0 24 24" fill="none"><path d="M9 6h11M9 12h11M9 18h11M4 6h.01M4 12h.01M4 18h.01" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+          My Tasks
+          <% if (typeof navCounts !== 'undefined' && navCounts.myTasks) { %><span class="tag-count"><%= navCounts.myTasks %></span><% } %>
+        </a>
+        <a class="nav-link <%= path && path.startsWith('/employee/submitted') ? 'active' : '' %>" href="/employee/submitted">
+          <svg width="17" height="17" viewBox="0 0 24 24" fill="none"><path d="M9 11l3 3L22 4" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          Submitted for Review
+        </a>
+        <a class="nav-link <%= path && path.startsWith('/employee/completed') ? 'active' : '' %>" href="/employee/completed">
+          <svg width="17" height="17" viewBox="0 0 24 24" fill="none"><path d="M20 6L9 17l-5-5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          Completed Tasks
         </a>
       <% } %>
     </nav>
     <div class="sidebar-spacer"></div>
-    <form method="POST" action="/logout">
-      <button class="logout-btn" type="submit">
-        <svg width="15" height="15" viewBox="0 0 24 24" fill="none"><path d="M9 4H6a2 2 0 00-2 2v12a2 2 0 002 2h3M16 17l5-5-5-5M21 12H9" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
-        Logout
+    <div class="sidebar-foot">
+      <div class="user-dropdown" id="userDropdown">
+        <div class="user-dropdown-label">Signed in as</div>
+        <div class="user-dropdown-item" style="cursor:default;"><div class="user-avatar" style="width:22px;height:22px;font-size:10px;"><%= (name || '?').trim().split(/\s+/).map(function(p){ return p.charAt(0).toUpperCase(); }).slice(0,2).join('') %></div><%= name %> (<%= roleLabel %>)</div>
+        <form method="POST" action="/logout">
+          <button class="user-dropdown-item" type="submit" style="width:100%;">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M9 4H6a2 2 0 00-2 2v12a2 2 0 002 2h3M16 17l5-5-5-5M21 12H9" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            Logout
+          </button>
+        </form>
+      </div>
+      <button class="user-chip" type="button" id="userChipToggle">
+        <div class="user-avatar"><%= (name || '?').trim().split(/\s+/).map(function(p){ return p.charAt(0).toUpperCase(); }).slice(0,2).join('') %></div>
+        <div><div class="user-info-name"><%= name %></div><div class="user-info-role"><%= roleLabel %></div></div>
+        <svg class="user-chip-caret" width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M18 15l-6-6-6 6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
       </button>
-    </form>
+    </div>
   </aside>
   <div class="content-area">
     <header class="topbar">
@@ -74,22 +100,66 @@
         <button class="menu-toggle" id="menuToggle" type="button" aria-label="Open menu">
           <svg width="19" height="19" viewBox="0 0 24 24" fill="none"><path d="M3 6h18M3 12h18M3 18h18" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/></svg>
         </button>
-        <div class="breadcrumb">
-          <span class="crumb-root">PMS</span>
-          <span class="crumb-sep">&rsaquo;</span>
-          <span class="crumb-current"><%= typeof crumb !== 'undefined' ? crumb : 'Dashboard' %></span>
-        </div>
+        <% if (typeof showSearch !== 'undefined' && showSearch) { %>
+          <form method="GET" action="<%= path %>" id="topbarFilterForm" style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;flex:1;">
+            <div class="search-box">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none"><circle cx="11" cy="11" r="8" stroke="currentColor" stroke-width="2"/><path d="M21 21l-4.35-4.35" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+              <input type="text" name="q" id="topbarSearch" placeholder="<%= typeof searchPlaceholder !== 'undefined' ? searchPlaceholder : 'Search tasks...' %>" value="<%= (typeof filters !== 'undefined' && filters.q) ? filters.q : '' %>" autocomplete="off">
+            </div>
+            <% if (typeof showFilters !== 'undefined' && showFilters) { %>
+              <select class="filter-select" name="due" id="topbarDueFilter">
+                <option value="all" <%= (!filters.due || filters.due==='all') ? 'selected' : '' %>>All dates</option>
+                <option value="overdue" <%= filters.due==='overdue' ? 'selected' : '' %>>Overdue</option>
+                <option value="today" <%= filters.due==='today' ? 'selected' : '' %>>Due today</option>
+                <option value="week" <%= filters.due==='week' ? 'selected' : '' %>>Due this week</option>
+              </select>
+              <select class="filter-select" name="employee" id="topbarEmployeeFilter">
+                <option value="all" <%= (!filters.employee || filters.employee==='all') ? 'selected' : '' %>>All employees</option>
+                <% (typeof employees !== 'undefined' ? employees : []).forEach(function(e) { %>
+                  <option value="<%= e.id %>" <%= String(filters.employee)===String(e.id) ? 'selected' : '' %>><%= e.name %></option>
+                <% }) %>
+              </select>
+            <% } %>
+            <% if (typeof filters !== 'undefined' && filters.view) { %><input type="hidden" name="view" value="<%= filters.view %>"><% } %>
+          </form>
+        <% } %>
       </div>
       <div class="topbar-right">
-        <div class="who">
-          <div class="u-name"><%= name %></div>
-          <div class="u-role"><%= roleLabel %></div>
-        </div>
-        <div class="avatar-wrap">
-          <div class="avatar"><%= (name || '?').trim().split(/\s+/).map(function(p){ return p.charAt(0).toUpperCase(); }).slice(0,2).join('') %></div>
-          <% if (typeof missedCount !== 'undefined' && missedCount > 0) { %><span class="missed-badge" title="<%= missedCount %> missed task(s), all-time"><%= missedCount %></span><% } %>
-        </div>
+        <button class="icon-btn" type="button" title="Notifications">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M18 8a6 6 0 00-12 0c0 7-3 9-3 9h18s-3-2-3-9" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M13.7 21a2 2 0 01-3.4 0" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </button>
+        <% if (typeof showCreateButton !== 'undefined' && showCreateButton) { %>
+          <button class="btn" type="button" id="openCreateTaskBtn">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none"><path d="M12 5v14M5 12h14" stroke="#fff" stroke-width="2.3" stroke-linecap="round"/></svg>
+            Create Task
+          </button>
+        <% } %>
       </div>
     </header>
     <main class="main-content">
+<script>
+  (function () {
+    var toggle = document.getElementById('userChipToggle');
+    var dropdown = document.getElementById('userDropdown');
+    if (toggle && dropdown) {
+      toggle.addEventListener('click', function (e) { e.stopPropagation(); dropdown.classList.toggle('open'); });
+      document.addEventListener('click', function (e) { if (!dropdown.contains(e.target) && e.target !== toggle) dropdown.classList.remove('open'); });
+    }
+    var form = document.getElementById('topbarFilterForm');
+    if (form) {
+      var search = document.getElementById('topbarSearch');
+      var due = document.getElementById('topbarDueFilter');
+      var emp = document.getElementById('topbarEmployeeFilter');
+      if (due) due.addEventListener('change', function () { form.submit(); });
+      if (emp) emp.addEventListener('change', function () { form.submit(); });
+      if (search) {
+        var t;
+        search.addEventListener('input', function () {
+          clearTimeout(t);
+          t = setTimeout(function () { form.submit(); }, 450);
+        });
+      }
+    }
+  })();
+</script>
 <% } %>

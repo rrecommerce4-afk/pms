@@ -1,0 +1,121 @@
+<div class="modal-backdrop" id="task-modal">
+  <div class="modal-box">
+    <div class="modal-head">
+      <h3>Create Task</h3>
+      <button type="button" class="modal-close" id="taskModalClose">&times;</button>
+    </div>
+    <div class="modal-body">
+      <form method="POST" action="/admin/tasks">
+        <input type="hidden" name="back" value="<%= typeof pageUrl !== 'undefined' ? pageUrl : '/admin/tasks' %>">
+        <div class="field">
+          <label>Task Name</label>
+          <input type="text" name="title" placeholder="e.g. Update homepage banner" required>
+        </div>
+        <div class="field">
+          <label>Description &amp; Expected Output</label>
+          <textarea name="description" rows="4" placeholder="Kya karna hai, expected output kya hai..."></textarea>
+        </div>
+        <div class="form-grid-2">
+          <div class="field">
+            <label>Assign To</label>
+            <select name="assignedTo" required>
+              <% (typeof employees !== 'undefined' ? employees : []).forEach(function(e) { %>
+                <option value="<%= e.id %>"><%= e.name %> — <%= e.department || 'Team Member' %></option>
+              <% }) %>
+            </select>
+          </div>
+          <div class="field">
+            <label>Priority</label>
+            <select name="priority">
+              <option value="high">High</option>
+              <option value="medium" selected>Medium</option>
+              <option value="low">Low</option>
+            </select>
+          </div>
+        </div>
+        <div class="field">
+          <label>Repeats</label>
+          <select name="recurrence">
+            <option value="none">One-time (no repeat)</option>
+            <option value="daily">Daily — no review needed, employee marks complete directly</option>
+            <option value="weekly">Weekly</option>
+            <option value="biweekly">Every 15 days</option>
+            <option value="monthly">Monthly</option>
+          </select>
+        </div>
+        <div class="form-grid-2">
+          <div class="field">
+            <label>Start Date</label>
+            <input type="date" name="startDate">
+          </div>
+          <div class="field">
+            <label>Due Date</label>
+            <input type="date" name="dueDate" required>
+          </div>
+        </div>
+        <div class="field">
+          <label>Checklist <span style="font-weight:400;color:var(--text-faint);text-transform:none;">(optional — items the employee should complete)</span></label>
+          <div id="tmChecklistList"></div>
+          <div class="add-check-row">
+            <input type="text" id="tmChecklistInput" placeholder="e.g. Reference deck check karo">
+            <button type="button" class="btn small outline" id="tmAddCheckBtn">Add</button>
+          </div>
+        </div>
+        <div class="emp-form-actions" style="margin-top:6px;">
+          <button type="button" class="btn outline" id="taskModalCancel">Cancel</button>
+          <button class="btn" type="submit">Save Task</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<script>
+  (function () {
+    var modal = document.getElementById('task-modal');
+    var openBtn = document.getElementById('openCreateTaskBtn');
+    var closeBtn = document.getElementById('taskModalClose');
+    var cancelBtn = document.getElementById('taskModalCancel');
+    if (modal && openBtn) {
+      openBtn.addEventListener('click', function () { modal.classList.add('open'); });
+      closeBtn.addEventListener('click', function () { modal.classList.remove('open'); });
+      cancelBtn.addEventListener('click', function () { modal.classList.remove('open'); });
+      modal.addEventListener('click', function (e) { if (e.target === modal) modal.classList.remove('open'); });
+      document.addEventListener('keydown', function (e) { if (e.key === 'Escape') modal.classList.remove('open'); });
+    }
+
+    var list = document.getElementById('tmChecklistList');
+    var input = document.getElementById('tmChecklistInput');
+    var addBtn = document.getElementById('tmAddCheckBtn');
+    function addItem() {
+      var val = input.value.trim();
+      if (!val) return;
+      var row = document.createElement('div');
+      row.className = 'checklist-item';
+      row.style.padding = '6px 0';
+      var box = document.createElement('div');
+      box.className = 'check-box';
+      box.style.opacity = '0.5';
+      var text = document.createElement('div');
+      text.className = 'check-text';
+      text.textContent = val;
+      var hidden = document.createElement('input');
+      hidden.type = 'hidden';
+      hidden.name = 'checklist';
+      hidden.value = val;
+      var remove = document.createElement('button');
+      remove.type = 'button';
+      remove.className = 'check-remove';
+      remove.innerHTML = '<svg width="13" height="13" viewBox="0 0 24 24" fill="none"><path d="M18 6L6 18M6 6l12 12" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>';
+      remove.addEventListener('click', function () { row.remove(); });
+      row.appendChild(box); row.appendChild(text); row.appendChild(hidden); row.appendChild(remove);
+      list.appendChild(row);
+      input.value = '';
+      input.focus();
+    }
+    if (addBtn) {
+      addBtn.addEventListener('click', addItem);
+      input.addEventListener('keydown', function (e) { if (e.key === 'Enter') { e.preventDefault(); addItem(); } });
+    }
+  })();
+</script>

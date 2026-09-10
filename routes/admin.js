@@ -1,117 +1,264 @@
 const express = require('express');
 const bcrypt = require('bcryptjs');
-const { load, save, todayStr, ensureTodayLogs, getMissedCount, getMissedTasks, clearMissedTasks } = require('../db');
+const { load, save, todayStr, logActivity } = require('../db');
 const { requireAdmin } = require('../middleware/auth');
-const { chipDateStr, formatIsoDate, yesterdayStr } = require('../utils');
+const T = require('../lib/tasks');
 
 const router = express.Router();
 router.use(requireAdmin);
 
-router.get('/dashboard', (req, res) => {
-  ensureTodayLogs();
+function queryFilters(req) {
+  return {
+    q: (req.query.q || '').trim(),
+    due: req.query.due || 'all',
+    employee: req.query.employee || 'all',
+    view: req.query.view === 'kanban' ? 'kanban' : 'list'
+  };
+}
+
+// Current page's path + querystring (minus `task`) — used to reopen the detail panel
+// on the right page/filter state after a form action redirects back.
+function pageUrl(req) {
+  const params = new URLSearchParams();
+  ['q', 'due', 'employee', 'view'].forEach((k) => { if (req.query[k]) params.set(k, req.query[k]); });
+  const qs = params.toString();
+  return req.baseUrl + req.path + (qs ? '?' + qs : '');
+}
+
+function loadCommon() {
   const db = load();
   const today = todayStr();
   const employees = db.users.filter((u) => u.role === 'employee' && u.active);
+  const decorated = T.decorateAll(db.tasks, db.users, today);
+  return { db, today, employees, decorated };
+}
 
-  const perEmployee = employees.map((emp) => {
-    const empTasks = db.tasks.filter((t) => t.assignedTo === emp.id && t.active);
-    const logsToday = empTasks
-      .map((t) => ({ log: db.taskLogs.find((l) => l.taskId === t.id && l.date === today), task: t }))
-      .filter((x) => x.log);
-    const total = logsToday.length;
-    const completed = logsToday.filter((x) => x.log.status === 'completed').length;
-    const missed = getMissedCount(db, emp.id, today);
-    const pct = total ? Math.round((completed / total) * 100) : 0;
-    return {
-      id: emp.id,
-      name: emp.name,
-      department: emp.department || 'Team Member',
-      total,
-      completed,
-      pending: total - completed,
-      missed,
-      pct,
-      logsToday
-    };
-  });
+function openTask(req, db, today) {
+  const taskId = req.query.task ? Number(req.query.task) : null;
+  if (!taskId) return null;
+  const task = db.tasks.find((t) => t.id === taskId);
+  return task ? T.decorate(task, db.users, today) : null;
+}
 
-  const total = perEmployee.reduce((s, e) => s + e.total, 0);
-  const completed = perEmployee.reduce((s, e) => s + e.completed, 0);
-  const pending = total - completed;
-  const donutPct = total ? Math.round((completed / total) * 100) : 0;
+// nav badge counts, needed on every admin page's sidebar
+router.use((req, res, next) => {
+  const db = load();
+  res.locals.navCounts = {
+    all: db.tasks.length,
+    review: db.tasks.filter((t) => t.status === 'review').length
+  };
+  next();
+});
 
-  const needsAttention = [...perEmployee].sort((a, b) => b.pending - a.pending);
-
-  const recentTasks = perEmployee
-    .flatMap((e) => e.logsToday.map((x) => ({ task: x.task, log: x.log, employeeName: e.name })))
-    .slice(0, 5);
-
-  const adminCount = db.users.filter((u) => u.role === 'admin' && u.active).length;
-  const totalDailyTasks = db.tasks.filter((t) => t.active).length;
-  const missedYesterday = db.taskLogs.filter((l) => l.date === yesterdayStr(today) && l.status === 'pending').length;
+router.get('/dashboard', (req, res) => {
+  const { db, today, employees, decorated } = loadCommon();
+  const filters = queryFilters(req);
+  const filtered = T.filterTasks(decorated, filters, today);
+  const summary = T.summaryCards(decorated, employees.length);
+  const attention = decorated.filter((t) => t.overdue || t.status === 'blocked' || t.status === 'review');
+  const workload = T.workloadData(decorated, employees).slice(0, 4);
+  const activity = (db.activity || []).slice(0, 6).map((a) => ({ text: a.text, time: T.formatRelativeTime(a.time) }));
 
   res.render('admin-dashboard', {
-    crumb: 'Dashboard',
-    heading: 'Dashboard',
-    chipDate: chipDateStr(),
-    today,
-    perEmployee,
-    needsAttention,
-    total,
-    completed,
-    pending,
-    donutPct,
-    recentTasks,
-    employeeCount: employees.length,
-    adminCount,
-    totalDailyTasks,
-    missedYesterday
+    crumb: 'Dashboard', heading: 'Dashboard',
+    filters, pageUrl: pageUrl(req), employees,
+    summary, attention, filtered, workload, activity,
+    detailTask: openTask(req, db, today),
+    showSearch: true, showFilters: true, showCreateButton: true, searchPlaceholder: 'Search tasks...'
   });
 });
 
-// ---- Missed Tasks ----
+router.get('/tasks', (req, res) => {
+  const { db, today, employees, decorated } = loadCommon();
+  const filters = queryFilters(req);
+  const filtered = T.filterTasks(decorated, filters, today);
 
-router.get('/missed', (req, res) => {
-  const db = load();
-  const today = todayStr();
-  const employeeId = req.query.employee ? Number(req.query.employee) : null;
-
-  const rows = getMissedTasks(db, today, employeeId).map((r) => ({ ...r, dateLabel: formatIsoDate(r.log.date) }));
-  const filteredEmployee = employeeId ? db.users.find((u) => u.id === employeeId) : null;
-
-  // Group rows by employee, preserving the most-recent-first order already applied to `rows`.
-  const groups = [];
-  const groupByEmployeeId = new Map();
-  rows.forEach((r) => {
-    let group = groupByEmployeeId.get(r.employee.id);
-    if (!group) {
-      group = { employee: r.employee, tasks: [] };
-      groupByEmployeeId.set(r.employee.id, group);
-      groups.push(group);
-    }
-    group.tasks.push(r);
-  });
-
-  res.render('admin-missed', {
-    crumb: 'Missed Tasks',
-    heading: 'Missed Tasks',
-    subheading: filteredEmployee
-      ? `${filteredEmployee.name} ke incomplete tasks jo unke din khatam hone tak complete nahi hue.`
-      : 'Sabhi employees ke incomplete tasks jo unke din khatam hone tak complete nahi hue.',
-    rows,
-    groups,
-    filteredEmployee,
-    asOfDate: chipDateStr()
+  res.render('admin-tasks', {
+    crumb: 'All Tasks', heading: 'All Tasks',
+    filters, pageUrl: pageUrl(req), employees, filtered,
+    detailTask: openTask(req, db, today),
+    showSearch: true, showFilters: true, showCreateButton: true, searchPlaceholder: 'Search tasks...'
   });
 });
 
-router.post('/missed/clear', (req, res) => {
+router.get('/review', (req, res) => {
+  const { db, today, employees, decorated } = loadCommon();
+  const filtered = decorated.filter((t) => t.status === 'review');
+
+  res.render('admin-review', {
+    crumb: 'Review & Approval', heading: 'Review & Approval',
+    pageUrl: pageUrl(req), filtered, employees,
+    detailTask: openTask(req, db, today),
+    showCreateButton: true
+  });
+});
+
+router.get('/workload', (req, res) => {
+  const { employees, decorated } = loadCommon();
+  res.render('admin-workload', {
+    crumb: 'Team Workload', heading: 'Team Workload',
+    workload: T.workloadData(decorated, employees), pageUrl: pageUrl(req), employees,
+    showCreateButton: true
+  });
+});
+
+router.get('/reports', (req, res) => {
+  const { employees, decorated } = loadCommon();
+  res.render('admin-reports', {
+    crumb: 'Reports', heading: 'Reports',
+    reports: T.reportsData(decorated, employees), pageUrl: pageUrl(req), employees,
+    showCreateButton: true
+  });
+});
+
+// ---- Task create / edit / delete ----
+
+router.post('/tasks', (req, res) => {
+  const { title, description, assignedTo, priority, recurrence, startDate, dueDate } = req.body;
   const db = load();
   const today = todayStr();
-  const employeeId = req.body.employee ? Number(req.body.employee) : null;
 
-  clearMissedTasks(db, today, employeeId);
-  res.redirect(employeeId ? `/admin/missed?employee=${employeeId}` : '/admin/missed');
+  if (!title || !title.trim() || !assignedTo || !dueDate) {
+    return res.redirect('/admin/tasks');
+  }
+
+  const checklistRaw = req.body.checklist;
+  const checklistItems = Array.isArray(checklistRaw) ? checklistRaw : (checklistRaw ? [checklistRaw] : []);
+
+  const newTask = {
+    id: db.nextId.tasks++,
+    title: title.trim(),
+    description: (description || '').trim(),
+    assignedTo: Number(assignedTo),
+    assignedByName: req.session.name,
+    priority: ['high', 'medium', 'low'].includes(priority) ? priority : 'medium',
+    status: 'todo',
+    recurrence: T.RECUR_DAYS[recurrence] ? recurrence : 'none',
+    startDate: startDate || today,
+    dueDate,
+    checklist: checklistItems.filter((c) => c && c.trim()).map((text) => ({ text: text.trim(), done: false })),
+    files: [],
+    comments: [],
+    blocked: false,
+    blockedReason: '',
+    createdAt: new Date().toISOString(),
+    completedAt: null
+  };
+  db.tasks.push(newTask);
+
+  const assignee = db.users.find((u) => u.id === newTask.assignedTo);
+  logActivity(db, `<b>${T.escapeHtml(req.session.name)}</b> created task "${T.escapeHtml(newTask.title)}" and assigned it to ${T.escapeHtml(assignee ? assignee.name : 'someone')}`);
+  save(db);
+  res.redirect('/admin/tasks?task=' + newTask.id);
+});
+
+router.post('/tasks/:id/update', (req, res) => {
+  const db = load();
+  const task = db.tasks.find((t) => t.id === Number(req.params.id));
+  if (!task) return res.redirect(req.body.back || '/admin/tasks');
+  const body = req.body;
+
+  if (body.title !== undefined && body.title.trim()) task.title = body.title.trim();
+  if (body.description !== undefined) task.description = body.description.trim();
+  if (body.priority !== undefined && ['high', 'medium', 'low'].includes(body.priority)) task.priority = body.priority;
+  if (body.startDate) task.startDate = body.startDate;
+  if (body.dueDate) task.dueDate = body.dueDate;
+  if (body.recurrence !== undefined && (body.recurrence === 'none' || T.RECUR_DAYS[body.recurrence])) task.recurrence = body.recurrence;
+
+  if (body.assignedTo !== undefined && Number(body.assignedTo) !== task.assignedTo) {
+    task.assignedTo = Number(body.assignedTo);
+    const assignee = db.users.find((u) => u.id === task.assignedTo);
+    logActivity(db, `<b>${T.escapeHtml(req.session.name)}</b> reassigned "${T.escapeHtml(task.title)}" to ${T.escapeHtml(assignee ? assignee.name : 'someone')}`);
+  }
+
+  save(db);
+  res.redirect(T.reopenUrl(body.back, task.id));
+});
+
+router.post('/tasks/:id/delete', (req, res) => {
+  const db = load();
+  const task = db.tasks.find((t) => t.id === Number(req.params.id));
+  if (task) {
+    logActivity(db, `<b>${T.escapeHtml(req.session.name)}</b> deleted "${T.escapeHtml(task.title)}"`);
+    db.tasks = db.tasks.filter((t) => t.id !== task.id);
+    save(db);
+  }
+  res.redirect(req.body.back || '/admin/tasks');
+});
+
+// ---- Checklist / files / comments ----
+
+router.post('/tasks/:id/checklist/add', (req, res) => {
+  const db = load();
+  const task = db.tasks.find((t) => t.id === Number(req.params.id));
+  const text = (req.body.text || '').trim();
+  if (task && text) { task.checklist.push({ text, done: false }); save(db); }
+  res.redirect(T.reopenUrl(req.body.back, req.params.id));
+});
+
+router.post('/tasks/:id/checklist/:idx/toggle', (req, res) => {
+  const db = load();
+  const task = db.tasks.find((t) => t.id === Number(req.params.id));
+  const item = task && task.checklist[Number(req.params.idx)];
+  if (item) { item.done = !item.done; save(db); }
+  res.redirect(T.reopenUrl(req.body.back, req.params.id));
+});
+
+router.post('/tasks/:id/checklist/:idx/remove', (req, res) => {
+  const db = load();
+  const task = db.tasks.find((t) => t.id === Number(req.params.id));
+  if (task) { task.checklist.splice(Number(req.params.idx), 1); save(db); }
+  res.redirect(T.reopenUrl(req.body.back, req.params.id));
+});
+
+router.post('/tasks/:id/files/add', (req, res) => {
+  const db = load();
+  const task = db.tasks.find((t) => t.id === Number(req.params.id));
+  const name = (req.body.name || '').trim();
+  if (task && name) { task.files.push({ name }); save(db); }
+  res.redirect(T.reopenUrl(req.body.back, req.params.id));
+});
+
+router.post('/tasks/:id/comment', (req, res) => {
+  const db = load();
+  const task = db.tasks.find((t) => t.id === Number(req.params.id));
+  const text = (req.body.text || '').trim();
+  if (task && text) {
+    task.comments.push({ name: req.session.name, time: new Date().toISOString(), text, feedback: false });
+    save(db);
+  }
+  res.redirect(T.reopenUrl(req.body.back, req.params.id));
+});
+
+// ---- Review & approval ----
+
+router.post('/tasks/:id/approve', (req, res) => {
+  const db = load();
+  const today = todayStr();
+  const task = db.tasks.find((t) => t.id === Number(req.params.id));
+  if (!task) return res.redirect(req.body.back || '/admin/review');
+
+  task.status = 'completed';
+  task.completedAt = new Date().toISOString();
+  const spawned = T.spawnRecurrence(db, task, today);
+  logActivity(db, `<b>${T.escapeHtml(req.session.name)}</b> approved "${T.escapeHtml(task.title)}"` + (spawned ? ' — next occurrence created' : ''));
+  save(db);
+  res.redirect(T.reopenUrl(req.body.back, task.id));
+});
+
+router.post('/tasks/:id/request-changes', (req, res) => {
+  const db = load();
+  const task = db.tasks.find((t) => t.id === Number(req.params.id));
+  if (!task) return res.redirect(req.body.back || '/admin/review');
+
+  const feedback = (req.body.feedback || '').trim();
+  if (!feedback) return res.redirect(T.reopenUrl(req.body.back, task.id));
+
+  task.status = 'changes';
+  task.comments.push({ name: req.session.name, time: new Date().toISOString(), text: feedback, feedback: true });
+  logActivity(db, `<b>${T.escapeHtml(req.session.name)}</b> requested changes on "${T.escapeHtml(task.title)}"`);
+  save(db);
+  res.redirect(T.reopenUrl(req.body.back, task.id));
 });
 
 // ---- Employees / Users (admin can add more admins here too) ----
@@ -214,79 +361,8 @@ router.post('/employees/:id/delete', (req, res) => {
   }
 
   user.active = false;
-  // deactivate their tasks too so no new daily logs get created for them
-  db.tasks.filter((t) => t.assignedTo === user.id).forEach((t) => (t.active = false));
   save(db);
   res.redirect('/admin/employees');
-});
-
-// ---- Tasks ----
-
-const taskPageLocals = { crumb: 'Tasks', heading: 'Tasks', subheading: 'Employees ko daily tasks assign karein.' };
-
-function buildTasksViewData(db) {
-  const employees = db.users.filter((u) => u.role === 'employee' && u.active);
-  const tasks = db.tasks
-    .filter((t) => t.active)
-    .map((t) => ({ ...t, employeeName: (db.users.find((u) => u.id === t.assignedTo) || {}).name || 'Unknown' }));
-  const groups = employees
-    .map((emp) => ({ employee: emp, tasks: tasks.filter((t) => t.assignedTo === emp.id) }))
-    .filter((g) => g.tasks.length > 0);
-  return { employees, tasks, groups };
-}
-
-router.get('/tasks', (req, res) => {
-  const db = load();
-  const { employees, tasks, groups } = buildTasksViewData(db);
-  res.render('admin-tasks', { ...taskPageLocals, tasks, employees, groups, taskCount: tasks.length, error: null });
-});
-
-router.post('/tasks', (req, res) => {
-  const { title, description, assignedTo, detail } = req.body;
-  const db = load();
-  const assigneeIds = (Array.isArray(assignedTo) ? assignedTo : [assignedTo]).filter(Boolean).map(Number);
-
-  if (!title || assigneeIds.length === 0) {
-    const { employees, tasks, groups } = buildTasksViewData(db);
-    return res.render('admin-tasks', { ...taskPageLocals, tasks, employees, groups, taskCount: tasks.length, error: 'Title and at least one assigned employee are required' });
-  }
-
-  const today = todayStr();
-  assigneeIds.forEach((empId) => {
-    const newTask = {
-      id: db.nextId.tasks++,
-      title,
-      description: description || '',
-      detail: detail || '',
-      assignedTo: empId,
-      source: 'admin',
-      active: true,
-      createdAt: new Date().toISOString()
-    };
-    db.tasks.push(newTask);
-
-    // create today's pending log immediately so it shows up right away
-    db.taskLogs.push({
-      id: db.nextId.taskLogs++,
-      taskId: newTask.id,
-      date: today,
-      status: 'pending',
-      completedAt: null
-    });
-  });
-
-  save(db);
-  res.redirect('/admin/tasks');
-});
-
-router.post('/tasks/:id/delete', (req, res) => {
-  const db = load();
-  const task = db.tasks.find((t) => t.id === Number(req.params.id));
-  if (task) {
-    task.active = false;
-    save(db);
-  }
-  res.redirect('/admin/tasks');
 });
 
 module.exports = router;

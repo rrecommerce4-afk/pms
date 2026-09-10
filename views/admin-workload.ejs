@@ -1,0 +1,33 @@
+<%- include('partials/header') %>
+<div class="container container-wide">
+  <div class="page-head">
+    <div>
+      <div class="eyebrow-date">ADMIN OVERVIEW</div>
+      <h1><%= heading %></h1>
+      <p>Employee-wise active tasks, overdue tasks aur workload.</p>
+    </div>
+  </div>
+
+  <div class="list-card">
+    <div class="list-card-head section-card-head"><h2>Workload Breakdown</h2></div>
+    <div class="workload-list">
+      <% if (workload.length) { %>
+        <% workload.forEach(function (r) { %>
+          <a class="wl-row" href="/admin/tasks?employee=<%= r.employee.id %>">
+            <div class="wl-avatar"><%= r.employee.name.trim().split(/\s+/).map(function (w) { return w[0]; }).join('').slice(0, 2).toUpperCase() %></div>
+            <div><div class="wl-name"><%= r.employee.name %></div><div class="wl-role"><%= r.employee.department || 'Team Member' %></div></div>
+            <div class="wl-bar-wrap"><div class="wl-bar-track"><div class="wl-bar-fill" style="width:<%= r.pct %>%;"></div></div><div class="wl-bar-label"><%= r.active %> active</div></div>
+            <div class="wl-stats">
+              <div class="wl-stat"><div class="wl-stat-val<%= r.overdue ? ' red-txt' : '' %>"><%= r.overdue %></div><div class="wl-stat-label">OVERDUE</div></div>
+              <div class="wl-stat"><div class="wl-stat-val"><%= r.completed %></div><div class="wl-stat-label">DONE</div></div>
+            </div>
+          </a>
+        <% }) %>
+      <% } else { %>
+        <div class="empty-state"><div class="empty-state-title">No employees yet.</div><div class="empty-state-sub">Add one from the Employees page.</div></div>
+      <% } %>
+    </div>
+  </div>
+</div>
+<%- include('partials/task-modal') %>
+<%- include('partials/footer') %>

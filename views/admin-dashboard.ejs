@@ -4,120 +4,108 @@
     <div>
       <div class="eyebrow-date">ADMIN OVERVIEW</div>
       <h1><%= heading %></h1>
-      <p><%= chipDate %> &middot; <%= employeeCount %> member<%= employeeCount === 1 ? '' : 's' %> &middot; <%= totalDailyTasks %> task<%= totalDailyTasks === 1 ? '' : 's' %> &middot; <%= completed %>/<%= total %> done today</p>
+      <p>Team ka overview &mdash; kaam kaha atka hai aur kya review ke liye ready hai.</p>
     </div>
   </div>
 
-  <div class="dash-layout">
-    <div class="section-card attn-card">
-      <div class="attn-card-head">
-        <div>
-          <h2>Needs attention</h2>
-          <p>Employees with pending tasks today, most behind first.</p>
-        </div>
-        <span class="pill-stat warning"><%= pending %> pending</span>
+  <div class="summary-row">
+    <a class="sum-card" href="/admin/tasks">
+      <div class="sum-card-top"><span class="sum-label">Total Tasks</span><div class="sum-icon" style="background:var(--info-soft);"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--info)" stroke-width="2"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"/></svg></div></div>
+      <div class="sum-value"><%= summary.total %></div><div class="sum-sub"><%= summary.employeeCount %> employees</div>
+    </a>
+    <a class="sum-card" href="/admin/tasks?due=all">
+      <div class="sum-card-top"><span class="sum-label">In Progress</span><div class="sum-icon" style="background:var(--info-soft);"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--info)" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 3"/></svg></div></div>
+      <div class="sum-value"><%= summary.inProgress %></div><div class="sum-sub">Active right now</div>
+    </a>
+    <a class="sum-card" href="/admin/review">
+      <div class="sum-card-top"><span class="sum-label">Pending Review</span><div class="sum-icon" style="background:var(--purple-soft);"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--purple)" stroke-width="2"><path d="M12 20h9M16.5 3.5a2.1 2.1 0 013 3L7 19l-4 1 1-4z"/></svg></div></div>
+      <div class="sum-value"><%= summary.pendingReview %></div><div class="sum-sub">Waiting on you</div>
+    </a>
+    <a class="sum-card<%= summary.overdue ? ' warn' : '' %>" href="/admin/tasks?due=overdue">
+      <div class="sum-card-top"><span class="sum-label">Overdue</span><div class="sum-icon" style="background:var(--danger-soft);"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--danger)" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 8v5M12 16h.01"/></svg></div></div>
+      <div class="sum-value"><%= summary.overdue %></div><div class="sum-sub">Past due date</div>
+    </a>
+    <a class="sum-card" href="/admin/tasks">
+      <div class="sum-card-top"><span class="sum-label">Completed</span><div class="sum-icon" style="background:var(--success-soft);"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--success)" stroke-width="2"><path d="M20 6L9 17l-5-5"/></svg></div></div>
+      <div class="sum-value"><%= summary.completed %></div><div class="sum-sub">All time</div>
+    </a>
+  </div>
+
+  <div class="list-card">
+    <div class="list-card-head section-card-head">
+      <h2>Needs Attention</h2>
+      <span class="tag-count"><%= attention.length %></span>
+    </div>
+    <% if (attention.length) { %>
+      <% attention.forEach(function (t) { %>
+        <%
+          var flag = 'blue', meta = '';
+          if (t.overdue) { flag = 'red'; meta = 'Assigned to ' + t.assigneeName + ' · Due ' + t.dueLabel + ' · ' + t.overdueDaysCount + ' day' + (t.overdueDaysCount > 1 ? 's' : '') + ' overdue'; }
+          else if (t.status === 'blocked') { flag = 'amber'; meta = 'Assigned to ' + t.assigneeName + ' · Blocked: ' + (t.blockedReason || ''); }
+          else if (t.status === 'review') { meta = 'Submitted by ' + t.assigneeName + ' · Waiting for your review'; }
+        %>
+        <a class="attn-row" href="<%= taskUrl(pageUrl, t.id) %>">
+          <div class="attn-flag <%= flag %>"></div>
+          <div class="attn-body"><div class="attn-title"><%= t.title %></div><div class="attn-meta"><%= meta %></div></div>
+          <% if (t.overdue) { %><span class="attn-badge overdue">Overdue</span>
+          <% } else if (t.status === 'blocked') { %><span class="attn-badge blocked">Blocked</span>
+          <% } else if (t.status === 'review') { %><span class="attn-badge review">In Review</span><% } %>
+        </a>
+      <% }) %>
+    <% } else { %>
+      <div class="empty-state">
+        <svg width="34" height="34" viewBox="0 0 24 24" fill="none"><path d="M20 6L9 17l-5-5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        <div class="empty-state-title">Sab kuchh on track hai!</div>
+        <div class="empty-state-sub">Koi overdue, blocked ya pending review task nahi hai.</div>
       </div>
-      <div class="attn-list">
-        <% needsAttention.forEach(function(e) { %>
-          <div class="attn-row">
-            <div class="attn-who">
-              <div class="avatar-wrap">
-                <div class="avatar"><%= e.name.trim().charAt(0).toUpperCase() %></div>
-                <% if (e.missed > 0) { %><a class="missed-badge" href="/admin/missed?employee=<%= e.id %>" title="<%= e.missed %> missed task(s) &mdash; click to view"><%= e.missed %></a><% } %>
-              </div>
-              <div>
-                <div class="attn-name"><%= e.name %></div>
-                <div class="attn-dept"><%= e.department %></div>
-              </div>
-            </div>
-            <div class="attn-progress">
-              <span class="attn-track"><span class="attn-fill" style="width:<%= e.pct %>%"></span></span>
-              <span class="attn-count"><b><%= e.completed %></b>/<%= e.total %> done</span>
-            </div>
-          </div>
-        <% }) %>
-        <% if (needsAttention.length === 0) { %>
-          <div class="attn-row" style="color:var(--text-faint);">No employees yet. Add one from the Employees page.</div>
+    <% } %>
+  </div>
+
+  <div class="list-card">
+    <div class="list-card-head section-card-head">
+      <h2>Task Overview</h2>
+      <%- include('partials/view-toggle', { basePath: '/admin/dashboard' }) %>
+    </div>
+    <% if (filters.view === 'kanban') { %>
+      <%- include('partials/kanban', { tasks: filtered, showAssignee: true, pageUrl: pageUrl }) %>
+    <% } else { %>
+      <%- include('partials/task-table', { tasks: filtered, showAssignee: true, showDelete: false, pageUrl: pageUrl, emptyTitle: 'Koi task nahi mila' }) %>
+    <% } %>
+  </div>
+
+  <div class="split-row">
+    <div class="section-card col-main" style="padding:0;">
+      <div class="list-card-head section-card-head">
+        <h2>Team Workload</h2>
+        <a class="link-more" href="/admin/workload">Full report &rarr;</a>
+      </div>
+      <div class="workload-list">
+        <% if (workload.length) { %>
+          <% workload.forEach(function (r) { %>
+            <a class="wl-row" href="/admin/tasks?employee=<%= r.employee.id %>">
+              <div class="wl-avatar"><%= r.employee.name.trim().split(/\s+/).map(function (w) { return w[0]; }).join('').slice(0, 2).toUpperCase() %></div>
+              <div><div class="wl-name"><%= r.employee.name %></div><div class="wl-role"><%= r.employee.department || 'Team Member' %></div></div>
+              <div class="wl-bar-wrap"><div class="wl-bar-track"><div class="wl-bar-fill" style="width:<%= r.pct %>%;"></div></div><div class="wl-bar-label"><%= r.active %> active</div></div>
+              <div class="wl-stats"><div class="wl-stat"><div class="wl-stat-val<%= r.overdue ? ' red-txt' : '' %>"><%= r.overdue %></div><div class="wl-stat-label">OVERDUE</div></div></div>
+            </a>
+          <% }) %>
+        <% } else { %>
+          <div class="empty-state"><div class="empty-state-title">No employees yet.</div></div>
         <% } %>
       </div>
     </div>
-
-    <div class="dash-side">
-      <div class="section-card tc-card">
-        <h2>Today's completion</h2>
-        <div class="tc-percent-row">
-          <span class="tc-percent"><%= donutPct %>%</span>
-          <span class="tc-caption">of today's tasks marked done</span>
-        </div>
-        <span class="tc-track"><span class="tc-fill" style="width:<%= donutPct %>%"></span></span>
-        <div class="tc-legend">
-          <span class="legend-item"><span class="legend-dot completed"></span> <%= completed %> completed</span>
-          <span class="legend-item"><span class="legend-dot pending"></span> <%= pending %> pending</span>
-        </div>
-      </div>
-
-      <div class="section-card snapshot-card">
-        <h2>Team snapshot</h2>
-        <div class="snapshot-list">
-          <div class="snapshot-row"><span class="snapshot-label">Team members</span><span class="snapshot-value"><%= employeeCount %></span></div>
-          <div class="snapshot-row"><span class="snapshot-label">Admins</span><span class="snapshot-value"><%= adminCount %></span></div>
-          <div class="snapshot-row"><span class="snapshot-label">Total daily tasks</span><span class="snapshot-value"><%= totalDailyTasks %></span></div>
-          <div class="snapshot-row"><span class="snapshot-label">Missed yesterday</span><span class="snapshot-value danger"><%= missedYesterday %></span></div>
-        </div>
-      </div>
-    </div>
-  </div>
-
-  <div class="section-card">
-    <div class="section-card-head">
-      <div>
-        <div class="eyebrow">RECENT TASKS</div>
-        <h2>Today's Team Tasks</h2>
-      </div>
-      <a class="view-all" href="/admin/tasks">View all tasks &rsaquo;</a>
-    </div>
-    <div class="table-card" style="box-shadow:none; border:1px solid var(--border);">
-      <div class="table-scroll">
-      <table>
-        <thead>
-          <tr><th>Task Name</th><th>Assigned To</th><th>Status</th></tr>
-        </thead>
-        <tbody>
-          <% recentTasks.forEach(function(r) { %>
-            <% const done = r.log.status === 'completed'; %>
-            <tr>
-              <td>
-                <div class="name-cell">
-                  <span class="status-dot <%= done ? 'completed' : 'pending' %>">
-                    <% if (done) { %><svg width="11" height="11" viewBox="0 0 24 24" fill="none"><path d="M20 6L9 17l-5-5" stroke="#fff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg><% } %>
-                  </span>
-                  <span style="<%= done ? 'color:var(--text-faint); text-decoration:line-through;' : '' %>"><%= r.task.title %></span>
-                </div>
-              </td>
-              <td>
-                <div class="name-cell">
-                  <div class="avatar" style="width:26px;height:26px;font-size:11px;"><%= r.employeeName.trim().charAt(0).toUpperCase() %></div>
-                  <%= r.employeeName %>
-                </div>
-              </td>
-              <td>
-                <span class="badge icon-pill <%= done ? 'completed' : 'pending' %>">
-                  <% if (done) { %>
-                    <svg width="11" height="11" viewBox="0 0 24 24" fill="none"><path d="M20 6L9 17l-5-5" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg> Complete
-                  <% } else { %>
-                    <svg width="11" height="11" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="2.4"/><path d="M12 7v5l3.5 2" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg> Pending
-                  <% } %>
-                </span>
-              </td>
-            </tr>
-          <% }) %>
-          <% if (recentTasks.length === 0) { %>
-            <tr class="empty-row"><td colspan="3">No tasks yet today.</td></tr>
-          <% } %>
-        </tbody>
-      </table>
-      </div>
+    <div class="section-card col-side" style="padding:0;">
+      <div class="list-card-head section-card-head"><h2>Recent Activity</h2></div>
+      <% if (activity.length) { %>
+        <% activity.forEach(function (a) { %>
+          <div class="activity-row"><div class="act-dot"></div><div><div class="act-text"><%- a.text %></div><div class="act-time"><%= a.time %></div></div></div>
+        <% }) %>
+      <% } else { %>
+        <div class="empty-state"><div class="empty-state-title">No recent activity yet.</div></div>
+      <% } %>
     </div>
   </div>
 </div>
+<%- include('partials/task-detail') %>
+<%- include('partials/task-modal') %>
 <%- include('partials/footer') %>

@@ -1,0 +1,17 @@
+<%- include('partials/header') %>
+<div class="container container-wide">
+  <div class="page-head">
+    <div>
+      <div class="eyebrow-date">MY WORK</div>
+      <h1><%= heading %></h1>
+      <p>Aapke submit kiye hue kaam ka status.</p>
+    </div>
+  </div>
+
+  <div class="list-card">
+    <div class="list-card-head section-card-head"><h2>In Review <span class="tag-count"><%= filtered.length %></span></h2></div>
+    <%- include('partials/task-table', { tasks: filtered, showAssignee: false, showDelete: false, pageUrl: pageUrl, emptyTitle: 'Abhi koi task review ke liye submit nahi kiya hai.' }) %>
+  </div>
+</div>
+<%- include('partials/task-detail') %>
+<%- include('partials/footer') %>

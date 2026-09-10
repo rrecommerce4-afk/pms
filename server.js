@@ -1,9 +1,8 @@
 const express = require('express');
 const session = require('express-session');
-const cron = require('node-cron');
 const path = require('path');
 
-const { seedAdminIfNeeded, ensureTodayLogs } = require('./db');
+const { seedAdminIfNeeded } = require('./db');
 const { topDateStr, dateBadge, dashboardPathForRole } = require('./utils');
 const authRoutes = require('./routes/auth');
 const adminRoutes = require('./routes/admin');
@@ -15,6 +14,10 @@ const PORT = process.env.PORT || 3000;
 
 app.set('view engine', 'ejs');
 app.set('views', path.join(__dirname, 'views'));
+
+// Appends `task=<id>` to a page URL (path + querystring) so a list page reopens
+// the task detail slide-over pointed at that task.
+app.locals.taskUrl = (base, id) => base + (base.includes('?') ? '&' : '?') + 'task=' + id;
 
 app.use(express.urlencoded({ extended: true }));
 app.use(express.static(path.join(__dirname, 'public')));
@@ -47,14 +50,7 @@ app.use('/admin', adminRoutes);
 app.use('/employee', employeeRoutes);
 app.use('/viewer', viewerRoutes);
 
-// Reset every employee's daily tasks back to pending at midnight, every day.
-cron.schedule('0 0 * * *', () => {
-  console.log('[cron] Midnight reset: creating today\'s pending task logs...');
-  ensureTodayLogs();
-});
-
 seedAdminIfNeeded();
-ensureTodayLogs();
 
 app.listen(PORT, () => {
   console.log(`PMS running at http://localhost:${PORT}`);

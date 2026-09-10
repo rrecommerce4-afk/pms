@@ -57,13 +57,27 @@ function formatIsoDate(isoDate) {
 
 // Given a YYYY-MM-DD string, returns the day before it in the same format.
 function yesterdayStr(todayIso) {
-  const [y, m, d] = todayIso.split('-').map(Number);
+  return addDays(todayIso, -1);
+}
+
+// Given a YYYY-MM-DD string, returns the date `days` after it (negative to go back), same format.
+function addDays(isoDate, days) {
+  const [y, m, d] = isoDate.split('-').map(Number);
   const dt = new Date(y, m - 1, d);
-  dt.setDate(dt.getDate() - 1);
+  dt.setDate(dt.getDate() + days);
   const yy = dt.getFullYear();
   const mm = String(dt.getMonth() + 1).padStart(2, '0');
   const dd = String(dt.getDate()).padStart(2, '0');
   return `${yy}-${mm}-${dd}`;
 }
 
-module.exports = { greetingWord, topDateStr, firstName, dateBadge, listDateStr, chipDateStr, formatIsoDate, yesterdayStr, dashboardPathForRole };
+// Whole-day difference between two YYYY-MM-DD strings (b - a), in days.
+function daysBetween(aIso, bIso) {
+  const [ay, am, ad] = aIso.split('-').map(Number);
+  const [by, bm, bd] = bIso.split('-').map(Number);
+  const a = Date.UTC(ay, am - 1, ad);
+  const b = Date.UTC(by, bm - 1, bd);
+  return Math.round((b - a) / 86400000);
+}
+
+module.exports = { greetingWord, topDateStr, firstName, dateBadge, listDateStr, chipDateStr, formatIsoDate, yesterdayStr, addDays, daysBetween, dashboardPathForRole };

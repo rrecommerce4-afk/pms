@@ -1,0 +1,311 @@
+<% if (typeof detailTask !== 'undefined' && detailTask) { %>
+<%
+  var t = detailTask;
+  var isAdmin = role === 'admin';
+  var isEmployee = role === 'employee';
+  var readOnly = role === 'viewer';
+  var basePath = isAdmin ? '/admin' : '/employee';
+  var STEP_STATUSES = ['todo', 'progress', 'review', 'completed'];
+  var effectiveIndex = STEP_STATUSES.indexOf(t.status);
+  if (t.status === 'changes' || t.status === 'blocked') effectiveIndex = STEP_STATUSES.indexOf('progress');
+  var STEP_LABELS = { todo: 'To Do', progress: 'In Progress', review: 'In Review', completed: 'Completed' };
+%>
+<div class="overlay open" id="taskOverlay">
+  <div class="detail-panel">
+    <div class="detail-head">
+      <div class="detail-head-top">
+        <div>
+          <div class="detail-id">TSK-<%= t.id %></div>
+          <div class="detail-title"><%= t.title %></div>
+        </div>
+        <a href="<%= pageUrl %>" class="close-btn"><svg width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M18 6L6 18M6 6l12 12" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></a>
+      </div>
+      <div class="detail-badges">
+        <span class="badge p-<%= t.priority %>"><%= t.priorityText %></span>
+        <span class="status-pill <%= t.statusPill %>"><%= t.statusLabel %></span>
+        <% if (t.recurText) { %>
+          <span class="recur-badge"><svg width="11" height="11" viewBox="0 0 24 24" fill="none"><path d="M17 2.1l4 4-4 4M3 12.6v-1a4 4 0 014-4h14M7 21.9l-4-4 4-4M21 11.4v1a4 4 0 01-4 4H3" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg><%= t.recurText %></span>
+        <% } %>
+        <% if (t.overdue) { %><span class="attn-badge overdue"><%= t.overdueDaysCount %> day<%= t.overdueDaysCount > 1 ? 's' : '' %> overdue</span><% } %>
+      </div>
+    </div>
+
+    <div class="status-stepper">
+      <% STEP_STATUSES.forEach(function (s, i) { %>
+        <div class="step <%= i < effectiveIndex ? 'done' : (i === effectiveIndex ? 'current' : '') %>">
+          <div class="step-line"></div>
+          <div class="step-dot"></div>
+          <div class="step-label"><%= STEP_LABELS[s] %></div>
+        </div>
+      <% }) %>
+    </div>
+
+    <% if (t.blocked) { %>
+      <div class="blocked-banner">
+        <svg width="17" height="17" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="2"/><path d="M12 8v5M12 16h.01" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+        <div><div class="blocked-banner-title">This task is blocked</div><div class="blocked-banner-text"><%= t.blockedReason %></div></div>
+      </div>
+    <% } %>
+
+    <div class="detail-body">
+      <div class="detail-block">
+        <div class="detail-block-label">
+          Description &amp; Expected Output
+          <% if (isAdmin) { %><button type="button" class="link-more" id="showEditBtn" style="border:none;background:none;cursor:pointer;">Edit</button><% } %>
+        </div>
+        <div class="detail-desc" id="descReadView"><%= t.description || 'No description provided.' %></div>
+        <% if (isAdmin) { %>
+          <form method="POST" action="/admin/tasks/<%= t.id %>/update" id="editTitleDescForm" style="display:none;">
+            <input type="hidden" name="back" value="<%= pageUrl %>">
+            <input type="text" name="title" value="<%= t.title %>" required class="editable-field-title">
+            <textarea name="description" rows="4" class="editable-field-desc"><%= t.description %></textarea>
+            <div class="inline-form-actions">
+              <button type="button" class="btn outline small" id="cancelEditBtn">Cancel</button>
+              <button class="btn small" type="submit">Save</button>
+            </div>
+          </form>
+        <% } %>
+      </div>
+
+      <div class="detail-block">
+        <div class="meta-grid">
+          <div>
+            <div class="meta-item-label">Assigned to</div>
+            <div class="meta-item-val">
+              <% if (isAdmin) { %>
+                <form method="POST" action="/admin/tasks/<%= t.id %>/update">
+                  <input type="hidden" name="back" value="<%= pageUrl %>">
+                  <select name="assignedTo" class="autosubmit-field">
+                    <% employees.forEach(function (e) { %><option value="<%= e.id %>" <%= e.id === t.assignedTo ? 'selected' : '' %>><%= e.name %></option><% }) %>
+                  </select>
+                </form>
+              <% } else { %>
+                <div class="mini-avatar"><%= t.assigneeInitials %></div><%= t.assigneeName %>
+              <% } %>
+            </div>
+          </div>
+          <div><div class="meta-item-label">Assigned by</div><div class="meta-item-val"><%= t.assignedByName %></div></div>
+          <div>
+            <div class="meta-item-label">Start date</div>
+            <div class="meta-item-val">
+              <% if (isAdmin) { %>
+                <form method="POST" action="/admin/tasks/<%= t.id %>/update"><input type="hidden" name="back" value="<%= pageUrl %>"><input type="date" name="startDate" class="autosubmit-field" value="<%= t.startDate %>"></form>
+              <% } else { %><%= t.startLabel %><% } %>
+            </div>
+          </div>
+          <div>
+            <div class="meta-item-label">Due date</div>
+            <div class="meta-item-val">
+              <% if (isAdmin) { %>
+                <form method="POST" action="/admin/tasks/<%= t.id %>/update"><input type="hidden" name="back" value="<%= pageUrl %>"><input type="date" name="dueDate" class="autosubmit-field" value="<%= t.dueDate %>"></form>
+              <% } else { %><%= t.dueLabel %><% } %>
+            </div>
+          </div>
+          <div>
+            <div class="meta-item-label">Repeats</div>
+            <div class="meta-item-val">
+              <% if (isAdmin) { %>
+                <form method="POST" action="/admin/tasks/<%= t.id %>/update">
+                  <input type="hidden" name="back" value="<%= pageUrl %>">
+                  <select name="recurrence" class="autosubmit-field">
+                    <option value="none" <%= t.recurrence === 'none' ? 'selected' : '' %>>One-time</option>
+                    <option value="daily" <%= t.recurrence === 'daily' ? 'selected' : '' %>>Daily</option>
+                    <option value="weekly" <%= t.recurrence === 'weekly' ? 'selected' : '' %>>Weekly</option>
+                    <option value="biweekly" <%= t.recurrence === 'biweekly' ? 'selected' : '' %>>Every 15 days</option>
+                    <option value="monthly" <%= t.recurrence === 'monthly' ? 'selected' : '' %>>Monthly</option>
+                  </select>
+                </form>
+              <% } else { %><%= t.recurText || 'One-time' %><% } %>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="detail-block">
+        <div class="detail-block-label">Checklist</div>
+        <div>
+          <% if (t.checklist.length) { %>
+            <% t.checklist.forEach(function (c, idx) { %>
+              <div class="checklist-item">
+                <% if (!readOnly) { %>
+                  <form method="POST" action="<%= basePath %>/tasks/<%= t.id %>/checklist/<%= idx %>/toggle" style="display:contents;">
+                    <input type="hidden" name="back" value="<%= pageUrl %>">
+                    <button type="submit" class="check-box <%= c.done ? 'checked' : '' %>"><% if (c.done) { %><svg width="10" height="10" viewBox="0 0 24 24" fill="none"><path d="M20 6L9 17l-5-5" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg><% } %></button>
+                  </form>
+                <% } else { %>
+                  <div class="check-box <%= c.done ? 'checked' : '' %>"><% if (c.done) { %><svg width="10" height="10" viewBox="0 0 24 24" fill="none"><path d="M20 6L9 17l-5-5" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg><% } %></div>
+                <% } %>
+                <div class="check-text <%= c.done ? 'done' : '' %>"><%= c.text %></div>
+                <% if (isAdmin) { %>
+                  <form method="POST" action="/admin/tasks/<%= t.id %>/checklist/<%= idx %>/remove" style="display:contents;">
+                    <input type="hidden" name="back" value="<%= pageUrl %>">
+                    <button type="submit" class="check-remove"><svg width="13" height="13" viewBox="0 0 24 24" fill="none"><path d="M18 6L6 18M6 6l12 12" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></button>
+                  </form>
+                <% } %>
+              </div>
+            <% }) %>
+          <% } else { %>
+            <div style="font-size:12.5px;color:var(--text-faint);padding:4px 0 2px;">Abhi koi checklist item nahi hai<% if (!readOnly) { %> — neeche box mein add karein.<% } %></div>
+          <% } %>
+        </div>
+        <% if (!readOnly) { %>
+          <form method="POST" action="<%= basePath %>/tasks/<%= t.id %>/checklist/add" class="add-check-row">
+            <input type="hidden" name="back" value="<%= pageUrl %>">
+            <input type="text" name="text" placeholder="Naya checklist item add karein..." required>
+            <button class="btn small outline" type="submit">Add</button>
+          </form>
+        <% } %>
+      </div>
+
+      <div class="detail-block">
+        <div class="detail-block-label">Reference Files &amp; Attachments</div>
+        <div>
+          <% if (t.files.length) { %>
+            <% t.files.forEach(function (f) { %>
+              <div class="file-chip"><svg width="15" height="15" viewBox="0 0 24 24" fill="none"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M14 2v6h6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg><span class="fname"><%= f.name %></span></div>
+            <% }) %>
+          <% } else { %>
+            <div style="font-size:12.5px;color:var(--text-faint);">No reference files attached yet.</div>
+          <% } %>
+        </div>
+        <% if (isAdmin) { %>
+          <form method="POST" action="/admin/tasks/<%= t.id %>/files/add" class="add-check-row">
+            <input type="hidden" name="back" value="<%= pageUrl %>">
+            <input type="text" name="name" placeholder="e.g. Reference-deck.pdf" required>
+            <button class="btn small outline" type="submit">Add</button>
+          </form>
+        <% } %>
+      </div>
+
+      <div class="detail-block">
+        <div class="detail-block-label">Comments &amp; Feedback</div>
+        <div>
+          <% if (t.comments.length) { %>
+            <% t.comments.forEach(function (c) { %>
+              <div class="comment-item">
+                <div class="mini-avatar" style="width:28px;height:28px;font-size:11px;"><%= (c.name || '').trim().split(/\s+/).map(function (w) { return w[0]; }).join('').slice(0, 2).toUpperCase() %></div>
+                <div class="comment-body">
+                  <div class="comment-head"><span class="comment-name"><%= c.name %></span><span class="comment-time"><%= c.timeLabel %></span></div>
+                  <div class="comment-text <%= c.feedback ? 'feedback' : '' %>"><%= c.text %></div>
+                </div>
+              </div>
+            <% }) %>
+          <% } else { %>
+            <div style="font-size:12.5px;color:var(--text-faint);">No comments yet.</div>
+          <% } %>
+        </div>
+        <% if (!readOnly) { %>
+          <form method="POST" action="<%= basePath %>/tasks/<%= t.id %>/comment" class="add-comment-row">
+            <input type="hidden" name="back" value="<%= pageUrl %>">
+            <textarea name="text" placeholder="Comment likhein..." required></textarea>
+            <button class="btn small outline" type="submit">Post</button>
+          </form>
+        <% } %>
+      </div>
+    </div>
+
+    <% if (isEmployee && ['todo', 'progress', 'changes'].indexOf(t.status) !== -1) { %>
+      <div class="inline-form" id="blockForm" style="display:none;">
+        <div class="detail-block-label">Reason for blocking</div>
+        <form method="POST" action="/employee/tasks/<%= t.id %>/block">
+          <input type="hidden" name="back" value="<%= pageUrl %>">
+          <textarea class="inline-textarea" name="reason" placeholder="e.g. Assets vendor se abhi tak nahi mile..." required></textarea>
+          <div class="inline-form-actions">
+            <button type="button" class="btn outline" id="cancelBlockBtn">Cancel</button>
+            <button class="btn btn-danger" type="submit">Confirm Block</button>
+          </div>
+        </form>
+      </div>
+    <% } %>
+    <% if (isAdmin && t.status === 'review') { %>
+      <div class="inline-form" id="changesForm" style="display:none;">
+        <div class="detail-block-label">Feedback for employee</div>
+        <form method="POST" action="/admin/tasks/<%= t.id %>/request-changes">
+          <input type="hidden" name="back" value="<%= pageUrl %>">
+          <textarea class="inline-textarea" name="feedback" placeholder="Kya badalna hai, clearly likhein..." required></textarea>
+          <div class="inline-form-actions">
+            <button type="button" class="btn outline" id="cancelChangesBtn">Cancel</button>
+            <button class="btn" type="submit">Send Feedback</button>
+          </div>
+        </form>
+      </div>
+    <% } %>
+
+    <div class="detail-footer">
+      <% if (isEmployee) { %>
+        <% if (t.status === 'todo') { %>
+          <button type="button" class="btn btn-danger" id="showBlockFormBtn">Mark as Blocked</button>
+          <form method="POST" action="/employee/tasks/<%= t.id %>/start"><input type="hidden" name="back" value="<%= pageUrl %>"><button class="btn" type="submit">Start Task</button></form>
+        <% } else if (t.status === 'progress') { %>
+          <button type="button" class="btn btn-danger" id="showBlockFormBtn">Mark as Blocked</button>
+          <% if (t.recurrence === 'daily') { %>
+            <form method="POST" action="/employee/tasks/<%= t.id %>/complete-direct"><input type="hidden" name="back" value="<%= pageUrl %>"><button class="btn" type="submit">Mark Complete</button></form>
+          <% } else { %>
+            <form method="POST" action="/employee/tasks/<%= t.id %>/submit-review"><input type="hidden" name="back" value="<%= pageUrl %>"><button class="btn" type="submit">Submit for Review</button></form>
+          <% } %>
+        <% } else if (t.status === 'changes') { %>
+          <button type="button" class="btn btn-danger" id="showBlockFormBtn">Mark as Blocked</button>
+          <form method="POST" action="/employee/tasks/<%= t.id %>/submit-review"><input type="hidden" name="back" value="<%= pageUrl %>"><button class="btn" type="submit">Resubmit for Review</button></form>
+        <% } else if (t.status === 'blocked') { %>
+          <form method="POST" action="/employee/tasks/<%= t.id %>/unblock"><input type="hidden" name="back" value="<%= pageUrl %>"><button class="btn btn-outline-accent" type="submit">Resume Task</button></form>
+        <% } else if (t.status === 'review') { %>
+          <span style="font-size:12.5px;color:var(--text-faint);align-self:center;">Waiting for admin review…</span>
+        <% } else { %>
+          <span style="font-size:12.5px;color:var(--success);align-self:center;font-weight:600;">✓ Completed<%= t.recurrence !== 'none' ? ' · next occurrence created' : '' %></span>
+        <% } %>
+      <% } else if (isAdmin) { %>
+        <form method="POST" action="/admin/tasks/<%= t.id %>/delete" style="margin-right:auto;" onsubmit="return confirm('Delete this task permanently?');"><input type="hidden" name="back" value="<%= pageUrl %>"><button class="btn btn-danger" type="submit">Delete</button></form>
+        <a href="<%= pageUrl %>" class="btn outline">Close</a>
+        <% if (t.status === 'review') { %>
+          <button type="button" class="btn btn-danger" id="showChangesFormBtn">Request Changes</button>
+          <form method="POST" action="/admin/tasks/<%= t.id %>/approve"><input type="hidden" name="back" value="<%= pageUrl %>"><button class="btn" type="submit">Approve &amp; Complete</button></form>
+        <% } else if (t.status === 'completed') { %>
+          <span style="font-size:12.5px;color:var(--success);align-self:center;font-weight:600;">✓ Approved &amp; Completed</span>
+        <% } %>
+      <% } else { %>
+        <a href="<%= pageUrl %>" class="btn outline">Close</a>
+      <% } %>
+    </div>
+  </div>
+</div>
+
+<script>
+  (function () {
+    document.querySelectorAll('.autosubmit-field').forEach(function (el) {
+      el.addEventListener('change', function () { el.form.submit(); });
+    });
+
+    var showEdit = document.getElementById('showEditBtn');
+    var editForm = document.getElementById('editTitleDescForm');
+    var readView = document.getElementById('descReadView');
+    var cancelEdit = document.getElementById('cancelEditBtn');
+    if (showEdit) {
+      showEdit.addEventListener('click', function () { editForm.style.display = 'block'; readView.style.display = 'none'; showEdit.style.display = 'none'; });
+      cancelEdit.addEventListener('click', function () { editForm.style.display = 'none'; readView.style.display = 'block'; showEdit.style.display = 'inline'; });
+    }
+
+    var showBlock = document.getElementById('showBlockFormBtn');
+    var blockForm = document.getElementById('blockForm');
+    var cancelBlock = document.getElementById('cancelBlockBtn');
+    if (showBlock && blockForm) {
+      showBlock.addEventListener('click', function () { blockForm.style.display = 'block'; });
+      cancelBlock.addEventListener('click', function () { blockForm.style.display = 'none'; });
+    }
+
+    var showChanges = document.getElementById('showChangesFormBtn');
+    var changesForm = document.getElementById('changesForm');
+    var cancelChanges = document.getElementById('cancelChangesBtn');
+    if (showChanges && changesForm) {
+      showChanges.addEventListener('click', function () { changesForm.style.display = 'block'; });
+      cancelChanges.addEventListener('click', function () { changesForm.style.display = 'none'; });
+    }
+
+    var overlay = document.getElementById('taskOverlay');
+    if (overlay) {
+      overlay.addEventListener('click', function (e) {
+        if (e.target === overlay) window.location.href = '<%= pageUrl %>';
+      });
+    }
+  })();
+</script>
+<% } %>

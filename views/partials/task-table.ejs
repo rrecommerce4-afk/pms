@@ -1,0 +1,55 @@
+<% if (!(tasks || []).length) { %>
+  <table><tbody><tr class="empty-row"><td><%= typeof emptyTitle !== 'undefined' ? emptyTitle : 'No tasks found.' %></td></tr></tbody></table>
+<% } else { %>
+  <div class="table-scroll">
+  <table>
+    <thead>
+      <tr>
+        <th>Task Name</th>
+        <% if (typeof showAssignee !== 'undefined' && showAssignee) { %><th><%= typeof assigneeColLabel !== 'undefined' ? assigneeColLabel : 'Assigned To' %></th><% } %>
+        <th>Priority</th>
+        <th>Due Date</th>
+        <th>Status</th>
+        <th></th>
+      </tr>
+    </thead>
+    <tbody>
+      <% tasks.forEach(function (t) { %>
+        <tr>
+          <td>
+            <a href="<%= taskUrl(pageUrl, t.id) %>" class="name-cell" style="text-decoration:none;color:inherit;">
+              <div>
+                <div style="font-weight:600;color:var(--text);"><%= t.title %><% if (t.recurText) { %><span class="recur-badge"><svg width="11" height="11" viewBox="0 0 24 24" fill="none"><path d="M17 2.1l4 4-4 4M3 12.6v-1a4 4 0 014-4h14M7 21.9l-4-4 4-4M21 11.4v1a4 4 0 01-4 4H3" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg><%= t.recurText %></span><% } %></div>
+                <div class="task-id">TSK-<%= t.id %></div>
+              </div>
+            </a>
+          </td>
+          <% if (typeof showAssignee !== 'undefined' && showAssignee) { %>
+            <td><div class="name-cell"><div class="mini-avatar"><%= t.assigneeInitials %></div><%= t.assigneeName %></div></td>
+          <% } %>
+          <td><span class="badge p-<%= t.priority %>"><%= t.priorityText %></span></td>
+          <td>
+            <% if (t.overdue) { %>
+              <div class="due-cell due-overdue"><%= t.dueLabel %> <span class="mini-overdue-tag">OVERDUE</span></div>
+            <% } else { %>
+              <div class="due-cell"><%= t.dueLabel %></div>
+            <% } %>
+          </td>
+          <td><span class="status-pill <%= t.statusPill %>"><%= t.statusLabel %></span></td>
+          <td>
+            <div class="row-actions-cell">
+              <a href="<%= taskUrl(pageUrl, t.id) %>" class="btn small outline"><%= t.status === 'review' ? 'Review' : 'View' %></a>
+              <% if (typeof showDelete !== 'undefined' && showDelete) { %>
+                <form method="POST" action="/admin/tasks/<%= t.id %>/delete" onsubmit="return confirm('Delete this task permanently?');">
+                  <input type="hidden" name="back" value="<%= pageUrl %>">
+                  <button type="submit" class="row-icon-btn" title="Delete task"><svg width="15" height="15" viewBox="0 0 24 24" fill="none"><path d="M3 6h18M8 6V4a2 2 0 012-2h4a2 2 0 012 2v2m3 0l-1 14a2 2 0 01-2 2H7a2 2 0 01-2-2L4 6h16z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+                </form>
+              <% } %>
+            </div>
+          </td>
+        </tr>
+      <% }) %>
+    </tbody>
+  </table>
+  </div>
+<% } %>

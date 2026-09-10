@@ -1,31 +1,19 @@
 const fs = require('fs');
 const path = require('path');
 const bcrypt = require('bcryptjs');
+const { addDays } = require('./utils');
 
 const DB_FILE = path.join(__dirname, 'db.json');
+const SCHEMA_VERSION = 2;
 
 function emptyDb() {
   return {
+    schemaVersion: SCHEMA_VERSION,
     users: [],
     tasks: [],
-    taskLogs: [],
-    nextId: { users: 1, tasks: 1, taskLogs: 1 }
+    activity: [],
+    nextId: { users: 1, tasks: 1 }
   };
-}
-
-function load() {
-  if (!fs.existsSync(DB_FILE)) {
-    const fresh = emptyDb();
-    save(fresh);
-    return fresh;
-  }
-  const raw = fs.readFileSync(DB_FILE, 'utf8');
-  if (!raw.trim()) return emptyDb();
-  return JSON.parse(raw);
-}
-
-function save(db) {
-  fs.writeFileSync(DB_FILE, JSON.stringify(db, null, 2));
 }
 
 // Today's date as YYYY-MM-DD in server local time
@@ -37,77 +25,73 @@ function todayStr() {
   return `${y}-${m}-${day}`;
 }
 
-// Create a pending log for today for every active task that doesn't have one yet.
-// Called on server start, at midnight via cron, and lazily on dashboard loads
-// so tasks are always "reset" to pending for the current day.
-function ensureTodayLogs() {
-  const db = load();
+// Upgrades tasks created under the old daily-checklist model (no `status` field)
+// into the new workflow-task shape, and drops the retired taskLogs table.
+// Runs once, guarded by schemaVersion, so it's safe to call on every load().
+function migrate(db) {
+  if (db.schemaVersion >= SCHEMA_VERSION) return false;
+
   const today = todayStr();
-  const activeTasks = db.tasks.filter((t) => t.active);
-  let changed = false;
+  const defaultDue = addDays(today, 7);
 
-  for (const task of activeTasks) {
-    const hasLogToday = db.taskLogs.some((l) => l.taskId === task.id && l.date === today);
-    if (!hasLogToday) {
-      db.taskLogs.push({
-        id: db.nextId.taskLogs++,
-        taskId: task.id,
-        date: today,
-        status: 'pending',
+  db.tasks = (db.tasks || [])
+    // old model soft-deleted tasks via active:false — drop those, they were already "removed"
+    .filter((t) => t.status || t.active !== false)
+    .map((t) => {
+      if (t.status) return t;
+      const description = t.detail
+        ? `${t.description || ''}${t.description ? '\n\n' : ''}${t.detail}`.trim()
+        : (t.description || '');
+      return {
+        id: t.id,
+        title: t.title,
+        description,
+        assignedTo: t.assignedTo,
+        assignedByName: 'Admin',
+        priority: 'medium',
+        status: 'todo',
+        recurrence: 'none',
+        startDate: today,
+        dueDate: defaultDue,
+        checklist: [],
+        files: [],
+        comments: [],
+        blocked: false,
+        blockedReason: '',
+        createdAt: t.createdAt || new Date().toISOString(),
         completedAt: null
-      });
-      changed = true;
-    }
-  }
+      };
+    });
 
-  if (changed) save(db);
+  delete db.taskLogs;
+  if (db.nextId) delete db.nextId.taskLogs;
+  db.activity = db.activity || [];
+  db.schemaVersion = SCHEMA_VERSION;
+  return true;
+}
+
+function load() {
+  if (!fs.existsSync(DB_FILE)) {
+    const fresh = emptyDb();
+    save(fresh);
+    return fresh;
+  }
+  const raw = fs.readFileSync(DB_FILE, 'utf8');
+  const db = raw.trim() ? JSON.parse(raw) : emptyDb();
+  if (!db.schemaVersion) db.schemaVersion = 1;
+  if (migrate(db)) save(db);
   return db;
 }
 
-// Lifetime count of tasks a user left "pending" once their day rolled over
-// (i.e. never marked complete before the midnight reset). Past days' logs are
-// never modified after the day ends, so this is a permanent running total.
-function getMissedCount(db, userId, today) {
-  return db.taskLogs.filter((l) => {
-    if (l.date >= today || l.status !== 'pending') return false;
-    const task = db.tasks.find((t) => t.id === l.taskId);
-    return task && task.assignedTo === userId;
-  }).length;
+function save(db) {
+  fs.writeFileSync(DB_FILE, JSON.stringify(db, null, 2));
 }
 
-// The actual list behind getMissedCount: every past-day task log still stuck at
-// "pending" once its day ended. Pass userId to filter to one employee, or leave
-// it null for every employee. Sorted most-recently-missed first.
-function getMissedTasks(db, today, userId) {
-  return db.taskLogs
-    .filter((l) => l.date < today && l.status === 'pending')
-    .map((l) => {
-      const task = db.tasks.find((t) => t.id === l.taskId);
-      if (!task) return null;
-      if (userId && task.assignedTo !== userId) return null;
-      const employee = db.users.find((u) => u.id === task.assignedTo);
-      if (!employee) return null;
-      return { log: l, task, employee };
-    })
-    .filter(Boolean)
-    .sort((a, b) => (a.log.date < b.log.date ? 1 : -1));
-}
-
-// Wipes out the missed-task backlog: deletes every past-day "pending" log so it
-// stops counting toward getMissedCount/getMissedTasks and the calendar dot for
-// that day goes back to "none" instead of red. Pass userId to clear just one
-// employee's backlog, or leave it null to clear everyone's. Returns how many
-// logs were removed.
-function clearMissedTasks(db, today, userId) {
-  const before = db.taskLogs.length;
-  db.taskLogs = db.taskLogs.filter((l) => {
-    if (l.date >= today || l.status !== 'pending') return true;
-    if (!userId) return false;
-    const task = db.tasks.find((t) => t.id === l.taskId);
-    return !(task && task.assignedTo === userId);
-  });
-  save(db);
-  return before - db.taskLogs.length;
+// Adds an activity-feed entry (newest first), capped to the most recent 50.
+function logActivity(db, text) {
+  db.activity = db.activity || [];
+  db.activity.unshift({ text, time: new Date().toISOString() });
+  if (db.activity.length > 50) db.activity.length = 50;
 }
 
 function seedAdminIfNeeded() {
@@ -127,4 +111,4 @@ function seedAdminIfNeeded() {
   }
 }
 
-module.exports = { load, save, todayStr, ensureTodayLogs, getMissedCount, getMissedTasks, clearMissedTasks, seedAdminIfNeeded };
+module.exports = { load, save, todayStr, logActivity, seedAdminIfNeeded };
