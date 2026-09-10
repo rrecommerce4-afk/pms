@@ -1,6 +1,6 @@
 const express = require('express');
 const bcrypt = require('bcryptjs');
-const { load, save, todayStr, logActivity } = require('../db');
+const { load, save, todayStr, logActivity, uniqueSlug, BADGE_COLORS } = require('../db');
 const { requireAdmin } = require('../middleware/auth');
 const T = require('../lib/tasks');
 
@@ -261,108 +261,198 @@ router.post('/tasks/:id/request-changes', (req, res) => {
   res.redirect(T.reopenUrl(req.body.back, task.id));
 });
 
-// ---- Employees / Users (admin can add more admins here too) ----
+// ---- Settings: Employee Management + Departments & Roles ----
 
-const employeesPageLocals = {
-  crumb: 'Employees',
-  heading: 'Team Members',
-  subheading: 'Add employees or additional admins and manage their access.'
-};
+function settingsRedirect(tab, error) {
+  const params = new URLSearchParams();
+  if (tab && tab !== 'employees') params.set('tab', tab);
+  if (error) params.set('error', error);
+  const qs = params.toString();
+  return '/admin/settings' + (qs ? '?' + qs : '');
+}
 
-router.get('/employees', (req, res) => {
+router.get('/settings', (req, res) => {
   const db = load();
+  const tab = req.query.tab === 'departments' ? 'departments' : 'employees';
   const users = db.users.filter((u) => u.active);
-  res.render('admin-employees', {
-    ...employeesPageLocals,
-    users,
+  const departments = db.departments || [];
+
+  res.render('admin-settings', {
+    crumb: 'Settings', heading: 'Settings',
+    tab, users, departments,
     userCount: users.length,
+    deptCount: departments.length,
+    badgeColors: BADGE_COLORS,
     error: req.query.error || null
   });
 });
 
-router.post('/employees', (req, res) => {
-  const { name, email, password, department, role } = req.body;
+router.post('/settings/employees', (req, res) => {
+  const { name, email, password, role, departmentId, roleTitle, color } = req.body;
   const db = load();
   const finalRole = role === 'admin' || role === 'viewer' ? role : 'employee';
 
   if (!name || !email || !password) {
-    return res.redirect('/admin/employees?error=' + encodeURIComponent('Full name, email, and password are required.'));
+    return res.redirect(settingsRedirect('employees', 'Full name, email, and password are required.'));
+  }
+  if (db.users.some((u) => u.email.toLowerCase() === email.toLowerCase())) {
+    return res.redirect(settingsRedirect('employees', 'Email already in use.'));
   }
 
-  const exists = db.users.some((u) => u.email.toLowerCase() === email.toLowerCase());
-  if (exists) {
-    return res.redirect('/admin/employees?error=' + encodeURIComponent('Email already in use.'));
+  let department, finalRoleTitle, finalColor;
+  if (finalRole === 'employee') {
+    const dept = (db.departments || []).find((d) => d.id === departmentId);
+    if (!dept) return res.redirect(settingsRedirect('employees', 'Please select a department.'));
+    if (!roleTitle) return res.redirect(settingsRedirect('employees', 'Please select a role.'));
+    department = dept.name;
+    finalRoleTitle = roleTitle;
+    finalColor = color || BADGE_COLORS[0];
   }
 
   db.users.push({
     id: db.nextId.users++,
-    name,
-    email,
+    name, email,
     passwordHash: bcrypt.hashSync(password, 10),
     role: finalRole,
-    department: finalRole === 'employee' ? (department || 'Team Member') : undefined,
+    department, roleTitle: finalRoleTitle, color: finalColor,
     active: true
   });
+  logActivity(db, `<b>${T.escapeHtml(req.session.name)}</b> added ${T.escapeHtml(name)} to the team`);
   save(db);
-  res.redirect('/admin/employees');
+  res.redirect('/admin/settings');
 });
 
-router.post('/employees/:id/edit', (req, res) => {
-  const { name, email, password, department, role } = req.body;
+router.post('/settings/employees/:id/edit', (req, res) => {
+  const { name, email, password, role, departmentId, roleTitle, color } = req.body;
   const db = load();
   const targetId = Number(req.params.id);
   const user = db.users.find((u) => u.id === targetId);
 
-  if (!user) return res.redirect('/admin/employees?error=' + encodeURIComponent('User not found.'));
+  if (!user) return res.redirect(settingsRedirect('employees', 'User not found.'));
   if (!name || !email) {
-    return res.redirect('/admin/employees?error=' + encodeURIComponent('Full name and email are required.'));
+    return res.redirect(settingsRedirect('employees', 'Full name and email are required.'));
   }
 
   const finalRole = role === 'admin' || role === 'viewer' ? role : 'employee';
-
-  const emailTaken = db.users.some((u) => u.id !== targetId && u.email.toLowerCase() === email.toLowerCase());
-  if (emailTaken) {
-    return res.redirect('/admin/employees?error=' + encodeURIComponent('Email already in use.'));
+  if (db.users.some((u) => u.id !== targetId && u.email.toLowerCase() === email.toLowerCase())) {
+    return res.redirect(settingsRedirect('employees', 'Email already in use.'));
   }
-
   if (user.role === 'admin' && finalRole !== 'admin') {
     const activeAdmins = db.users.filter((u) => u.role === 'admin' && u.active);
-    if (activeAdmins.length <= 1) {
-      return res.redirect('/admin/employees?error=' + encodeURIComponent('At least one admin must remain.'));
-    }
+    if (activeAdmins.length <= 1) return res.redirect(settingsRedirect('employees', 'At least one admin must remain.'));
   }
 
   user.name = name;
   user.email = email;
   user.role = finalRole;
-  user.department = finalRole === 'employee' ? (department || 'Team Member') : undefined;
+  if (finalRole === 'employee') {
+    const dept = (db.departments || []).find((d) => d.id === departmentId);
+    if (!dept) return res.redirect(settingsRedirect('employees', 'Please select a department.'));
+    if (!roleTitle) return res.redirect(settingsRedirect('employees', 'Please select a role.'));
+    user.department = dept.name;
+    user.roleTitle = roleTitle;
+    user.color = color || user.color || BADGE_COLORS[0];
+  } else {
+    user.department = undefined;
+    user.roleTitle = undefined;
+    user.color = undefined;
+  }
   if (password) user.passwordHash = bcrypt.hashSync(password, 10);
 
+  logActivity(db, `<b>${T.escapeHtml(req.session.name)}</b> updated ${T.escapeHtml(name)}'s profile`);
   save(db);
-  res.redirect('/admin/employees');
+  res.redirect('/admin/settings');
 });
 
-router.post('/employees/:id/delete', (req, res) => {
+router.post('/settings/employees/:id/delete', (req, res) => {
   const db = load();
   const targetId = Number(req.params.id);
   const user = db.users.find((u) => u.id === targetId);
 
-  if (!user) return res.redirect('/admin/employees');
-
+  if (!user) return res.redirect('/admin/settings');
   if (targetId === req.session.userId) {
-    return res.redirect('/admin/employees?error=' + encodeURIComponent('You cannot remove your own account.'));
+    return res.redirect(settingsRedirect('employees', 'You cannot remove your own account.'));
   }
-
   if (user.role === 'admin') {
     const activeAdmins = db.users.filter((u) => u.role === 'admin' && u.active);
-    if (activeAdmins.length <= 1) {
-      return res.redirect('/admin/employees?error=' + encodeURIComponent('At least one admin must remain.'));
-    }
+    if (activeAdmins.length <= 1) return res.redirect(settingsRedirect('employees', 'At least one admin must remain.'));
+  }
+  const assignedCount = db.tasks.filter((t) => t.assignedTo === targetId).length;
+  if (assignedCount > 0) {
+    return res.redirect(settingsRedirect('employees', `Can't remove ${user.name} — they have ${assignedCount} task(s) assigned. Reassign those first.`));
   }
 
   user.active = false;
+  logActivity(db, `<b>${T.escapeHtml(req.session.name)}</b> removed ${T.escapeHtml(user.name)} from the team`);
   save(db);
-  res.redirect('/admin/employees');
+  res.redirect('/admin/settings');
+});
+
+router.post('/settings/departments', (req, res) => {
+  const name = (req.body.name || '').trim();
+  const db = load();
+  db.departments = db.departments || [];
+
+  if (!name) return res.redirect(settingsRedirect('departments', 'Department name is required.'));
+  if (db.departments.some((d) => d.name.toLowerCase() === name.toLowerCase())) {
+    return res.redirect(settingsRedirect('departments', 'That department already exists.'));
+  }
+
+  db.departments.push({ id: uniqueSlug(name, db.departments), name, roles: [] });
+  logActivity(db, `<b>${T.escapeHtml(req.session.name)}</b> added department ${T.escapeHtml(name)}`);
+  save(db);
+  res.redirect(settingsRedirect('departments'));
+});
+
+router.post('/settings/departments/:id/delete', (req, res) => {
+  const db = load();
+  db.departments = db.departments || [];
+  const dept = db.departments.find((d) => d.id === req.params.id);
+  if (!dept) return res.redirect(settingsRedirect('departments'));
+
+  const assignedCount = db.users.filter((u) => u.role === 'employee' && u.active && u.department === dept.name).length;
+  if (assignedCount > 0) {
+    return res.redirect(settingsRedirect('departments', `Can't remove ${dept.name} — ${assignedCount} employee(s) are in this department.`));
+  }
+  if (db.departments.length <= 1) {
+    return res.redirect(settingsRedirect('departments', 'At least one department must remain.'));
+  }
+
+  db.departments = db.departments.filter((d) => d.id !== dept.id);
+  logActivity(db, `<b>${T.escapeHtml(req.session.name)}</b> removed department ${T.escapeHtml(dept.name)}`);
+  save(db);
+  res.redirect(settingsRedirect('departments'));
+});
+
+router.post('/settings/departments/:id/roles/add', (req, res) => {
+  const db = load();
+  db.departments = db.departments || [];
+  const dept = db.departments.find((d) => d.id === req.params.id);
+  const value = (req.body.role || '').trim();
+  if (!dept || !value) return res.redirect(settingsRedirect('departments'));
+
+  if (dept.roles.some((r) => r.toLowerCase() === value.toLowerCase())) {
+    return res.redirect(settingsRedirect('departments', `"${value}" already exists in ${dept.name}.`));
+  }
+  dept.roles.push(value);
+  save(db);
+  res.redirect(settingsRedirect('departments'));
+});
+
+router.post('/settings/departments/:id/roles/:idx/remove', (req, res) => {
+  const db = load();
+  db.departments = db.departments || [];
+  const dept = db.departments.find((d) => d.id === req.params.id);
+  if (!dept) return res.redirect(settingsRedirect('departments'));
+
+  const roleName = dept.roles[Number(req.params.idx)];
+  const inUse = db.users.some((u) => u.role === 'employee' && u.active && u.department === dept.name && u.roleTitle === roleName);
+  if (inUse) {
+    return res.redirect(settingsRedirect('departments', `Can't remove "${roleName}" — an employee has this role.`));
+  }
+  dept.roles.splice(Number(req.params.idx), 1);
+  save(db);
+  res.redirect(settingsRedirect('departments'));
 });
 
 module.exports = router;

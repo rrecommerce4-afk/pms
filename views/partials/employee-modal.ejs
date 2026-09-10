@@ -1,0 +1,158 @@
+<div class="modal-backdrop <%= (typeof error !== 'undefined' && error) ? 'open' : '' %>" id="employee-modal">
+  <div class="modal-box">
+    <div class="modal-head">
+      <h3 id="employeeModalTitle">Add Employee</h3>
+      <button type="button" class="modal-close" id="employeeModalClose">&times;</button>
+    </div>
+    <div class="modal-body">
+      <% if (typeof error !== 'undefined' && error) { %><div class="error"><%= error %></div><% } %>
+      <form method="POST" action="/admin/settings/employees" id="employeeForm">
+        <div class="field">
+          <label>Full Name</label>
+          <input type="text" name="name" id="em-name" placeholder="e.g. Priya Nair" required>
+        </div>
+        <div class="field">
+          <label>Email Address</label>
+          <input type="email" name="email" id="em-email" placeholder="e.g. priya.nair@company.com" required>
+        </div>
+        <div class="field">
+          <label id="em-password-label">Password</label>
+          <input type="text" name="password" id="em-password" placeholder="Set a password" required>
+        </div>
+        <div class="field">
+          <label>Access Role <span style="font-weight:400;color:var(--text-faint);text-transform:none;">&mdash; decides which panel this person gets</span></label>
+          <div class="access-role-toggle" id="accessRoleToggle">
+            <label class="access-role-btn active" data-role="employee">
+              <input type="radio" name="role" value="employee" checked style="position:absolute;opacity:0;">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="7" r="4"/><path d="M5.5 21a6.5 6.5 0 0113 0"/></svg>
+              <span>Employee</span><small>Employee panel</small>
+            </label>
+            <label class="access-role-btn" data-role="admin">
+              <input type="radio" name="role" value="admin" style="position:absolute;opacity:0;">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2l8 4v6c0 5-3.5 8.5-8 10-4.5-1.5-8-5-8-10V6z"/></svg>
+              <span>Admin</span><small>Full admin access</small>
+            </label>
+            <label class="access-role-btn" data-role="viewer">
+              <input type="radio" name="role" value="viewer" style="position:absolute;opacity:0;">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7z"/><circle cx="12" cy="12" r="3"/></svg>
+              <span>Viewer</span><small>Read-only overview</small>
+            </label>
+          </div>
+        </div>
+        <div class="form-grid-2" id="employeeDeptFields">
+          <div class="field">
+            <label>Department</label>
+            <select name="departmentId" id="em-department"></select>
+          </div>
+          <div class="field">
+            <label>Role</label>
+            <select name="roleTitle" id="em-role-title"></select>
+          </div>
+        </div>
+        <div class="field" id="employeeColorField">
+          <label>Badge Color</label>
+          <select name="color" id="em-color">
+            <% var colorNames = { 'var(--info)': 'Blue', 'var(--purple)': 'Purple', 'var(--success)': 'Green', 'var(--warning)': 'Amber', 'var(--primary)': 'Terracotta', 'var(--danger)': 'Red' }; %>
+            <% badgeColors.forEach(function (c) { %><option value="<%= c %>"><%= colorNames[c] || c %></option><% }) %>
+          </select>
+        </div>
+        <div class="emp-form-actions">
+          <button type="button" class="btn outline" id="employeeModalCancel">Cancel</button>
+          <button class="btn" type="submit" id="employeeModalSave">Add Employee</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<script>
+  (function () {
+    var DEPARTMENTS = <%- JSON.stringify(departments) %>;
+    var modal = document.getElementById('employee-modal');
+    var openAddBtn = document.getElementById('openAddEmployeeBtn');
+    var closeBtn = document.getElementById('employeeModalClose');
+    var cancelBtn = document.getElementById('employeeModalCancel');
+    var form = document.getElementById('employeeForm');
+    var title = document.getElementById('employeeModalTitle');
+    var saveBtn = document.getElementById('employeeModalSave');
+    var passwordInput = document.getElementById('em-password');
+    var passwordLabel = document.getElementById('em-password-label');
+    var deptSelect = document.getElementById('em-department');
+    var roleSelect = document.getElementById('em-role-title');
+    var colorSelect = document.getElementById('em-color');
+    var deptFields = document.getElementById('employeeDeptFields');
+    var colorField = document.getElementById('employeeColorField');
+    var accessButtons = document.querySelectorAll('#accessRoleToggle .access-role-btn');
+
+    function deptById(id) { for (var i = 0; i < DEPARTMENTS.length; i++) { if (DEPARTMENTS[i].id === id) return DEPARTMENTS[i]; } return null; }
+
+    function populateDepartments(selectedId) {
+      deptSelect.innerHTML = DEPARTMENTS.map(function (d) {
+        return '<option value="' + d.id + '"' + (d.id === selectedId ? ' selected' : '') + '>' + d.name + '</option>';
+      }).join('');
+    }
+    function populateRoles(deptId, selectedRole) {
+      var dept = deptById(deptId || deptSelect.value);
+      var roles = dept ? dept.roles : [];
+      if (!roles.length) { roleSelect.innerHTML = '<option value="">No roles set up yet</option>'; return; }
+      roleSelect.innerHTML = roles.map(function (r) {
+        return '<option value="' + r + '"' + (r === selectedRole ? ' selected' : '') + '>' + r + '</option>';
+      }).join('');
+    }
+    function setAccessRole(role) {
+      accessButtons.forEach(function (b) {
+        var match = b.dataset.role === role;
+        b.classList.toggle('active', match);
+        b.querySelector('input').checked = match;
+      });
+      var isEmployee = role === 'employee';
+      deptFields.style.display = isEmployee ? '' : 'none';
+      colorField.style.display = isEmployee ? '' : 'none';
+      deptSelect.disabled = !isEmployee;
+      roleSelect.disabled = !isEmployee;
+    }
+    accessButtons.forEach(function (b) {
+      b.addEventListener('click', function () { setAccessRole(b.dataset.role); });
+    });
+    if (deptSelect) deptSelect.addEventListener('change', function () { populateRoles(deptSelect.value); });
+
+    function openAdd() {
+      title.textContent = 'Add Employee';
+      saveBtn.textContent = 'Add Employee';
+      form.action = '/admin/settings/employees';
+      form.reset();
+      populateDepartments();
+      populateRoles(deptSelect.value);
+      setAccessRole('employee');
+      passwordInput.required = true;
+      passwordInput.placeholder = 'Set a password';
+      passwordLabel.textContent = 'Password';
+      modal.classList.add('open');
+    }
+    function openEdit(btn) {
+      title.textContent = 'Edit Employee';
+      saveBtn.textContent = 'Save Changes';
+      form.action = '/admin/settings/employees/' + btn.dataset.id + '/edit';
+      document.getElementById('em-name').value = btn.dataset.name;
+      document.getElementById('em-email').value = btn.dataset.email;
+      passwordInput.value = '';
+      passwordInput.required = false;
+      passwordInput.placeholder = 'Leave blank to keep current password';
+      passwordLabel.textContent = 'New password (optional)';
+      populateDepartments(btn.dataset.department);
+      populateRoles(btn.dataset.department, btn.dataset.roletitle);
+      setAccessRole(btn.dataset.role || 'employee');
+      if (btn.dataset.color) colorSelect.value = btn.dataset.color;
+      modal.classList.add('open');
+    }
+
+    if (openAddBtn) openAddBtn.addEventListener('click', openAdd);
+    document.querySelectorAll('.open-edit-employee-btn').forEach(function (btn) {
+      btn.addEventListener('click', function () { openEdit(btn); });
+    });
+    if (closeBtn) closeBtn.addEventListener('click', function () { modal.classList.remove('open'); });
+    if (cancelBtn) cancelBtn.addEventListener('click', function () { modal.classList.remove('open'); });
+    modal.addEventListener('click', function (e) { if (e.target === modal) modal.classList.remove('open'); });
+    document.addEventListener('keydown', function (e) { if (e.key === 'Escape') modal.classList.remove('open'); });
+  })();
+</script>

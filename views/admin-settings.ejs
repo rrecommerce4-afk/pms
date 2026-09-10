@@ -1,0 +1,111 @@
+<%- include('partials/header') %>
+<div class="container container-wide">
+  <div class="page-head">
+    <div>
+      <div class="eyebrow-date">ADMIN OVERVIEW</div>
+      <h1><%= heading %></h1>
+      <p>System aur team ka configuration.</p>
+    </div>
+  </div>
+
+  <% if (error) { %><div class="error"><%= error %></div><% } %>
+
+  <div class="settings-tabs">
+    <a class="settings-tab <%= tab === 'employees' ? 'active' : '' %>" href="/admin/settings">Employee Management</a>
+    <a class="settings-tab <%= tab === 'departments' ? 'active' : '' %>" href="/admin/settings?tab=departments">Departments &amp; Roles</a>
+  </div>
+
+  <% if (tab === 'employees') { %>
+    <div class="list-card">
+      <div class="list-card-head section-card-head">
+        <h2>Team Members <span class="tag-count"><%= userCount %></span></h2>
+        <button class="btn small" type="button" id="openAddEmployeeBtn">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M12 5v14M5 12h14" stroke="#fff" stroke-width="2.3" stroke-linecap="round"/></svg>
+          Add Employee
+        </button>
+      </div>
+      <% if (users.length) { %>
+        <div class="table-scroll">
+        <table>
+          <thead><tr><th>Name</th><th>Email</th><th>Department</th><th>Role</th><th>Access Role</th><th></th></tr></thead>
+          <tbody>
+            <% users.forEach(function (u) { %>
+              <% var dept = departments.find(function (d) { return d.name === u.department; }); %>
+              <tr>
+                <td>
+                  <div class="name-cell">
+                    <div class="mini-avatar" style="width:28px;height:28px;font-size:11px;background:<%= u.color || 'var(--text-faint)' %>;color:#fff;"><%= u.name.trim().split(/\s+/).map(function (w) { return w[0]; }).join('').slice(0, 2).toUpperCase() %></div>
+                    <%= u.name %>
+                  </div>
+                </td>
+                <td class="emp-email-cell"><%= u.email %></td>
+                <td><%= u.department || '—' %></td>
+                <td><%= u.roleTitle || '—' %></td>
+                <td><span class="access-badge role-<%= u.role %>"><%= u.role %></span></td>
+                <td>
+                  <div class="row-actions-cell">
+                    <button type="button" class="btn small outline open-edit-employee-btn"
+                      data-id="<%= u.id %>" data-name="<%= u.name %>" data-email="<%= u.email %>"
+                      data-role="<%= u.role %>" data-department="<%= dept ? dept.id : '' %>"
+                      data-roletitle="<%= u.roleTitle || '' %>" data-color="<%= u.color || '' %>">Edit</button>
+                    <form method="POST" action="/admin/settings/employees/<%= u.id %>/delete" onsubmit="return confirm('Remove this employee?');">
+                      <button type="submit" class="row-icon-btn" title="Remove employee"><svg width="15" height="15" viewBox="0 0 24 24" fill="none"><path d="M3 6h18M8 6V4a2 2 0 012-2h4a2 2 0 012 2v2m3 0l-1 14a2 2 0 01-2 2H7a2 2 0 01-2-2L4 6h16z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+                    </form>
+                  </div>
+                </td>
+              </tr>
+            <% }) %>
+          </tbody>
+        </table>
+        </div>
+      <% } else { %>
+        <div class="empty-state"><div class="empty-state-title">No team members yet.</div></div>
+      <% } %>
+    </div>
+    <%- include('partials/employee-modal', { departments: departments, badgeColors: badgeColors, error: error }) %>
+  <% } else { %>
+    <div class="list-card">
+      <div class="list-card-head section-card-head">
+        <h2>Departments &amp; Roles <span class="tag-count"><%= deptCount %></span></h2>
+        <button class="btn small" type="button" id="openAddDepartmentBtn">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M12 5v14M5 12h14" stroke="#fff" stroke-width="2.3" stroke-linecap="round"/></svg>
+          Add Department
+        </button>
+      </div>
+      <% if (departments.length) { %>
+        <% departments.forEach(function (d) { %>
+          <% var empCount = users.filter(function (u) { return u.role === 'employee' && u.department === d.name; }).length; %>
+          <div class="dept-card">
+            <div class="dept-card-head">
+              <div class="dept-card-title"><%= d.name %><span class="tag-count"><%= empCount %> employee<%= empCount === 1 ? '' : 's' %></span></div>
+              <form method="POST" action="/admin/settings/departments/<%= d.id %>/delete" onsubmit="return confirm('Remove this department?');">
+                <button type="submit" class="row-icon-btn" title="Remove department"><svg width="15" height="15" viewBox="0 0 24 24" fill="none"><path d="M3 6h18M8 6V4a2 2 0 012-2h4a2 2 0 012 2v2m3 0l-1 14a2 2 0 01-2 2H7a2 2 0 01-2-2L4 6h16z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+              </form>
+            </div>
+            <% if (d.roles.length) { %>
+              <div class="dept-roles-wrap">
+                <% d.roles.forEach(function (r, idx) { %>
+                  <span class="dept-role-chip"><%= r %>
+                    <form method="POST" action="/admin/settings/departments/<%= d.id %>/roles/<%= idx %>/remove" style="display:contents;">
+                      <button type="submit" title="Remove role"><svg width="12" height="12" viewBox="0 0 24 24" fill="none"><path d="M18 6L6 18M6 6l12 12" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></button>
+                    </form>
+                  </span>
+                <% }) %>
+              </div>
+            <% } else { %>
+              <div class="dept-empty-roles">Abhi koi role add nahi kiya — neeche add karein.</div>
+            <% } %>
+            <form method="POST" action="/admin/settings/departments/<%= d.id %>/roles/add" class="dept-add-role-row">
+              <input type="text" name="role" placeholder="Naya role add karein, e.g. Senior Designer" required>
+              <button class="btn small outline" type="submit">Add Role</button>
+            </form>
+          </div>
+        <% }) %>
+      <% } else { %>
+        <div class="empty-state"><div class="empty-state-title">No departments yet.</div><div class="empty-state-sub">Add one to start assigning roles.</div></div>
+      <% } %>
+    </div>
+    <%- include('partials/department-modal') %>
+  <% } %>
+</div>
+<%- include('partials/footer') %>

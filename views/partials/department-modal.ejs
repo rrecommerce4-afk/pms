@@ -1,0 +1,36 @@
+<div class="modal-backdrop" id="department-modal">
+  <div class="modal-box">
+    <div class="modal-head">
+      <h3>Add Department</h3>
+      <button type="button" class="modal-close" id="departmentModalClose">&times;</button>
+    </div>
+    <div class="modal-body">
+      <form method="POST" action="/admin/settings/departments">
+        <div class="field">
+          <label>Department Name</label>
+          <input type="text" name="name" placeholder="e.g. Marketing" required>
+        </div>
+        <div class="emp-form-actions">
+          <button type="button" class="btn outline" id="departmentModalCancel">Cancel</button>
+          <button class="btn" type="submit">Add Department</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<script>
+  (function () {
+    var modal = document.getElementById('department-modal');
+    var openBtn = document.getElementById('openAddDepartmentBtn');
+    var closeBtn = document.getElementById('departmentModalClose');
+    var cancelBtn = document.getElementById('departmentModalCancel');
+    if (modal && openBtn) {
+      openBtn.addEventListener('click', function () { modal.classList.add('open'); });
+      closeBtn.addEventListener('click', function () { modal.classList.remove('open'); });
+      cancelBtn.addEventListener('click', function () { modal.classList.remove('open'); });
+      modal.addEventListener('click', function (e) { if (e.target === modal) modal.classList.remove('open'); });
+      document.addEventListener('keydown', function (e) { if (e.key === 'Escape') modal.classList.remove('open'); });
+    }
+  })();
+</script>

@@ -4,16 +4,34 @@ const bcrypt = require('bcryptjs');
 const { addDays } = require('./utils');
 
 const DB_FILE = path.join(__dirname, 'db.json');
-const SCHEMA_VERSION = 2;
+const SCHEMA_VERSION = 3;
+const BADGE_COLORS = ['var(--info)', 'var(--purple)', 'var(--success)', 'var(--warning)', 'var(--primary)', 'var(--danger)'];
 
 function emptyDb() {
   return {
     schemaVersion: SCHEMA_VERSION,
     users: [],
     tasks: [],
+    departments: [],
     activity: [],
     nextId: { users: 1, tasks: 1 }
   };
+}
+
+function slugify(name) {
+  const base = String(name || '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '') || 'dept';
+  return base;
+}
+
+function uniqueSlug(name, departments) {
+  const base = slugify(name);
+  let slug = base;
+  let n = 1;
+  while (departments.some((d) => d.id === slug)) {
+    n++;
+    slug = `${base}-${n}`;
+  }
+  return slug;
 }
 
 // Today's date as YYYY-MM-DD in server local time
@@ -66,6 +84,28 @@ function migrate(db) {
   delete db.taskLogs;
   if (db.nextId) delete db.nextId.taskLogs;
   db.activity = db.activity || [];
+
+  // v3: introduce a structured Departments & Roles list, seeded from whatever free-text
+  // `department` strings employees already had, plus per-employee roleTitle/color fields.
+  if (!db.departments) {
+    db.departments = [];
+    const seen = new Map();
+    db.users.forEach((u) => {
+      if (u.role !== 'employee' || !u.department) return;
+      if (!seen.has(u.department)) {
+        seen.set(u.department, { id: uniqueSlug(u.department, db.departments), name: u.department, roles: [] });
+        db.departments.push(seen.get(u.department));
+      }
+    });
+  }
+  let colorIdx = 0;
+  db.users.forEach((u) => {
+    if (u.role !== 'employee') return;
+    if (u.roleTitle === undefined) u.roleTitle = '';
+    if (!u.color) u.color = BADGE_COLORS[colorIdx % BADGE_COLORS.length];
+    colorIdx++;
+  });
+
   db.schemaVersion = SCHEMA_VERSION;
   return true;
 }
@@ -111,4 +151,4 @@ function seedAdminIfNeeded() {
   }
 }
 
-module.exports = { load, save, todayStr, logActivity, seedAdminIfNeeded };
+module.exports = { load, save, todayStr, logActivity, seedAdminIfNeeded, uniqueSlug, BADGE_COLORS };
