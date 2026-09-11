@@ -21,6 +21,7 @@ app.locals.taskUrl = (base, id) => base + (base.includes('?') ? '&' : '?') + 'ta
 
 app.use(express.urlencoded({ extended: true }));
 app.use(express.static(path.join(__dirname, 'public')));
+app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 app.use(
   session({
     secret: 'pms-secret-key-change-me',

@@ -3,6 +3,7 @@ const bcrypt = require('bcryptjs');
 const { load, save, todayStr, logActivity, uniqueSlug, BADGE_COLORS } = require('../db');
 const { requireAdmin } = require('../middleware/auth');
 const T = require('../lib/tasks');
+const upload = require('../lib/upload');
 
 const router = express.Router();
 router.use(requireAdmin);
@@ -212,11 +213,16 @@ router.post('/tasks/:id/checklist/:idx/remove', (req, res) => {
 });
 
 router.post('/tasks/:id/files/add', (req, res) => {
-  const db = load();
-  const task = db.tasks.find((t) => t.id === Number(req.params.id));
-  const name = (req.body.name || '').trim();
-  if (task && name) { task.files.push({ name }); save(db); }
-  res.redirect(T.reopenUrl(req.body.back, req.params.id));
+  upload.single('file')(req, res, (err) => {
+    if (err) return res.redirect(T.reopenUrl(req.body.back, req.params.id));
+    const db = load();
+    const task = db.tasks.find((t) => t.id === Number(req.params.id));
+    if (task && req.file) {
+      task.files.push({ name: req.file.originalname, url: '/uploads/' + req.file.filename });
+      save(db);
+    }
+    res.redirect(T.reopenUrl(req.body.back, req.params.id));
+  });
 });
 
 router.post('/tasks/:id/comment', (req, res) => {

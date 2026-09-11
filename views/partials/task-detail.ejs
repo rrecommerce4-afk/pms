@@ -162,16 +162,20 @@
         <div>
           <% if (t.files.length) { %>
             <% t.files.forEach(function (f) { %>
-              <div class="file-chip"><svg width="15" height="15" viewBox="0 0 24 24" fill="none"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M14 2v6h6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg><span class="fname"><%= f.name %></span></div>
+              <% if (f.url) { %>
+                <a class="file-chip" href="<%= f.url %>" target="_blank" rel="noopener" style="text-decoration:none;color:inherit;"><svg width="15" height="15" viewBox="0 0 24 24" fill="none"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M14 2v6h6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg><span class="fname"><%= f.name %></span></a>
+              <% } else { %>
+                <div class="file-chip"><svg width="15" height="15" viewBox="0 0 24 24" fill="none"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M14 2v6h6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg><span class="fname"><%= f.name %></span></div>
+              <% } %>
             <% }) %>
           <% } else { %>
             <div style="font-size:12.5px;color:var(--text-faint);">No reference files attached yet.</div>
           <% } %>
         </div>
         <% if (isAdmin) { %>
-          <form method="POST" action="/admin/tasks/<%= t.id %>/files/add" class="add-check-row">
+          <form method="POST" action="/admin/tasks/<%= t.id %>/files/add" enctype="multipart/form-data" class="add-check-row">
             <input type="hidden" name="back" value="<%= pageUrl %>">
-            <input type="text" name="name" placeholder="e.g. Reference-deck.pdf" required>
+            <input type="file" name="file" required>
             <button class="btn small outline" type="submit">Add</button>
           </form>
         <% } %>
