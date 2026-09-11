@@ -1,5 +1,7 @@
 const express = require('express');
 const bcrypt = require('bcryptjs');
+const fs = require('fs');
+const path = require('path');
 const { load, save, todayStr, logActivity, uniqueSlug, BADGE_COLORS } = require('../db');
 const { requireAdmin } = require('../middleware/auth');
 const T = require('../lib/tasks');
@@ -223,6 +225,21 @@ router.post('/tasks/:id/files/add', (req, res) => {
     }
     res.redirect(T.reopenUrl(req.body.back, req.params.id));
   });
+});
+
+router.post('/tasks/:id/files/:idx/remove', (req, res) => {
+  const db = load();
+  const task = db.tasks.find((t) => t.id === Number(req.params.id));
+  const file = task && task.files[Number(req.params.idx)];
+  if (file) {
+    task.files.splice(Number(req.params.idx), 1);
+    save(db);
+    if (file.url && file.url.startsWith('/uploads/')) {
+      const filePath = path.join(__dirname, '..', 'uploads', path.basename(file.url));
+      fs.unlink(filePath, () => {});
+    }
+  }
+  res.redirect(T.reopenUrl(req.body.back, req.params.id));
 });
 
 router.post('/tasks/:id/comment', (req, res) => {

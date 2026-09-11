@@ -161,12 +161,21 @@
         <div class="detail-block-label">Reference Files &amp; Attachments</div>
         <div>
           <% if (t.files.length) { %>
-            <% t.files.forEach(function (f) { %>
-              <% if (f.url) { %>
-                <a class="file-chip" href="<%= f.url %>" target="_blank" rel="noopener" style="text-decoration:none;color:inherit;"><svg width="15" height="15" viewBox="0 0 24 24" fill="none"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M14 2v6h6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg><span class="fname"><%= f.name %></span></a>
-              <% } else { %>
-                <div class="file-chip"><svg width="15" height="15" viewBox="0 0 24 24" fill="none"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M14 2v6h6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg><span class="fname"><%= f.name %></span></div>
-              <% } %>
+            <% t.files.forEach(function (f, fidx) { %>
+              <div class="file-chip">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M14 2v6h6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                <% if (f.url) { %>
+                  <a class="fname" href="<%= f.url %>" target="_blank" rel="noopener" style="text-decoration:none;color:inherit;"><%= f.name %></a>
+                <% } else { %>
+                  <span class="fname"><%= f.name %></span>
+                <% } %>
+                <% if (isAdmin) { %>
+                  <form method="POST" action="/admin/tasks/<%= t.id %>/files/<%= fidx %>/remove" style="display:contents;">
+                    <input type="hidden" name="back" value="<%= pageUrl %>">
+                    <button type="submit" class="check-remove"><svg width="13" height="13" viewBox="0 0 24 24" fill="none"><path d="M18 6L6 18M6 6l12 12" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></button>
+                  </form>
+                <% } %>
+              </div>
             <% }) %>
           <% } else { %>
             <div style="font-size:12.5px;color:var(--text-faint);">No reference files attached yet.</div>
