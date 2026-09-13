@@ -52,6 +52,7 @@
       </div>
     </div>
 
+    <div class="cal-grid-scroll">
     <div class="cal-grid">
       <% calendar.weekdayLabels.forEach(function (wd) { %><div class="cal-weekday"><%= wd %></div><% }) %>
       <% calendar.weeks.forEach(function (week) { %>
@@ -85,6 +86,7 @@
           <% } %>
         <% }) %>
       <% }) %>
+    </div>
     </div>
   </div>
 </div>
