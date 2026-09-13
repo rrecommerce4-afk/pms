@@ -8,6 +8,10 @@
     return '/admin/calendar?' + p.toString();
   }
   function taskUrl(id) { return pageUrl + (pageUrl.indexOf('?') !== -1 ? '&' : '?') + 'task=' + id; }
+  function dayLabel(iso) {
+    var p = iso.split('-').map(Number);
+    return new Date(p[0], p[1] - 1, p[2]).toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' });
+  }
 %>
 <div class="container container-wide">
   <div class="page-head">
@@ -62,16 +66,23 @@
                 </a>
               <% }) %>
               <% if (day.tasks.length > 3) { %>
-                <button type="button" class="cal-more-btn" data-cal-more>+<%= day.tasks.length - 3 %> more</button>
-                <% day.tasks.slice(3).forEach(function (t) { %>
-                  <a class="cal-chip s-<%= t.status %>" href="<%= taskUrl(t.id) %>" title="<%= t.title %> — <%= t.assigneeName %>" hidden data-cal-extra>
-                    <% if (employeeFilter === 'all') { %><span class="cal-chip-avatar"><%= t.assigneeInitials %></span><% } %>
-                    <%= t.title %>
-                  </a>
-                <% }) %>
+                <button type="button" class="cal-more-btn" data-day-more="<%= day.iso %>" data-day-label="<%= dayLabel(day.iso) %>">+<%= day.tasks.length - 3 %> more</button>
               <% } %>
             </div>
           </div>
+          <% if (day.tasks.length > 3) { %>
+            <template id="cal-day-tpl-<%= day.iso %>">
+              <% day.tasks.forEach(function (t) { %>
+                <a class="cal-modal-task-row s-<%= t.status %>" href="<%= taskUrl(t.id) %>">
+                  <span class="status-pill <%= t.statusPill %>"><%= t.statusLabel %></span>
+                  <span class="cal-modal-task-title"><%= t.title %></span>
+                  <% if (employeeFilter === 'all') { %>
+                    <span class="cal-modal-task-assignee"><span class="cal-chip-avatar"><%= t.assigneeInitials %></span><%= t.assigneeName %></span>
+                  <% } %>
+                </a>
+              <% }) %>
+            </template>
+          <% } %>
         <% }) %>
       <% }) %>
     </div>
@@ -79,19 +90,11 @@
 </div>
 <%- include('partials/task-detail') %>
 <%- include('partials/task-modal') %>
+<%- include('partials/day-tasks-modal') %>
 <script>
   (function () {
     var select = document.getElementById('calEmployeeSelect');
     if (select) select.addEventListener('change', function () { document.getElementById('calEmployeeForm').submit(); });
-
-    document.querySelectorAll('[data-cal-more]').forEach(function (btn) {
-      btn.addEventListener('click', function () {
-        var extras = btn.parentElement.querySelectorAll('[data-cal-extra]');
-        var opening = extras.length && extras[0].hidden;
-        extras.forEach(function (el) { el.hidden = !opening; });
-        btn.textContent = opening ? 'Show less' : '+' + extras.length + ' more';
-      });
-    });
   })();
 </script>
 <%- include('partials/footer') %>

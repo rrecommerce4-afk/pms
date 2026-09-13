@@ -1,0 +1,40 @@
+<div class="modal-backdrop" id="dayTasksModal">
+  <div class="modal-box">
+    <div class="modal-head">
+      <h3 id="dayTasksModalTitle">Tasks</h3>
+      <button type="button" class="modal-close" id="dayTasksModalClose">&times;</button>
+    </div>
+    <div class="modal-body">
+      <div class="cal-modal-list" id="dayTasksModalList"></div>
+    </div>
+  </div>
+</div>
+
+<script>
+  (function () {
+    var modal = document.getElementById('dayTasksModal');
+    if (!modal) return;
+    var titleEl = document.getElementById('dayTasksModalTitle');
+    var listEl = document.getElementById('dayTasksModalList');
+
+    function closeModal() { modal.classList.remove('open'); }
+    function openForDay(iso, label) {
+      var tpl = document.getElementById('cal-day-tpl-' + iso);
+      if (!tpl) return;
+      listEl.innerHTML = '';
+      listEl.appendChild(tpl.content.cloneNode(true));
+      titleEl.textContent = label || 'Tasks';
+      modal.classList.add('open');
+    }
+
+    document.querySelectorAll('[data-day-more]').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        openForDay(btn.getAttribute('data-day-more'), btn.getAttribute('data-day-label'));
+      });
+    });
+
+    document.getElementById('dayTasksModalClose').addEventListener('click', closeModal);
+    modal.addEventListener('click', function (e) { if (e.target === modal) closeModal(); });
+    document.addEventListener('keydown', function (e) { if (e.key === 'Escape') closeModal(); });
+  })();
+</script>
