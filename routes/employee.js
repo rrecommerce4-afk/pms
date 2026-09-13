@@ -14,6 +14,13 @@ function pageUrl(req) {
   return req.baseUrl + req.path + (qs ? '?' + qs : '');
 }
 
+function calendarPageUrl(req) {
+  const params = new URLSearchParams();
+  if (req.query.month) params.set('month', req.query.month);
+  const qs = params.toString();
+  return req.baseUrl + req.path + (qs ? '?' + qs : '');
+}
+
 function loadCommon(req) {
   const db = load();
   const today = todayStr();
@@ -90,6 +97,17 @@ router.get('/completed', (req, res) => {
     crumb: 'Completed Tasks', heading: 'Completed Tasks',
     filtered: decorated.filter((t) => t.status === 'completed'),
     pageUrl: pageUrl(req), detailTask: openTask(req, db, today)
+  });
+});
+
+router.get('/calendar', (req, res) => {
+  const { db, today, decorated } = loadCommon(req);
+  res.render('employee-calendar', {
+    crumb: 'My Calendar', heading: 'My Calendar',
+    calendar: T.buildMonthCalendar(decorated, req.query.month, today),
+    todayIsoMonth: today.slice(0, 7),
+    pageUrl: calendarPageUrl(req),
+    detailTask: openTask(req, db, today)
   });
 });
 

@@ -28,6 +28,15 @@ function pageUrl(req) {
   return req.baseUrl + req.path + (qs ? '?' + qs : '');
 }
 
+// Calendar page keeps its own querystring shape (month + employee, no search/due/view).
+function calendarPageUrl(req) {
+  const params = new URLSearchParams();
+  if (req.query.month) params.set('month', req.query.month);
+  if (req.query.employee) params.set('employee', req.query.employee);
+  const qs = params.toString();
+  return req.baseUrl + req.path + (qs ? '?' + qs : '');
+}
+
 function loadCommon() {
   const db = load();
   const today = todayStr();
@@ -91,6 +100,23 @@ router.get('/review', (req, res) => {
   res.render('admin-review', {
     crumb: 'Review & Approval', heading: 'Review & Approval',
     pageUrl: pageUrl(req), filtered, employees,
+    detailTask: openTask(req, db, today),
+    showCreateButton: true
+  });
+});
+
+router.get('/calendar', (req, res) => {
+  const { db, today, employees, decorated } = loadCommon();
+  const employeeFilter = req.query.employee || 'all';
+  const tasksForCalendar = employeeFilter === 'all'
+    ? decorated
+    : decorated.filter((t) => String(t.assignedTo) === String(employeeFilter));
+
+  res.render('admin-calendar', {
+    crumb: 'Calendar', heading: 'Calendar',
+    calendar: T.buildMonthCalendar(tasksForCalendar, req.query.month, today),
+    employees, employeeFilter, todayIsoMonth: today.slice(0, 7),
+    pageUrl: calendarPageUrl(req),
     detailTask: openTask(req, db, today),
     showCreateButton: true
   });

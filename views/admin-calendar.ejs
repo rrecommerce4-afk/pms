@@ -1,0 +1,97 @@
+<%- include('partials/header') %>
+<%
+  var __calParams = new URLSearchParams();
+  if (employeeFilter && employeeFilter !== 'all') __calParams.set('employee', employeeFilter);
+  function calUrl(monthParam) {
+    var p = new URLSearchParams(__calParams);
+    p.set('month', monthParam);
+    return '/admin/calendar?' + p.toString();
+  }
+  function taskUrl(id) { return pageUrl + (pageUrl.indexOf('?') !== -1 ? '&' : '?') + 'task=' + id; }
+%>
+<div class="container container-wide">
+  <div class="page-head">
+    <div>
+      <div class="eyebrow-date">ADMIN OVERVIEW</div>
+      <h1><%= heading %></h1>
+      <p>Kisi bhi employee ka poora schedule, ek calendar mein dekhein.</p>
+    </div>
+  </div>
+
+  <div class="list-card">
+    <div class="cal-toolbar">
+      <div class="cal-toolbar-left">
+        <form method="GET" action="/admin/calendar" id="calEmployeeForm">
+          <input type="hidden" name="month" value="<%= calendar.monthParam %>">
+          <select class="filter-select" name="employee" id="calEmployeeSelect">
+            <option value="all" <%= employeeFilter === 'all' ? 'selected' : '' %>>All employees</option>
+            <% employees.forEach(function (e) { %>
+              <option value="<%= e.id %>" <%= String(employeeFilter) === String(e.id) ? 'selected' : '' %>><%= e.name %></option>
+            <% }) %>
+          </select>
+        </form>
+        <div class="cal-legend">
+          <span class="cal-legend-item"><span class="cal-legend-dot" style="background:var(--text-muted);"></span>To Do</span>
+          <span class="cal-legend-item"><span class="cal-legend-dot" style="background:var(--info);"></span>In Progress</span>
+          <span class="cal-legend-item"><span class="cal-legend-dot" style="background:var(--purple);"></span>In Review</span>
+          <span class="cal-legend-item"><span class="cal-legend-dot" style="background:var(--danger);"></span>Blocked</span>
+          <span class="cal-legend-item"><span class="cal-legend-dot" style="background:var(--success);"></span>Completed</span>
+        </div>
+      </div>
+      <div class="cal-toolbar-right">
+        <div class="cal-month-label"><%= calendar.label %></div>
+        <div class="cal-nav">
+          <a class="cal-nav-btn" href="<%= calUrl(calendar.prevParam) %>" aria-label="Previous month"><svg width="15" height="15" viewBox="0 0 24 24" fill="none"><path d="M15 18l-6-6 6-6" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg></a>
+          <a class="cal-today-btn" href="<%= calUrl(todayIsoMonth) %>">Today</a>
+          <a class="cal-nav-btn" href="<%= calUrl(calendar.nextParam) %>" aria-label="Next month"><svg width="15" height="15" viewBox="0 0 24 24" fill="none"><path d="M9 6l6 6-6 6" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg></a>
+        </div>
+      </div>
+    </div>
+
+    <div class="cal-grid">
+      <% calendar.weekdayLabels.forEach(function (wd) { %><div class="cal-weekday"><%= wd %></div><% }) %>
+      <% calendar.weeks.forEach(function (week) { %>
+        <% week.forEach(function (day) { %>
+          <div class="cal-day <%= !day.inMonth ? 'out' : '' %> <%= day.isToday ? 'today' : '' %>">
+            <div class="cal-day-num"><%= day.day %></div>
+            <div class="cal-day-tasks">
+              <% day.tasks.slice(0, 3).forEach(function (t) { %>
+                <a class="cal-chip s-<%= t.status %>" href="<%= taskUrl(t.id) %>" title="<%= t.title %> — <%= t.assigneeName %>">
+                  <% if (employeeFilter === 'all') { %><span class="cal-chip-avatar"><%= t.assigneeInitials %></span><% } %>
+                  <%= t.title %>
+                </a>
+              <% }) %>
+              <% if (day.tasks.length > 3) { %>
+                <button type="button" class="cal-more-btn" data-cal-more>+<%= day.tasks.length - 3 %> more</button>
+                <% day.tasks.slice(3).forEach(function (t) { %>
+                  <a class="cal-chip s-<%= t.status %>" href="<%= taskUrl(t.id) %>" title="<%= t.title %> — <%= t.assigneeName %>" hidden data-cal-extra>
+                    <% if (employeeFilter === 'all') { %><span class="cal-chip-avatar"><%= t.assigneeInitials %></span><% } %>
+                    <%= t.title %>
+                  </a>
+                <% }) %>
+              <% } %>
+            </div>
+          </div>
+        <% }) %>
+      <% }) %>
+    </div>
+  </div>
+</div>
+<%- include('partials/task-detail') %>
+<%- include('partials/task-modal') %>
+<script>
+  (function () {
+    var select = document.getElementById('calEmployeeSelect');
+    if (select) select.addEventListener('change', function () { document.getElementById('calEmployeeForm').submit(); });
+
+    document.querySelectorAll('[data-cal-more]').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        var extras = btn.parentElement.querySelectorAll('[data-cal-extra]');
+        var opening = extras.length && extras[0].hidden;
+        extras.forEach(function (el) { el.hidden = !opening; });
+        btn.textContent = opening ? 'Show less' : '+' + extras.length + ' more';
+      });
+    });
+  })();
+</script>
+<%- include('partials/footer') %>
