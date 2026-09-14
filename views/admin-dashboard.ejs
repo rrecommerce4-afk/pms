@@ -46,7 +46,7 @@
         %>
         <a class="attn-row" href="<%= taskUrl(pageUrl, t.id) %>">
           <div class="attn-flag <%= flag %>"></div>
-          <div class="attn-body"><div class="attn-title"><%= t.title %></div><div class="attn-meta"><%= meta %></div></div>
+          <div class="attn-body"><div class="attn-title"><%= t.title %><% if (t.isMilestone) { %><span class="milestone-badge" title="Milestone"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M4 22V4M4 4h11l-2 4 2 4H4"/></svg>Milestone</span><% } %></div><div class="attn-meta"><%= meta %></div></div>
           <% if (t.overdue) { %><span class="attn-badge overdue">Overdue</span>
           <% } else if (t.status === 'blocked') { %><span class="attn-badge blocked">Blocked</span>
           <% } else if (t.status === 'review') { %><span class="attn-badge review">In Review</span><% } %>
@@ -57,6 +57,28 @@
         <svg width="34" height="34" viewBox="0 0 24 24" fill="none"><path d="M20 6L9 17l-5-5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
         <div class="empty-state-title">Sab kuchh on track hai!</div>
         <div class="empty-state-sub">Koi overdue, blocked ya pending review task nahi hai.</div>
+      </div>
+    <% } %>
+  </div>
+
+  <div class="list-card">
+    <div class="list-card-head section-card-head">
+      <h2>🏁 Milestones</h2>
+      <span class="tag-count"><%= milestones.length %></span>
+    </div>
+    <% if (milestones.length) { %>
+      <% milestones.forEach(function (t) { %>
+        <a class="attn-row" href="<%= taskUrl(pageUrl, t.id) %>">
+          <div class="attn-flag blue"></div>
+          <div class="attn-body"><div class="attn-title"><%= t.title %></div><div class="attn-meta">Assigned to <%= t.assigneeName %> &middot; Due <%= t.dueLabel %></div></div>
+          <span class="status-pill <%= t.statusPill %>"><%= t.statusLabel %></span>
+        </a>
+      <% }) %>
+    <% } else { %>
+      <div class="empty-state">
+        <svg width="34" height="34" viewBox="0 0 24 24" fill="none"><path d="M4 22V4M4 4h11l-2 4 2 4H4" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        <div class="empty-state-title">Abhi koi milestone mark nahi kiya gaya.</div>
+        <div class="empty-state-sub">Kisi task ke detail panel se "Mark as Milestone" use karein.</div>
       </div>
     <% } %>
   </div>

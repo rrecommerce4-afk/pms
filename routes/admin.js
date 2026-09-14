@@ -68,13 +68,14 @@ router.get('/dashboard', (req, res) => {
   const filtered = T.filterTasks(decorated, filters, today);
   const summary = T.summaryCards(decorated, employees.length);
   const attention = decorated.filter((t) => t.overdue || t.status === 'blocked' || t.status === 'review');
+  const milestones = T.milestoneTasks(decorated);
   const workload = T.workloadData(decorated, employees).slice(0, 4);
   const activity = (db.activity || []).slice(0, 6).map((a) => ({ text: a.text, time: T.formatRelativeTime(a.time) }));
 
   res.render('admin-dashboard', {
     crumb: 'Dashboard', heading: 'Dashboard',
     filters, pageUrl: pageUrl(req), employees,
-    summary, attention, filtered, workload, activity,
+    summary, attention, milestones, filtered, workload, activity,
     detailTask: openTask(req, db, today),
     showSearch: true, showFilters: true, showCreateButton: true, searchPlaceholder: 'Search tasks...'
   });
@@ -170,6 +171,7 @@ router.post('/tasks', (req, res) => {
     comments: [],
     blocked: false,
     blockedReason: '',
+    isMilestone: !!req.body.isMilestone,
     createdAt: new Date().toISOString(),
     completedAt: null
   };
@@ -202,6 +204,17 @@ router.post('/tasks/:id/update', (req, res) => {
 
   save(db);
   res.redirect(T.reopenUrl(body.back, task.id));
+});
+
+router.post('/tasks/:id/toggle-milestone', (req, res) => {
+  const db = load();
+  const task = db.tasks.find((t) => t.id === Number(req.params.id));
+  if (task) {
+    task.isMilestone = !task.isMilestone;
+    logActivity(db, `<b>${T.escapeHtml(req.session.name)}</b> ${task.isMilestone ? 'marked' : 'unmarked'} "${T.escapeHtml(task.title)}" as a milestone`);
+    save(db);
+  }
+  res.redirect(T.reopenUrl(req.body.back, req.params.id));
 });
 
 router.post('/tasks/:id/delete', (req, res) => {

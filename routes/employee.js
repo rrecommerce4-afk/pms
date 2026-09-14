@@ -58,6 +58,7 @@ router.get('/dashboard', (req, res) => {
     heading: `${greetingWord()}, ${firstName(req.session.name)}`,
     filters, pageUrl: pageUrl(req),
     summary: T.employeeSummaryCards(decorated),
+    milestones: T.milestoneTasks(decorated),
     focus: decorated.filter((t) => t.status === 'todo' || t.status === 'changes' || t.priority === 'high').slice(0, 4),
     groups: T.groupByRecurrence(taskListTasks),
     taskListTasks,

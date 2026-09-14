@@ -61,6 +61,26 @@
 
   <div class="list-card">
     <div class="list-card-head section-card-head">
+      <h2>🏁 Milestones</h2>
+      <span class="tag-count"><%= milestones.length %></span>
+    </div>
+    <% if (milestones.length) { %>
+      <% milestones.forEach(function (t) { %>
+        <a class="attn-row" href="<%= taskUrl(pageUrl, t.id) %>">
+          <div class="attn-flag blue"></div>
+          <div class="attn-body"><div class="attn-title"><%= t.title %></div><div class="attn-meta">Due <%= t.dueLabel %> &middot; <%= t.statusLabel %></div></div>
+        </a>
+      <% }) %>
+    <% } else { %>
+      <div class="empty-state">
+        <svg width="34" height="34" viewBox="0 0 24 24" fill="none"><path d="M4 22V4M4 4h11l-2 4 2 4H4" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        <div class="empty-state-title">Aapke liye abhi koi milestone task nahi hai.</div>
+      </div>
+    <% } %>
+  </div>
+
+  <div class="list-card">
+    <div class="list-card-head section-card-head">
       <h2>My Task List</h2>
       <%- include('partials/view-toggle', { basePath: '/employee/dashboard' }) %>
     </div>

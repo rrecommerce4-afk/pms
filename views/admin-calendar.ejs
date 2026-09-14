@@ -58,6 +58,9 @@
       <% calendar.weeks.forEach(function (week) { %>
         <% week.forEach(function (day) { %>
           <div class="cal-day <%= !day.inMonth ? 'out' : '' %> <%= day.isToday ? 'today' : '' %>">
+            <% if (day.tasks.some(function (t) { return t.isMilestone; })) { %>
+              <svg class="cal-milestone-star" viewBox="0 0 24 24" fill="currentColor" title="Milestone due"><path d="M12 2l2.9 6.9 7.1.6-5.4 4.6 1.6 7-6.2-3.9-6.2 3.9 1.6-7L2 9.5l7.1-.6z"/></svg>
+            <% } %>
             <div class="cal-day-num"><%= day.day %></div>
             <div class="cal-day-tasks">
               <% day.tasks.slice(0, 3).forEach(function (t) { %>

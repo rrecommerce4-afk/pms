@@ -1498,6 +1498,20 @@ form.inline { display: inline; }
 .recur-badge { display: inline-flex; align-items: center; gap: 4px; font-size: 11px; font-weight: 700; padding: 3px 9px; border-radius: 5px; background: var(--info-soft); color: var(--info); white-space: nowrap; margin-left: 8px; vertical-align: middle; }
 .recur-badge svg { width: 11px; height: 11px; }
 
+/* ---------- Milestones ---------- */
+.milestone-badge { display: inline-flex; align-items: center; gap: 4px; font-size: 11px; font-weight: 700; padding: 3px 9px; border-radius: 5px; background: var(--primary-soft); color: var(--primary-dark); white-space: nowrap; margin-left: 8px; vertical-align: middle; }
+.milestone-badge svg { width: 11px; height: 11px; }
+.milestone-toggle-row { display: flex; align-items: center; gap: 10px; width: 100%; padding: 12px 14px; border: 1.5px solid var(--border); border-radius: var(--radius-sm); background: var(--bg); cursor: pointer; text-align: left; font: inherit; color: inherit; }
+.milestone-toggle-row.active { border-color: var(--primary); background: var(--primary-soft); }
+.milestone-toggle-row svg { width: 18px; height: 18px; color: var(--text-faint); flex-shrink: 0; }
+.milestone-toggle-row.active svg { color: var(--primary-dark); }
+.milestone-toggle-row .mt-label { font-size: 13px; font-weight: 700; color: var(--text); }
+.milestone-toggle-row .mt-sub { font-size: 11.5px; color: var(--text-faint); }
+.milestone-checkbox { width: 18px; height: 18px; border-radius: 5px; border: 1.5px solid var(--border); flex-shrink: 0; display: flex; align-items: center; justify-content: center; margin-left: auto; background: var(--surface); }
+.milestone-toggle-row.active .milestone-checkbox { background: var(--primary); border-color: var(--primary); }
+.milestone-checkbox svg { width: 11px; height: 11px; color: #fff; display: none; }
+.milestone-toggle-row.active .milestone-checkbox svg { display: block; }
+
 /* ---------- Task table extras ---------- */
 .task-id { font-size: 11px; color: var(--text-faint); font-family: var(--font-serif); }
 .mini-avatar { width: 22px; height: 22px; border-radius: 50%; background: var(--info-soft); color: var(--info); display: flex; align-items: center; justify-content: center; font-size: 10px; font-weight: 700; flex-shrink: 0; }
@@ -1728,7 +1742,8 @@ form.inline { display: inline; }
 .cal-grid-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; }
 .cal-grid { display: grid; grid-template-columns: repeat(7, minmax(92px, 1fr)); min-width: 650px; }
 .cal-weekday { padding: 10px 8px; font-size: 11px; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; color: var(--text-faint); text-align: center; border-bottom: 1px solid var(--border-soft); }
-.cal-day { min-height: 108px; border-right: 1px solid var(--border-soft); border-bottom: 1px solid var(--border-soft); padding: 6px 6px 8px; display: flex; flex-direction: column; gap: 4px; }
+.cal-day { position: relative; min-height: 108px; border-right: 1px solid var(--border-soft); border-bottom: 1px solid var(--border-soft); padding: 6px 6px 8px; display: flex; flex-direction: column; gap: 4px; }
+.cal-milestone-star { position: absolute; top: 5px; right: 6px; width: 12px; height: 12px; color: var(--primary); }
 .cal-grid .cal-day:nth-child(7n) { border-right: none; }
 .cal-day.out { background: var(--bg); }
 .cal-day.out .cal-day-num { color: var(--text-faint); }
