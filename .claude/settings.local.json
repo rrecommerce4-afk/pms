@@ -35,7 +35,13 @@
       "Bash(MSYS_NO_PATHCONV=1 curl -s -b c.txt -X POST \"http://localhost:3097/admin/tasks\" -d \"title=Daily UI test&assignedTo=2&priority=medium&recurrence=daily&startDate=2026-09-17\" -o /dev/null -w \"create daily: %{http_code} %{redirect_url}\\\\n\")",
       "Bash(MSYS_NO_PATHCONV=1 curl -s -b c.txt \"http://localhost:3097/admin/tasks?task=69\" -o daily_detail.html -w \"%{http_code}\\\\n\")",
       "Bash(MSYS_NO_PATHCONV=1 curl -s -b c.txt -X POST \"http://localhost:3097/admin/tasks/69/delete\" -d \"back=/admin/tasks\" -o /dev/null -w \"delete: %{http_code}\\\\n\")",
-      "Bash(pkill -f \"node server.js\")"
+      "Bash(pkill -f \"node server.js\")",
+      "Bash(rm -f c2.txt)",
+      "Bash(curl -s -c c2.txt -X POST http://localhost:3096/login -d \"email=admin@pms.com&password=admin123\" -o /dev/null -w \"login: %{http_code}\\\\n\")",
+      "Bash(MSYS_NO_PATHCONV=1 curl -s -b c2.txt -X POST \"http://localhost:3096/admin/tasks\" -d \"title=Daily calendar test&assignedTo=2&priority=medium&recurrence=daily&startDate=2026-09-17\" -o /dev/null -w \"create: %{http_code} %{redirect_url}\\\\n\")",
+      "Bash(MSYS_NO_PATHCONV=1 curl -s -b c2.txt \"http://localhost:3096/admin/calendar?month=2026-09\" -o cal2.html -w \"%{http_code}\\\\n\")",
+      "Bash(MSYS_NO_PATHCONV=1 curl -s -b c2.txt \"http://localhost:3096/admin/calendar?month=2026-10\" -o cal3.html -w \"%{http_code}\\\\n\")",
+      "Bash(MSYS_NO_PATHCONV=1 curl -s -b c2.txt -X POST \"http://localhost:3096/admin/tasks/70/delete\" -d \"back=/admin/tasks\" -o /dev/null -w \"delete: %{http_code}\\\\n\")"
     ]
   }
 }
