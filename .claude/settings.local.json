@@ -25,7 +25,11 @@
       "Bash(rm -f a.txt e.txt)",
       "Bash(rm -rf __TRACKED_VAR__/chrome-profile-detail __TRACKED_VAR__/autologin_detail.html __TRACKED_VAR__/emp_tasks_with_details.png __TRACKED_VAR__/modal_open.png __TRACKED_VAR__/modal_clicked.png __TRACKED_VAR__/cdp_click_test.js __TRACKED_VAR__/chrome_cdp.log __TRACKED_VAR__/click_details.js)",
       "Bash(nslookup pms.rajaraniproduct.tech)",
-      "Bash(ping -n 1 pms.rajaraniproduct.tech)"
+      "Bash(ping -n 1 pms.rajaraniproduct.tech)",
+      "Bash(cd /tmp)",
+      "Bash(rm -f cookies2.txt)",
+      "Bash(curl -s -c cookies2.txt -X POST http://localhost:3098/login -d \"email=admin@pms.com&password=admin123\" -o /dev/null -w \"login: %{http_code}\\\\n\")",
+      "Bash(MSYS_NO_PATHCONV=1 curl -s -b cookies2.txt -X POST http://localhost:3098/admin/tasks -d 'title=Daily reset test&assignedTo=2&priority=medium&recurrence=daily&startDate=2026-09-17' -o create2.html -w 'create: %{http_code} redirect=%{redirect_url}\\\\n')"
     ]
   }
 }

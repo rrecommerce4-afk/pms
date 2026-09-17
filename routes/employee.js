@@ -141,10 +141,8 @@ router.post('/tasks/:id/complete-direct', (req, res) => {
   const today = todayStr();
   const task = myTask(db, req.params.id, req.session.userId);
   if (task && task.status === 'progress' && T.isReviewFreeRecurring(task)) {
-    task.status = 'completed';
-    task.completedAt = new Date().toISOString();
-    const spawned = T.spawnRecurrence(db, task, today);
-    logActivity(db, `<b>${T.escapeHtml(req.session.name)}</b> completed "${T.escapeHtml(task.title)}" (no review needed)` + (spawned ? ' — next occurrence created' : ''));
+    logActivity(db, `<b>${T.escapeHtml(req.session.name)}</b> completed "${T.escapeHtml(task.title)}" (no review needed) — resets to To Do for tomorrow`);
+    T.resetDailyTask(task, today);
     save(db);
   }
   res.redirect(T.reopenUrl(req.body.back, req.params.id));

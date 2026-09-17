@@ -148,12 +148,16 @@ router.post('/tasks', (req, res) => {
   const db = load();
   const today = todayStr();
 
-  if (!title || !title.trim() || !assignedTo || !dueDate) {
+  // Daily tasks repeat forever, so a due date isn't meaningful up front — it's
+  // required for every other recurrence (and one-time tasks).
+  const isDaily = recurrence === 'daily';
+  if (!title || !title.trim() || !assignedTo || (!isDaily && !dueDate)) {
     return res.redirect('/admin/tasks');
   }
 
   const checklistRaw = req.body.checklist;
   const checklistItems = Array.isArray(checklistRaw) ? checklistRaw : (checklistRaw ? [checklistRaw] : []);
+  const finalStartDate = startDate || today;
 
   const newTask = {
     id: db.nextId.tasks++,
@@ -164,8 +168,8 @@ router.post('/tasks', (req, res) => {
     priority: ['high', 'medium', 'low'].includes(priority) ? priority : 'medium',
     status: 'todo',
     recurrence: T.RECUR_DAYS[recurrence] ? recurrence : 'none',
-    startDate: startDate || today,
-    dueDate,
+    startDate: finalStartDate,
+    dueDate: isDaily ? (dueDate || finalStartDate) : dueDate,
     checklist: checklistItems.filter((c) => c && c.trim()).map((text) => ({ text: text.trim(), done: false })),
     files: [],
     comments: [],
