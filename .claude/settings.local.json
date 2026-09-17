@@ -29,7 +29,13 @@
       "Bash(cd /tmp)",
       "Bash(rm -f cookies2.txt)",
       "Bash(curl -s -c cookies2.txt -X POST http://localhost:3098/login -d \"email=admin@pms.com&password=admin123\" -o /dev/null -w \"login: %{http_code}\\\\n\")",
-      "Bash(MSYS_NO_PATHCONV=1 curl -s -b cookies2.txt -X POST http://localhost:3098/admin/tasks -d 'title=Daily reset test&assignedTo=2&priority=medium&recurrence=daily&startDate=2026-09-17' -o create2.html -w 'create: %{http_code} redirect=%{redirect_url}\\\\n')"
+      "Bash(MSYS_NO_PATHCONV=1 curl -s -b cookies2.txt -X POST http://localhost:3098/admin/tasks -d 'title=Daily reset test&assignedTo=2&priority=medium&recurrence=daily&startDate=2026-09-17' -o create2.html -w 'create: %{http_code} redirect=%{redirect_url}\\\\n')",
+      "Bash(rm -f c.txt)",
+      "Bash(curl -s -c c.txt -X POST http://localhost:3097/login -d \"email=admin@pms.com&password=admin123\" -o /dev/null -w \"login: %{http_code}\\\\n\")",
+      "Bash(MSYS_NO_PATHCONV=1 curl -s -b c.txt -X POST \"http://localhost:3097/admin/tasks\" -d \"title=Daily UI test&assignedTo=2&priority=medium&recurrence=daily&startDate=2026-09-17\" -o /dev/null -w \"create daily: %{http_code} %{redirect_url}\\\\n\")",
+      "Bash(MSYS_NO_PATHCONV=1 curl -s -b c.txt \"http://localhost:3097/admin/tasks?task=69\" -o daily_detail.html -w \"%{http_code}\\\\n\")",
+      "Bash(MSYS_NO_PATHCONV=1 curl -s -b c.txt -X POST \"http://localhost:3097/admin/tasks/69/delete\" -d \"back=/admin/tasks\" -o /dev/null -w \"delete: %{http_code}\\\\n\")",
+      "Bash(pkill -f \"node server.js\")"
     ]
   }
 }

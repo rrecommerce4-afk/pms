@@ -109,14 +109,16 @@
               <% } else { %><%= t.startLabel %><% } %>
             </div>
           </div>
-          <div>
-            <div class="meta-item-label">Due date</div>
-            <div class="meta-item-val">
-              <% if (isAdmin) { %>
-                <form method="POST" action="/admin/tasks/<%= t.id %>/update"><input type="hidden" name="back" value="<%= pageUrl %>"><input type="date" name="dueDate" class="autosubmit-field" value="<%= t.dueDate %>"></form>
-              <% } else { %><%= t.dueLabel %><% } %>
+          <% if (t.recurrence !== 'daily') { %>
+            <div>
+              <div class="meta-item-label">Due date</div>
+              <div class="meta-item-val">
+                <% if (isAdmin) { %>
+                  <form method="POST" action="/admin/tasks/<%= t.id %>/update"><input type="hidden" name="back" value="<%= pageUrl %>"><input type="date" name="dueDate" class="autosubmit-field" value="<%= t.dueDate %>"></form>
+                <% } else { %><%= t.dueLabel %><% } %>
+              </div>
             </div>
-          </div>
+          <% } %>
           <div>
             <div class="meta-item-label">Repeats</div>
             <div class="meta-item-val">
