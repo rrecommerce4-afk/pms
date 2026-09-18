@@ -71,6 +71,23 @@ function addDays(isoDate, days) {
   return `${yy}-${mm}-${dd}`;
 }
 
+// Given a YYYY-MM-DD string, returns the date `months` calendar months later, keeping the
+// same day of month where possible (e.g. 5 Oct + 1 month -> 5 Nov). If the target month is
+// shorter than that day, clamps to its last day (e.g. 31 Jan + 1 month -> 28/29 Feb).
+function addMonths(isoDate, months) {
+  const [y, m, d] = isoDate.split('-').map(Number);
+  const totalMonths = (m - 1) + months;
+  const targetYear = y + Math.floor(totalMonths / 12);
+  const targetMonth = ((totalMonths % 12) + 12) % 12;
+  const lastDayOfTargetMonth = new Date(targetYear, targetMonth + 1, 0).getDate();
+  const day = Math.min(d, lastDayOfTargetMonth);
+  const dt = new Date(targetYear, targetMonth, day);
+  const yy = dt.getFullYear();
+  const mm = String(dt.getMonth() + 1).padStart(2, '0');
+  const dd = String(dt.getDate()).padStart(2, '0');
+  return `${yy}-${mm}-${dd}`;
+}
+
 // Whole-day difference between two YYYY-MM-DD strings (b - a), in days.
 function daysBetween(aIso, bIso) {
   const [ay, am, ad] = aIso.split('-').map(Number);
@@ -80,4 +97,4 @@ function daysBetween(aIso, bIso) {
   return Math.round((b - a) / 86400000);
 }
 
-module.exports = { greetingWord, topDateStr, firstName, dateBadge, listDateStr, chipDateStr, formatIsoDate, yesterdayStr, addDays, daysBetween, dashboardPathForRole };
+module.exports = { greetingWord, topDateStr, firstName, dateBadge, listDateStr, chipDateStr, formatIsoDate, yesterdayStr, addDays, addMonths, daysBetween, dashboardPathForRole };

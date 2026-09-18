@@ -2,6 +2,7 @@ const fs = require('fs');
 const path = require('path');
 const bcrypt = require('bcryptjs');
 const { addDays } = require('./utils');
+const { catchUpDailyTasks } = require('./lib/tasks');
 
 const DB_FILE = path.join(__dirname, 'db.json');
 const SCHEMA_VERSION = 3;
@@ -119,7 +120,9 @@ function load() {
   const raw = fs.readFileSync(DB_FILE, 'utf8');
   const db = raw.trim() ? JSON.parse(raw) : emptyDb();
   if (!db.schemaVersion) db.schemaVersion = 1;
-  if (migrate(db)) save(db);
+  let dirty = migrate(db);
+  if (catchUpDailyTasks(db.tasks, todayStr())) dirty = true;
+  if (dirty) save(db);
   return db;
 }
 

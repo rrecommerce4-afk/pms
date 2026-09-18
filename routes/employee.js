@@ -138,11 +138,13 @@ router.post('/tasks/:id/submit-review', (req, res) => {
 
 router.post('/tasks/:id/complete-direct', (req, res) => {
   const db = load();
-  const today = todayStr();
   const task = myTask(db, req.params.id, req.session.userId);
   if (task && task.status === 'progress' && T.isReviewFreeRecurring(task)) {
-    logActivity(db, `<b>${T.escapeHtml(req.session.name)}</b> completed "${T.escapeHtml(task.title)}" (no review needed) — resets to To Do for tomorrow`);
-    T.resetDailyTask(task, today);
+    // Stays marked Completed for the rest of today so it's clear it's done; the daily
+    // catch-up in db.js load() resets it to To Do once the date actually rolls over.
+    task.status = 'completed';
+    task.completedAt = new Date().toISOString();
+    logActivity(db, `<b>${T.escapeHtml(req.session.name)}</b> completed "${T.escapeHtml(task.title)}" (no review needed) — resets to To Do tomorrow`);
     save(db);
   }
   res.redirect(T.reopenUrl(req.body.back, req.params.id));
