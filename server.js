@@ -2,7 +2,7 @@ const express = require('express');
 const session = require('express-session');
 const path = require('path');
 
-const { seedAdminIfNeeded } = require('./db');
+const { load, seedAdminIfNeeded } = require('./db');
 const { topDateStr, dateBadge, dashboardPathForRole } = require('./utils');
 const authRoutes = require('./routes/auth');
 const adminRoutes = require('./routes/admin');
@@ -30,6 +30,16 @@ app.use(
     cookie: { maxAge: 1000 * 60 * 60 * 12 } // 12 hours
   })
 );
+
+// The session keeps the name from login time, so a profile rename wouldn't show until the
+// user logged in again. Re-read it from the users list on each request instead.
+app.use((req, res, next) => {
+  if (req.session.userId) {
+    const user = load().users.find((u) => u.id === req.session.userId);
+    if (user) req.session.name = user.name;
+  }
+  next();
+});
 
 app.use((req, res, next) => {
   res.locals.role = req.session.role;

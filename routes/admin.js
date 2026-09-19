@@ -164,6 +164,7 @@ router.post('/tasks', (req, res) => {
     title: title.trim(),
     description: (description || '').trim(),
     assignedTo: Number(assignedTo),
+    assignedById: req.session.userId,
     assignedByName: req.session.name,
     priority: ['high', 'medium', 'low'].includes(priority) ? priority : 'medium',
     status: 'todo',
