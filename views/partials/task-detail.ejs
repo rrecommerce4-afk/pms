@@ -285,8 +285,7 @@
           <span style="font-size:12.5px;color:var(--success);align-self:center;font-weight:600;">✓ Completed<%= t.recurrence === 'daily' ? ' for today · resets to To Do tomorrow' : (t.recurrence !== 'none' ? ' · next occurrence created' : '') %></span>
         <% } %>
       <% } else if (isAdmin) { %>
-        <form method="POST" action="/admin/tasks/<%= t.id %>/delete" style="margin-right:auto;" onsubmit="return confirm('Delete this task permanently?');"><input type="hidden" name="back" value="<%= pageUrl %>"><button class="btn btn-danger" type="submit">Delete</button></form>
-        <a href="<%= pageUrl %>" class="btn outline">Close</a>
+        <a href="<%= pageUrl %>" class="btn outline" style="margin-right:auto;">Close</a>
         <% if (t.status === 'review') { %>
           <button type="button" class="btn btn-danger" id="showChangesFormBtn">Request Changes</button>
           <form method="POST" action="/admin/tasks/<%= t.id %>/approve"><input type="hidden" name="back" value="<%= pageUrl %>"><button class="btn" type="submit">Approve &amp; Complete</button></form>
