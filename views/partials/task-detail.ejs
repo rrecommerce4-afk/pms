@@ -92,7 +92,7 @@
                 <form method="POST" action="/admin/tasks/<%= t.id %>/update">
                   <input type="hidden" name="back" value="<%= pageUrl %>">
                   <select name="assignedTo" class="autosubmit-field">
-                    <% employees.forEach(function (e) { %><option value="<%= e.id %>" <%= e.id === t.assignedTo ? 'selected' : '' %>><%= e.name %></option><% }) %>
+                    <% (typeof assignees !== 'undefined' ? assignees : employees).forEach(function (e) { %><option value="<%= e.id %>" <%= e.id === t.assignedTo ? 'selected' : '' %>><%= e.name %><%= e.role === 'admin' ? ' — Admin' : '' %></option><% }) %>
                   </select>
                 </form>
               <% } else { %>

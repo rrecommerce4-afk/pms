@@ -23,8 +23,8 @@
           <div class="field">
             <label>Assign To</label>
             <select name="assignedTo" required>
-              <% (typeof employees !== 'undefined' ? employees : []).forEach(function(e) { %>
-                <option value="<%= e.id %>"><%= e.name %> — <%= e.department || 'Team Member' %></option>
+              <% (typeof assignees !== 'undefined' ? assignees : (typeof employees !== 'undefined' ? employees : [])).forEach(function(e) { %>
+                <option value="<%= e.id %>"><%= e.name %> — <%= e.role === 'admin' ? 'Admin' : (e.department || 'Team Member') %></option>
               <% }) %>
             </select>
           </div>

@@ -59,6 +59,10 @@ router.use((req, res, next) => {
     all: db.tasks.length,
     review: db.tasks.filter((t) => t.status === 'review').length
   };
+  // Who a task can be assigned to: active team members plus admins (admin names come first).
+  res.locals.assignees = db.users
+    .filter((u) => u.active && (u.role === 'admin' || u.role === 'employee'))
+    .sort((a, b) => (a.role === b.role ? 0 : a.role === 'admin' ? -1 : 1));
   next();
 });
 
