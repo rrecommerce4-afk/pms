@@ -329,13 +329,6 @@
       showChanges.addEventListener('click', function () { changesForm.style.display = 'block'; });
       cancelChanges.addEventListener('click', function () { changesForm.style.display = 'none'; });
     }
-
-    var overlay = document.getElementById('taskOverlay');
-    if (overlay) {
-      overlay.addEventListener('click', function (e) {
-        if (e.target === overlay) window.location.href = '<%= pageUrl %>';
-      });
-    }
   })();
 </script>
 <% } %>
