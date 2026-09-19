@@ -45,7 +45,8 @@
       "Bash(node -e \"const db = require\\('./db.js'\\); console.log\\('db.js loaded OK'\\); const t = require\\('./lib/tasks.js'\\); console.log\\(typeof t.catchUpDailyTasks\\);\")",
       "Bash(node --check server.js)",
       "Bash(node --check lib/tasks.js)",
-      "Bash(node --check routes/admin.js)"
+      "Bash(node --check routes/admin.js)",
+      "Bash(node -e \"const d=require\\('./db.json'\\);console.log\\(d.users.filter\\(u=>u.role!=='employee'\\).map\\(u=>\\({id:u.id,name:u.name,email:u.email,role:u.role,active:u.active}\\)\\)\\);console.log\\(d.tasks.slice\\(0,3\\).map\\(t=>[t.id,t.assignedByName,t.assignedById]\\)\\)\")"
     ]
   }
 }
