@@ -1,0 +1,25 @@
+<%- include('partials/header') %>
+<div class="container container-wide">
+  <div class="page-head">
+    <div>
+      <div class="eyebrow-date">MY WORK</div>
+      <h1><%= heading %></h1>
+      <p>Aapko assign kiye gaye saare tasks &mdash; repeat schedule ke hisab se grouped.</p>
+    </div>
+  </div>
+
+  <div class="list-card">
+    <div class="list-card-head section-card-head">
+      <h2>Assigned to Me <span class="tag-count"><%= filtered.length %></span></h2>
+      <%- include('partials/view-toggle', { basePath: '/admin/my-tasks' }) %>
+    </div>
+    <% if (filters.view === 'kanban') { %>
+      <%- include('partials/kanban', { tasks: filtered, showAssignee: false, pageUrl: pageUrl }) %>
+    <% } else { %>
+      <%- include('partials/task-groups', { groups: groups, pageUrl: pageUrl }) %>
+    <% } %>
+  </div>
+</div>
+<%- include('partials/task-modal') %>
+<%- include('partials/task-detail') %>
+<%- include('partials/footer') %>

@@ -21,4 +21,11 @@ function requireEmployee(req, res, next) {
   next();
 }
 
-module.exports = { requireLogin, requireAdmin, requireViewer, requireEmployee };
+// Task actions (start, submit, block, checklist...) — admins can work tasks assigned to them too.
+function requireEmployeeOrAdmin(req, res, next) {
+  if (!req.session.userId) return res.redirect('/login');
+  if (req.session.role !== 'employee' && req.session.role !== 'admin') return res.status(403).send('Forbidden');
+  next();
+}
+
+module.exports = { requireLogin, requireAdmin, requireViewer, requireEmployee, requireEmployeeOrAdmin };

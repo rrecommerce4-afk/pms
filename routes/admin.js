@@ -57,7 +57,8 @@ router.use((req, res, next) => {
   const db = load();
   res.locals.navCounts = {
     all: db.tasks.length,
-    review: db.tasks.filter((t) => t.status === 'review').length
+    review: db.tasks.filter((t) => t.status === 'review').length,
+    myTasks: db.tasks.filter((t) => t.assignedTo === req.session.userId).length
   };
   // Who a task can be assigned to: active team members plus admins (admin names come first).
   res.locals.assignees = db.users
@@ -95,6 +96,22 @@ router.get('/tasks', (req, res) => {
     filters, pageUrl: pageUrl(req), employees, filtered,
     detailTask: openTask(req, db, today),
     showSearch: true, showFilters: true, showCreateButton: true, searchPlaceholder: 'Search tasks...'
+  });
+});
+
+// Tasks assigned to the logged-in admin (admins can be assigned work like anyone else).
+router.get('/my-tasks', (req, res) => {
+  const { db, today, decorated } = loadCommon();
+  const filters = { q: (req.query.q || '').trim(), view: req.query.view === 'kanban' ? 'kanban' : 'list' };
+  const mine = decorated.filter((t) => t.assignedTo === req.session.userId);
+  const filtered = T.filterTasks(mine, { q: filters.q }, today);
+
+  res.render('admin-my-tasks', {
+    crumb: 'My Tasks', heading: 'My Tasks',
+    filters, pageUrl: pageUrl(req), filtered,
+    groups: T.groupByRecurrence(filtered),
+    detailTask: openTask(req, db, today),
+    showSearch: true, searchPlaceholder: 'Search my tasks...', showCreateButton: true
   });
 });
 

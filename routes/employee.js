@@ -1,11 +1,13 @@
 const express = require('express');
 const { load, save, todayStr, logActivity } = require('../db');
-const { requireEmployee } = require('../middleware/auth');
+const { requireEmployee, requireEmployeeOrAdmin } = require('../middleware/auth');
 const { greetingWord, firstName } = require('../utils');
 const T = require('../lib/tasks');
 
 const router = express.Router();
-router.use(requireEmployee);
+// Pages are employee-only; the POST task actions also accept admins (for their own assigned tasks —
+// myTask() still only lets a user act on tasks assigned to them).
+router.use((req, res, next) => (req.method === 'GET' ? requireEmployee : requireEmployeeOrAdmin)(req, res, next));
 
 function pageUrl(req) {
   const params = new URLSearchParams();

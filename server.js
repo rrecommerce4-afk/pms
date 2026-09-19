@@ -44,6 +44,7 @@ app.use((req, res, next) => {
 app.use((req, res, next) => {
   res.locals.role = req.session.role;
   res.locals.name = req.session.name;
+  res.locals.userId = req.session.userId;
   res.locals.roleLabel = req.session.role === 'admin' ? 'Admin' : req.session.role === 'viewer' ? 'Viewer' : 'Team Member';
   res.locals.path = req.path;
   res.locals.topDate = topDateStr();

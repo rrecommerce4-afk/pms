@@ -4,6 +4,8 @@
   var isAdmin = role === 'admin';
   var isEmployee = role === 'employee';
   var readOnly = role === 'viewer';
+  // An admin can also be assigned tasks, and works those like an employee would (start / submit / block).
+  var isMine = isAdmin && typeof userId !== 'undefined' && t.assignedTo === userId;
   var basePath = isAdmin ? '/admin' : '/employee';
   var STEP_STATUSES = ['todo', 'progress', 'review', 'completed'];
   var effectiveIndex = STEP_STATUSES.indexOf(t.status);
@@ -235,7 +237,7 @@
       </div>
     </div>
 
-    <% if (isEmployee && ['todo', 'progress', 'changes'].indexOf(t.status) !== -1) { %>
+    <% if ((isEmployee || isMine) && ['todo', 'progress', 'changes'].indexOf(t.status) !== -1) { %>
       <div class="inline-form" id="blockForm" style="display:none;">
         <div class="detail-block-label">Reason for blocking</div>
         <form method="POST" action="/employee/tasks/<%= t.id %>/block">
@@ -286,6 +288,24 @@
         <% } %>
       <% } else if (isAdmin) { %>
         <a href="<%= pageUrl %>" class="btn outline" style="margin-right:auto;">Close</a>
+        <% if (isMine) { %>
+          <% if (t.status === 'todo') { %>
+            <button type="button" class="btn btn-danger" id="showBlockFormBtn">Mark as Blocked</button>
+            <form method="POST" action="/employee/tasks/<%= t.id %>/start"><input type="hidden" name="back" value="<%= pageUrl %>"><button class="btn" type="submit">Start Task</button></form>
+          <% } else if (t.status === 'progress') { %>
+            <button type="button" class="btn btn-danger" id="showBlockFormBtn">Mark as Blocked</button>
+            <% if (t.recurrence === 'daily') { %>
+              <form method="POST" action="/employee/tasks/<%= t.id %>/complete-direct"><input type="hidden" name="back" value="<%= pageUrl %>"><button class="btn" type="submit">Mark Complete</button></form>
+            <% } else { %>
+              <form method="POST" action="/employee/tasks/<%= t.id %>/submit-review"><input type="hidden" name="back" value="<%= pageUrl %>"><button class="btn" type="submit">Submit for Review</button></form>
+            <% } %>
+          <% } else if (t.status === 'changes') { %>
+            <button type="button" class="btn btn-danger" id="showBlockFormBtn">Mark as Blocked</button>
+            <form method="POST" action="/employee/tasks/<%= t.id %>/submit-review"><input type="hidden" name="back" value="<%= pageUrl %>"><button class="btn" type="submit">Resubmit for Review</button></form>
+          <% } else if (t.status === 'blocked') { %>
+            <form method="POST" action="/employee/tasks/<%= t.id %>/unblock"><input type="hidden" name="back" value="<%= pageUrl %>"><button class="btn btn-outline-accent" type="submit">Resume Task</button></form>
+          <% } %>
+        <% } %>
         <% if (t.status === 'review') { %>
           <button type="button" class="btn btn-danger" id="showChangesFormBtn">Request Changes</button>
           <form method="POST" action="/admin/tasks/<%= t.id %>/approve"><input type="hidden" name="back" value="<%= pageUrl %>"><button class="btn" type="submit">Approve &amp; Complete</button></form>
