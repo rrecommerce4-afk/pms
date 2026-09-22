@@ -48,7 +48,7 @@
           </select>
         </div>
         <div class="form-grid-2">
-          <div class="field">
+          <div class="field" id="tmStartDateField">
             <label>Start Date</label>
             <input type="date" name="startDate" id="tmStartDate">
           </div>
@@ -58,6 +58,36 @@
           </div>
         </div>
         <div id="tmDailyNote" style="display:none;font-size:12px;color:var(--text-faint);margin-top:-8px;">Daily tasks repeat every day — koi due date select karne ki zaroorat nahi hai.</div>
+        <div class="field" id="tmWeeklyDaysField" style="display:none;">
+          <label>Repeat Days</label>
+          <div class="form-grid-2">
+            <div class="field">
+              <label style="font-weight:400;text-transform:none;">From Day</label>
+              <select name="weeklyFromDay" id="tmWeeklyFromDay">
+                <option value="0">Sunday</option>
+                <option value="1" selected>Monday</option>
+                <option value="2">Tuesday</option>
+                <option value="3">Wednesday</option>
+                <option value="4">Thursday</option>
+                <option value="5">Friday</option>
+                <option value="6">Saturday</option>
+              </select>
+            </div>
+            <div class="field">
+              <label style="font-weight:400;text-transform:none;">To Day</label>
+              <select name="weeklyToDay" id="tmWeeklyToDay">
+                <option value="0">Sunday</option>
+                <option value="1" selected>Monday</option>
+                <option value="2">Tuesday</option>
+                <option value="3">Wednesday</option>
+                <option value="4">Thursday</option>
+                <option value="5">Friday</option>
+                <option value="6">Saturday</option>
+              </select>
+            </div>
+          </div>
+          <div style="font-size:12px;color:var(--text-faint);">Pick the same day twice for a single weekday, or a range (e.g. Monday to Wednesday) to show the task every day in that window. It repeats on the same days every week.</div>
+        </div>
         <div class="field">
           <label>Checklist <span style="font-weight:400;color:var(--text-faint);text-transform:none;">(optional — items the employee should complete)</span></label>
           <div id="tmChecklistList"></div>
@@ -90,19 +120,32 @@
     }
 
     var recurSelect = document.getElementById('tmRecurrenceSelect');
+    var startField = document.getElementById('tmStartDateField');
     var dueField = document.getElementById('tmDueDateField');
     var dueInput = document.getElementById('tmDueDateInput');
     var dailyNote = document.getElementById('tmDailyNote');
+    var weeklyDaysField = document.getElementById('tmWeeklyDaysField');
     function syncDueDateForRecurrence() {
       var isDaily = recurSelect.value === 'daily';
-      dueField.style.display = isDaily ? 'none' : '';
+      var isWeekly = recurSelect.value === 'weekly';
+      dueField.style.display = (isDaily || isWeekly) ? 'none' : '';
+      startField.style.display = isWeekly ? 'none' : '';
       dailyNote.style.display = isDaily ? 'block' : 'none';
-      dueInput.required = !isDaily;
-      if (isDaily) dueInput.value = '';
+      weeklyDaysField.style.display = isWeekly ? 'block' : 'none';
+      dueInput.required = !(isDaily || isWeekly);
+      if (isDaily || isWeekly) dueInput.value = '';
     }
     if (recurSelect) {
       recurSelect.addEventListener('change', syncDueDateForRecurrence);
       syncDueDateForRecurrence();
+    }
+
+    var weeklyFromDay = document.getElementById('tmWeeklyFromDay');
+    var weeklyToDay = document.getElementById('tmWeeklyToDay');
+    if (weeklyFromDay && weeklyToDay) {
+      weeklyFromDay.addEventListener('change', function () {
+        if (Number(weeklyToDay.value) < Number(weeklyFromDay.value)) weeklyToDay.value = weeklyFromDay.value;
+      });
     }
 
     var list = document.getElementById('tmChecklistList');

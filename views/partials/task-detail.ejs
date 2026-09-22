@@ -11,6 +11,7 @@
   var effectiveIndex = STEP_STATUSES.indexOf(t.status);
   if (t.status === 'changes' || t.status === 'blocked') effectiveIndex = STEP_STATUSES.indexOf('progress');
   var STEP_LABELS = { todo: 'To Do', progress: 'In Progress', review: 'In Review', completed: 'Completed' };
+  var WEEKDAY_NAMES = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 %>
 <div class="overlay open" id="taskOverlay">
   <div class="detail-panel">
@@ -106,7 +107,7 @@
           <div>
             <div class="meta-item-label">Start date</div>
             <div class="meta-item-val">
-              <% if (isAdmin) { %>
+              <% if (isAdmin && t.recurrence !== 'weekly') { %>
                 <form method="POST" action="/admin/tasks/<%= t.id %>/update"><input type="hidden" name="back" value="<%= pageUrl %>"><input type="date" name="startDate" class="autosubmit-field" value="<%= t.startDate %>"></form>
               <% } else { %><%= t.startLabel %><% } %>
             </div>
@@ -115,7 +116,7 @@
             <div>
               <div class="meta-item-label">Due date</div>
               <div class="meta-item-val">
-                <% if (isAdmin) { %>
+                <% if (isAdmin && t.recurrence !== 'weekly') { %>
                   <form method="POST" action="/admin/tasks/<%= t.id %>/update"><input type="hidden" name="back" value="<%= pageUrl %>"><input type="date" name="dueDate" class="autosubmit-field" value="<%= t.dueDate %>"></form>
                 <% } else { %><%= t.dueLabel %><% } %>
               </div>
@@ -138,6 +139,36 @@
               <% } else { %><%= t.recurText || 'One-time' %><% } %>
             </div>
           </div>
+          <% if (t.recurrence === 'weekly') { %>
+            <div>
+              <div class="meta-item-label">Repeat Days</div>
+              <div class="meta-item-val">
+                <% if (isAdmin) { %>
+                  <div style="display:flex;align-items:center;gap:4px;">
+                    <form method="POST" action="/admin/tasks/<%= t.id %>/update">
+                      <input type="hidden" name="back" value="<%= pageUrl %>">
+                      <select name="weeklyFromDay" class="autosubmit-field">
+                        <% WEEKDAY_NAMES.forEach(function (name, idx) { %>
+                          <option value="<%= idx %>" <%= t.weeklyFromDay === idx ? 'selected' : '' %>><%= name %></option>
+                        <% }) %>
+                      </select>
+                    </form>
+                    <span>to</span>
+                    <form method="POST" action="/admin/tasks/<%= t.id %>/update">
+                      <input type="hidden" name="back" value="<%= pageUrl %>">
+                      <select name="weeklyToDay" class="autosubmit-field">
+                        <% WEEKDAY_NAMES.forEach(function (name, idx) { %>
+                          <option value="<%= idx %>" <%= t.weeklyToDay === idx ? 'selected' : '' %>><%= name %></option>
+                        <% }) %>
+                      </select>
+                    </form>
+                  </div>
+                <% } else { %>
+                  <%= WEEKDAY_NAMES[t.weeklyFromDay] %><% if (t.weeklyToDay !== t.weeklyFromDay) { %> to <%= WEEKDAY_NAMES[t.weeklyToDay] %><% } %>
+                <% } %>
+              </div>
+            </div>
+          <% } %>
         </div>
       </div>
 

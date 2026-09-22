@@ -169,16 +169,30 @@ router.post('/tasks', (req, res) => {
   const db = load();
   const today = todayStr();
 
-  // Daily tasks repeat forever, so a due date isn't meaningful up front — it's
-  // required for every other recurrence (and one-time tasks).
+  // Daily tasks repeat forever, so a due date isn't meaningful up front. Weekly tasks
+  // get their start/due dates computed from the chosen day range instead of typed in —
+  // both skip the "due date required" check that applies to every other recurrence.
   const isDaily = recurrence === 'daily';
-  if (!title || !title.trim() || !assignedTo || (!isDaily && !dueDate)) {
+  const isWeekly = recurrence === 'weekly';
+  if (!title || !title.trim() || !assignedTo || (!isDaily && !isWeekly && !dueDate)) {
     return res.redirect('/admin/tasks');
   }
 
   const checklistRaw = req.body.checklist;
   const checklistItems = Array.isArray(checklistRaw) ? checklistRaw : (checklistRaw ? [checklistRaw] : []);
-  const finalStartDate = startDate || today;
+  let finalStartDate = startDate || today;
+  let finalDueDate = isDaily ? (dueDate || finalStartDate) : dueDate;
+  let weeklyFromDay, weeklyToDay;
+
+  if (isWeekly) {
+    const rawFrom = Number(req.body.weeklyFromDay);
+    weeklyFromDay = Number.isInteger(rawFrom) && rawFrom >= 0 && rawFrom <= 6 ? rawFrom : new Date(today + 'T00:00:00').getDay();
+    const rawTo = Number(req.body.weeklyToDay);
+    weeklyToDay = Number.isInteger(rawTo) && rawTo >= weeklyFromDay && rawTo <= 6 ? rawTo : weeklyFromDay;
+    const range = T.computeWeeklyRange(weeklyFromDay, weeklyToDay, today);
+    finalStartDate = range.startDate;
+    finalDueDate = range.dueDate;
+  }
 
   const newTask = {
     id: db.nextId.tasks++,
@@ -190,8 +204,10 @@ router.post('/tasks', (req, res) => {
     priority: ['high', 'medium', 'low'].includes(priority) ? priority : 'medium',
     status: 'todo',
     recurrence: T.RECUR_DAYS[recurrence] ? recurrence : 'none',
+    weeklyFromDay: isWeekly ? weeklyFromDay : undefined,
+    weeklyToDay: isWeekly ? weeklyToDay : undefined,
     startDate: finalStartDate,
-    dueDate: isDaily ? (dueDate || finalStartDate) : dueDate,
+    dueDate: finalDueDate,
     checklist: checklistItems.filter((c) => c && c.trim()).map((text) => ({ text: text.trim(), done: false })),
     files: [],
     comments: [],
@@ -214,13 +230,37 @@ router.post('/tasks/:id/update', (req, res) => {
   const task = db.tasks.find((t) => t.id === Number(req.params.id));
   if (!task) return res.redirect(req.body.back || '/admin/tasks');
   const body = req.body;
+  const today = todayStr();
 
   if (body.title !== undefined && body.title.trim()) task.title = body.title.trim();
   if (body.description !== undefined) task.description = body.description.trim();
   if (body.priority !== undefined && ['high', 'medium', 'low'].includes(body.priority)) task.priority = body.priority;
   if (body.startDate) task.startDate = body.startDate;
   if (body.dueDate) task.dueDate = body.dueDate;
-  if (body.recurrence !== undefined && (body.recurrence === 'none' || T.RECUR_DAYS[body.recurrence])) task.recurrence = body.recurrence;
+  if (body.recurrence !== undefined && (body.recurrence === 'none' || T.RECUR_DAYS[body.recurrence])) {
+    task.recurrence = body.recurrence;
+    // Switching a task to Weekly needs a day range right away so it has a real
+    // start/due date — default it to today's weekday until the admin picks otherwise.
+    if (body.recurrence === 'weekly' && (task.weeklyFromDay == null || task.weeklyToDay == null)) {
+      const dow = new Date(today + 'T00:00:00').getDay();
+      task.weeklyFromDay = dow;
+      task.weeklyToDay = dow;
+      const range = T.computeWeeklyRange(dow, dow, today);
+      task.startDate = range.startDate;
+      task.dueDate = range.dueDate;
+    }
+  }
+
+  if (task.recurrence === 'weekly' && (body.weeklyFromDay !== undefined || body.weeklyToDay !== undefined)) {
+    const fromDay = body.weeklyFromDay !== undefined ? Number(body.weeklyFromDay) : task.weeklyFromDay;
+    let toDay = body.weeklyToDay !== undefined ? Number(body.weeklyToDay) : task.weeklyToDay;
+    if (toDay < fromDay) toDay = fromDay;
+    task.weeklyFromDay = fromDay;
+    task.weeklyToDay = toDay;
+    const range = T.computeWeeklyRange(fromDay, toDay, today);
+    task.startDate = range.startDate;
+    task.dueDate = range.dueDate;
+  }
 
   if (body.assignedTo !== undefined && Number(body.assignedTo) !== task.assignedTo) {
     task.assignedTo = Number(body.assignedTo);

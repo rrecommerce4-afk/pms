@@ -43,6 +43,14 @@ function myTask(db, id, userId) {
   return t && t.assignedTo === userId ? t : null;
 }
 
+// Only tasks that fall on today's date and still need work: Daily tasks, plus anything due today.
+// A Monthly/Weekly task due later (e.g. on the 30th) stays out until its own due date.
+function todaysFocus(decorated, today) {
+  return decorated.filter((t) =>
+    ['todo', 'progress', 'changes'].indexOf(t.status) !== -1 &&
+    (t.recurrence === 'daily' || t.dueDate === today));
+}
+
 router.use((req, res, next) => {
   const db = load();
   res.locals.navCounts = { myTasks: db.tasks.filter((t) => t.assignedTo === req.session.userId).length };
@@ -61,7 +69,7 @@ router.get('/dashboard', (req, res) => {
     filters, pageUrl: pageUrl(req),
     summary: T.employeeSummaryCards(decorated),
     milestones: T.milestoneTasks(decorated),
-    focus: decorated.filter((t) => t.status === 'todo' || t.status === 'changes' || t.priority === 'high').slice(0, 4),
+    focus: todaysFocus(decorated, today),
     groups: T.groupByRecurrence(taskListTasks),
     taskListTasks,
     reviewUpdates: decorated.filter((t) => t.status === 'changes' || t.status === 'completed').slice(0, 4),
