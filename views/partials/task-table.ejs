@@ -20,7 +20,7 @@
           <td>
             <a href="<%= taskUrl(pageUrl, t.id) %>" class="name-cell" style="text-decoration:none;color:inherit;">
               <div>
-                <div style="font-weight:600;color:var(--text);"><%= t.title %><% if (t.recurText) { %><span class="recur-badge"><svg width="11" height="11" viewBox="0 0 24 24" fill="none"><path d="M17 2.1l4 4-4 4M3 12.6v-1a4 4 0 014-4h14M7 21.9l-4-4 4-4M21 11.4v1a4 4 0 01-4 4H3" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg><%= t.recurText %></span><% } %><% if (t.isMilestone) { %><span class="milestone-badge" title="Milestone"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M4 22V4M4 4h11l-2 4 2 4H4"/></svg>Milestone</span><% } %></div>
+                <div style="font-weight:600;color:var(--text);"><%= t.title %><% if (t.recurText) { %><span class="recur-badge"><svg width="11" height="11" viewBox="0 0 24 24" fill="none"><path d="M17 2.1l4 4-4 4M3 12.6v-1a4 4 0 014-4h14M7 21.9l-4-4 4-4M21 11.4v1a4 4 0 01-4 4H3" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg><%= t.recurText %></span><% } %><% if (t.isMilestone) { %><span class="milestone-badge" title="Milestone"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M4 22V4M4 4h11l-2 4 2 4H4"/></svg>Milestone</span><% } %><% if (t.isAdditional) { %><span class="additional-badge" title="Employee ne khud add kiya">Additional</span><% } %></div>
                 <div class="task-id">TSK-<%= t.id %></div>
               </div>
             </a>

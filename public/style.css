@@ -1501,6 +1501,9 @@ form.inline { display: inline; }
 /* ---------- Milestones ---------- */
 .milestone-badge { display: inline-flex; align-items: center; gap: 4px; font-size: 11px; font-weight: 700; padding: 3px 9px; border-radius: 5px; background: var(--primary-soft); color: var(--primary-dark); white-space: nowrap; margin-left: 8px; vertical-align: middle; }
 .milestone-badge svg { width: 11px; height: 11px; }
+
+/* ---------- Additional (employee self-added) tasks ---------- */
+.additional-badge { display: inline-flex; align-items: center; font-size: 11px; font-weight: 700; padding: 3px 9px; border-radius: 5px; background: var(--warning-soft); color: var(--warning); white-space: nowrap; margin-left: 8px; vertical-align: middle; }
 .milestone-toggle-row { display: flex; align-items: center; gap: 10px; width: 100%; padding: 12px 14px; border: 1.5px solid var(--border); border-radius: var(--radius-sm); background: var(--bg); cursor: pointer; text-align: left; font: inherit; color: inherit; }
 .milestone-toggle-row.active { border-color: var(--primary); background: var(--primary-soft); }
 .milestone-toggle-row svg { width: 18px; height: 18px; color: var(--text-faint); flex-shrink: 0; }

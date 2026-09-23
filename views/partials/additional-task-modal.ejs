@@ -1,0 +1,46 @@
+<div class="modal-backdrop" id="additional-task-modal">
+  <div class="modal-box">
+    <div class="modal-head">
+      <h3>Additional Task</h3>
+      <button type="button" class="modal-close" id="atModalClose">&times;</button>
+    </div>
+    <div class="modal-body">
+      <form method="POST" action="/employee/tasks">
+        <input type="hidden" name="back" value="<%= typeof pageUrl !== 'undefined' ? pageUrl : '/employee/tasks' %>">
+        <div class="field">
+          <label>Task Name</label>
+          <input type="text" name="title" placeholder="e.g. Clean up my desktop files" required>
+        </div>
+        <div class="field">
+          <label>Description <span style="font-weight:400;color:var(--text-faint);text-transform:none;">(optional)</span></label>
+          <textarea name="description" rows="4" placeholder="Kya karna hai..."></textarea>
+        </div>
+        <div class="field">
+          <label>Due Date <span style="font-weight:400;color:var(--text-faint);text-transform:none;">(optional)</span></label>
+          <input type="date" name="dueDate">
+        </div>
+        <div style="font-size:12px;color:var(--text-faint);margin-top:-8px;">Yeh apna extra task hai — koi review nahi lagega, aap khud complete mark kar sakte hain.</div>
+        <div class="emp-form-actions" style="margin-top:6px;">
+          <button type="button" class="btn outline" id="atModalCancel">Cancel</button>
+          <button class="btn" type="submit">Add Task</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<script>
+  (function () {
+    var modal = document.getElementById('additional-task-modal');
+    var openBtn = document.getElementById('openAdditionalTaskBtn');
+    var closeBtn = document.getElementById('atModalClose');
+    var cancelBtn = document.getElementById('atModalCancel');
+    if (modal && openBtn) {
+      openBtn.addEventListener('click', function () { modal.classList.add('open'); });
+      closeBtn.addEventListener('click', function () { modal.classList.remove('open'); });
+      cancelBtn.addEventListener('click', function () { modal.classList.remove('open'); });
+      modal.addEventListener('click', function (e) { if (e.target === modal) modal.classList.remove('open'); });
+      document.addEventListener('keydown', function (e) { if (e.key === 'Escape') modal.classList.remove('open'); });
+    }
+  })();
+</script>

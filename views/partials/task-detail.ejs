@@ -32,6 +32,9 @@
         <% if (t.isMilestone) { %>
           <span class="milestone-badge" title="Milestone"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M4 22V4M4 4h11l-2 4 2 4H4"/></svg>Milestone</span>
         <% } %>
+        <% if (t.isAdditional) { %>
+          <span class="additional-badge" title="Employee ne khud add kiya">Additional</span>
+        <% } %>
         <% if (t.overdue) { %><span class="attn-badge overdue"><%= t.overdueDaysCount %> day<%= t.overdueDaysCount > 1 ? 's' : '' %> overdue</span><% } %>
       </div>
     </div>
@@ -325,7 +328,7 @@
           <form method="POST" action="/employee/tasks/<%= t.id %>/start"><input type="hidden" name="back" value="<%= pageUrl %>"><button class="btn" type="submit">Start Task</button></form>
         <% } else if (t.status === 'progress') { %>
           <button type="button" class="btn btn-danger" id="showBlockFormBtn">Mark as Blocked</button>
-          <% if (t.recurrence === 'daily') { %>
+          <% if (t.reviewFree) { %>
             <form method="POST" action="/employee/tasks/<%= t.id %>/complete-direct"><input type="hidden" name="back" value="<%= pageUrl %>"><button class="btn" type="submit">Mark Complete</button></form>
           <% } else { %>
             <form method="POST" action="/employee/tasks/<%= t.id %>/submit-review"><input type="hidden" name="back" value="<%= pageUrl %>"><button class="btn" type="submit">Submit for Review</button></form>
@@ -348,7 +351,7 @@
             <form method="POST" action="/employee/tasks/<%= t.id %>/start"><input type="hidden" name="back" value="<%= pageUrl %>"><button class="btn" type="submit">Start Task</button></form>
           <% } else if (t.status === 'progress') { %>
             <button type="button" class="btn btn-danger" id="showBlockFormBtn">Mark as Blocked</button>
-            <% if (t.recurrence === 'daily') { %>
+            <% if (t.reviewFree) { %>
               <form method="POST" action="/employee/tasks/<%= t.id %>/complete-direct"><input type="hidden" name="back" value="<%= pageUrl %>"><button class="btn" type="submit">Mark Complete</button></form>
             <% } else { %>
               <form method="POST" action="/employee/tasks/<%= t.id %>/submit-review"><input type="hidden" name="back" value="<%= pageUrl %>"><button class="btn" type="submit">Submit for Review</button></form>

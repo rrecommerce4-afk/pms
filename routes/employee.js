@@ -89,7 +89,8 @@ router.get('/tasks', (req, res) => {
     filters, pageUrl: pageUrl(req), filtered,
     groups: T.groupByRecurrence(filtered),
     detailTask: openTask(req, db, today),
-    showSearch: true, searchPlaceholder: 'Search my tasks...'
+    showSearch: true, searchPlaceholder: 'Search my tasks...',
+    showAddTaskButton: true
   });
 });
 
@@ -120,6 +121,44 @@ router.get('/calendar', (req, res) => {
     pageUrl: calendarPageUrl(req),
     detailTask: openTask(req, db, today)
   });
+});
+
+// ---- Additional task: an employee (or admin, for their own list) adding their own
+// extra task. Always assigned to themselves, no recurrence, and no review needed —
+// see isReviewFreeRecurring(), which treats isAdditional the same as Daily. ----
+
+router.post('/tasks', (req, res) => {
+  const db = load();
+  const today = todayStr();
+  const title = (req.body.title || '').trim();
+  if (!title) return res.redirect(req.body.back || '/employee/tasks');
+
+  const newTask = {
+    id: db.nextId.tasks++,
+    title,
+    description: (req.body.description || '').trim(),
+    assignedTo: req.session.userId,
+    assignedById: req.session.userId,
+    assignedByName: req.session.name,
+    priority: 'medium',
+    status: 'todo',
+    recurrence: 'none',
+    isAdditional: true,
+    startDate: today,
+    dueDate: req.body.dueDate || today,
+    checklist: [],
+    files: [],
+    comments: [],
+    blocked: false,
+    blockedReason: '',
+    isMilestone: false,
+    createdAt: new Date().toISOString(),
+    completedAt: null
+  };
+  db.tasks.push(newTask);
+  logActivity(db, `<b>${T.escapeHtml(req.session.name)}</b> added their own additional task "${T.escapeHtml(newTask.title)}"`);
+  save(db);
+  res.redirect(req.body.back || '/employee/tasks');
 });
 
 // ---- Task status actions ----
