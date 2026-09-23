@@ -170,11 +170,15 @@ router.post('/tasks', (req, res) => {
   const today = todayStr();
 
   // Daily tasks repeat forever, so a due date isn't meaningful up front. Weekly tasks
-  // get their start/due dates computed from the chosen day range instead of typed in —
-  // both skip the "due date required" check that applies to every other recurrence.
+  // get their start/due dates computed from the chosen day range instead of typed in.
+  // Monthly tasks get both dates computed from a chosen day-of-month (e.g. "the 12th").
+  // Every-15-days tasks get their due date computed from the Start Date plus 15 days.
+  // All of these skip the "due date required" check that applies to a plain one-time task.
   const isDaily = recurrence === 'daily';
   const isWeekly = recurrence === 'weekly';
-  if (!title || !title.trim() || !assignedTo || (!isDaily && !isWeekly && !dueDate)) {
+  const isMonthly = recurrence === 'monthly';
+  const isBiweekly = recurrence === 'biweekly';
+  if (!title || !title.trim() || !assignedTo || (!isDaily && !isWeekly && !isMonthly && !isBiweekly && !dueDate)) {
     return res.redirect('/admin/tasks');
   }
 
@@ -182,7 +186,7 @@ router.post('/tasks', (req, res) => {
   const checklistItems = Array.isArray(checklistRaw) ? checklistRaw : (checklistRaw ? [checklistRaw] : []);
   let finalStartDate = startDate || today;
   let finalDueDate = isDaily ? (dueDate || finalStartDate) : dueDate;
-  let weeklyFromDay, weeklyToDay;
+  let weeklyFromDay, weeklyToDay, monthlyDay;
 
   if (isWeekly) {
     const rawFrom = Number(req.body.weeklyFromDay);
@@ -192,6 +196,13 @@ router.post('/tasks', (req, res) => {
     const range = T.computeWeeklyRange(weeklyFromDay, weeklyToDay, today);
     finalStartDate = range.startDate;
     finalDueDate = range.dueDate;
+  } else if (isMonthly) {
+    const rawDay = Number(req.body.monthlyDay);
+    monthlyDay = Number.isInteger(rawDay) && rawDay >= 1 && rawDay <= 31 ? rawDay : new Date(today + 'T00:00:00').getDate();
+    finalStartDate = T.computeMonthlyOccurrence(monthlyDay, today);
+    finalDueDate = finalStartDate;
+  } else if (isBiweekly) {
+    finalDueDate = T.computeNextDueDate(finalStartDate, recurrence);
   }
 
   const newTask = {
@@ -206,6 +217,7 @@ router.post('/tasks', (req, res) => {
     recurrence: T.RECUR_DAYS[recurrence] ? recurrence : 'none',
     weeklyFromDay: isWeekly ? weeklyFromDay : undefined,
     weeklyToDay: isWeekly ? weeklyToDay : undefined,
+    monthlyDay: isMonthly ? monthlyDay : undefined,
     startDate: finalStartDate,
     dueDate: finalDueDate,
     checklist: checklistItems.filter((c) => c && c.trim()).map((text) => ({ text: text.trim(), done: false })),
@@ -237,6 +249,11 @@ router.post('/tasks/:id/update', (req, res) => {
   if (body.priority !== undefined && ['high', 'medium', 'low'].includes(body.priority)) task.priority = body.priority;
   if (body.startDate) task.startDate = body.startDate;
   if (body.dueDate) task.dueDate = body.dueDate;
+  // Every-15-days no longer takes a typed due date — moving the Start Date
+  // re-derives it from the interval instead (unless a due date was submitted alongside it).
+  if (task.recurrence === 'biweekly' && body.startDate && !body.dueDate) {
+    task.dueDate = T.computeNextDueDate(task.startDate, task.recurrence);
+  }
   if (body.recurrence !== undefined && (body.recurrence === 'none' || T.RECUR_DAYS[body.recurrence])) {
     task.recurrence = body.recurrence;
     // Switching a task to Weekly needs a day range right away so it has a real
@@ -248,6 +265,22 @@ router.post('/tasks/:id/update', (req, res) => {
       const range = T.computeWeeklyRange(dow, dow, today);
       task.startDate = range.startDate;
       task.dueDate = range.dueDate;
+    } else if (body.recurrence === 'monthly' && task.monthlyDay == null) {
+      const day = new Date(today + 'T00:00:00').getDate();
+      task.monthlyDay = day;
+      task.startDate = T.computeMonthlyOccurrence(day, today);
+      task.dueDate = task.startDate;
+    } else if (body.recurrence === 'biweekly') {
+      task.dueDate = T.computeNextDueDate(task.startDate || today, body.recurrence);
+    }
+  }
+
+  if (task.recurrence === 'monthly' && body.monthlyDay !== undefined) {
+    const day = Number(body.monthlyDay);
+    if (Number.isInteger(day) && day >= 1 && day <= 31) {
+      task.monthlyDay = day;
+      task.startDate = T.computeMonthlyOccurrence(day, today);
+      task.dueDate = task.startDate;
     }
   }
 

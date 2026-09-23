@@ -107,7 +107,7 @@
           <div>
             <div class="meta-item-label">Start date</div>
             <div class="meta-item-val">
-              <% if (isAdmin && t.recurrence !== 'weekly') { %>
+              <% if (isAdmin && t.recurrence !== 'weekly' && t.recurrence !== 'monthly') { %>
                 <form method="POST" action="/admin/tasks/<%= t.id %>/update"><input type="hidden" name="back" value="<%= pageUrl %>"><input type="date" name="startDate" class="autosubmit-field" value="<%= t.startDate %>"></form>
               <% } else { %><%= t.startLabel %><% } %>
             </div>
@@ -116,9 +116,15 @@
             <div>
               <div class="meta-item-label">Due date</div>
               <div class="meta-item-val">
-                <% if (isAdmin && t.recurrence !== 'weekly') { %>
+                <% if (isAdmin && t.recurrence === 'none') { %>
                   <form method="POST" action="/admin/tasks/<%= t.id %>/update"><input type="hidden" name="back" value="<%= pageUrl %>"><input type="date" name="dueDate" class="autosubmit-field" value="<%= t.dueDate %>"></form>
                 <% } else { %><%= t.dueLabel %><% } %>
+                <% if (isAdmin && t.recurrence === 'biweekly') { %>
+                  <div style="font-size:11px;color:var(--text-faint);font-weight:400;">auto — change Start Date to move it</div>
+                <% } %>
+                <% if (isAdmin && t.recurrence === 'monthly') { %>
+                  <div style="font-size:11px;color:var(--text-faint);font-weight:400;">auto — change Day of Month below to move it</div>
+                <% } %>
               </div>
             </div>
           <% } %>
@@ -166,6 +172,23 @@
                 <% } else { %>
                   <%= WEEKDAY_NAMES[t.weeklyFromDay] %><% if (t.weeklyToDay !== t.weeklyFromDay) { %> to <%= WEEKDAY_NAMES[t.weeklyToDay] %><% } %>
                 <% } %>
+              </div>
+            </div>
+          <% } %>
+          <% if (t.recurrence === 'monthly') { %>
+            <div>
+              <div class="meta-item-label">Day of Month</div>
+              <div class="meta-item-val">
+                <% if (isAdmin) { %>
+                  <form method="POST" action="/admin/tasks/<%= t.id %>/update">
+                    <input type="hidden" name="back" value="<%= pageUrl %>">
+                    <select name="monthlyDay" class="autosubmit-field">
+                      <% for (var md = 1; md <= 31; md++) { %>
+                        <option value="<%= md %>" <%= t.monthlyDay === md ? 'selected' : '' %>><%= md %></option>
+                      <% } %>
+                    </select>
+                  </form>
+                <% } else { %><%= t.monthlyDay %><% } %>
               </div>
             </div>
           <% } %>
