@@ -1787,3 +1787,19 @@ form.inline { display: inline; }
   .cal-day-num { font-size: 11px; }
   .cal-chip { font-size: 10px; }
 }
+
+/* Viewer task tracker: employees x days of the month, one round dot per day */
+.trk-scroll { overflow-x: auto; }
+.trk-table { border-collapse: collapse; width: 100%; }
+.trk-table th, .trk-table td { padding: 8px 4px; text-align: center; border-bottom: 1px solid var(--border-soft); }
+.trk-table th { font-size: 11px; font-weight: 700; color: var(--text-muted); line-height: 1.25; }
+.trk-table th small { display: block; font-size: 9.5px; font-weight: 500; color: var(--text-faint); }
+.trk-table th.today { color: var(--primary-dark); }
+.trk-table th.off, .trk-table td.off { background: var(--bg, rgba(0,0,0,0.025)); }
+.trk-name-col { text-align: left !important; padding-left: 20px !important; min-width: 170px; position: sticky; left: 0; background: var(--surface); z-index: 1; }
+.trk-total-col { min-width: 62px; font-size: 12px; font-weight: 700; }
+.trk-dot { display: inline-block; width: 16px; height: 16px; border-radius: 50%; border: 2px solid var(--border); box-sizing: border-box; vertical-align: middle; }
+.trk-dot.done { background: var(--success); border-color: var(--success); }
+.trk-dot.missed { background: var(--danger); border-color: var(--danger); }
+.trk-legend { display: flex; gap: 14px; align-items: center; font-size: 12px; color: var(--text-muted); flex-wrap: wrap; }
+.trk-legend .trk-dot { width: 11px; height: 11px; margin-right: 5px; }

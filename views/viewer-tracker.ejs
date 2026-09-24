@@ -1,0 +1,60 @@
+<%- include('partials/header') %>
+<div class="container container-wide">
+  <div class="page-head">
+    <div>
+      <div class="eyebrow-date">VIEWER</div>
+      <h1><%= heading %></h1>
+      <p>Har employee ka din-wise status: <b style="color:var(--danger);">red</b> = task miss hua, <b style="color:var(--success);">green</b> = saare task complete.</p>
+    </div>
+  </div>
+
+  <div class="list-card">
+    <div class="cal-toolbar">
+      <div class="cal-toolbar-left">
+        <div class="trk-legend">
+          <span><span class="trk-dot done"></span>All tasks done</span>
+          <span><span class="trk-dot missed"></span>Task missed</span>
+          <span><span class="trk-dot"></span>Nothing due / pending</span>
+        </div>
+      </div>
+      <div class="cal-toolbar-right">
+        <div class="cal-month-label"><%= tracker.label %></div>
+        <div class="cal-nav">
+          <a class="cal-nav-btn" href="/viewer/tracker?month=<%= tracker.prevParam %>" aria-label="Previous month"><svg width="15" height="15" viewBox="0 0 24 24" fill="none"><path d="M15 18l-6-6 6-6" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg></a>
+          <a class="cal-today-btn" href="/viewer/tracker?month=<%= todayIsoMonth %>">Today</a>
+          <a class="cal-nav-btn" href="/viewer/tracker?month=<%= tracker.nextParam %>" aria-label="Next month"><svg width="15" height="15" viewBox="0 0 24 24" fill="none"><path d="M9 6l6 6-6 6" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg></a>
+        </div>
+      </div>
+    </div>
+
+    <% if (!tracker.rows.length) { %>
+      <div class="empty-state"><div class="empty-state-title">No employees with tasks yet.</div></div>
+    <% } else { %>
+      <div class="trk-scroll">
+        <table class="trk-table">
+          <thead>
+            <tr>
+              <th class="trk-name-col">Employee</th>
+              <% tracker.days.forEach(function (d) { %>
+                <th class="<%= d.isToday ? 'today' : '' %> <%= d.isOff ? 'off' : '' %>"><%= d.n %><small><%= d.weekday.charAt(0) %></small></th>
+              <% }) %>
+              <th class="trk-total-col">Missed</th>
+            </tr>
+          </thead>
+          <tbody>
+            <% tracker.rows.forEach(function (r) { %>
+              <tr>
+                <td class="trk-name-col"><div class="name-cell"><div class="mini-avatar"><%= r.initials %></div><%= r.employee.name %></div></td>
+                <% r.cells.forEach(function (c, i) { %>
+                  <td class="<%= tracker.days[i].isOff ? 'off' : '' %>"><span class="trk-dot <%= c.state === 'none' ? '' : c.state %>"<% if (c.tip) { %> title="<%= c.tip %>"<% } %>></span></td>
+                <% }) %>
+                <td class="trk-total-col" style="color:<%= r.missedCount ? 'var(--danger)' : 'var(--success)' %>;"><%= r.missedCount %></td>
+              </tr>
+            <% }) %>
+          </tbody>
+        </table>
+      </div>
+    <% } %>
+  </div>
+</div>
+<%- include('partials/footer') %>

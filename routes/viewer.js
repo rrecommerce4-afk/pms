@@ -40,4 +40,17 @@ router.get('/dashboard', (req, res) => {
   });
 });
 
+// Month grid of employees x days: red dot = missed a task that day, green = finished everything.
+router.get('/tracker', (req, res) => {
+  const db = load();
+  const today = todayStr();
+  const employees = db.users.filter((u) => u.role === 'employee' && u.active);
+
+  res.render('viewer-tracker', {
+    crumb: 'Task Tracker', heading: 'Task Tracker',
+    tracker: T.buildTrackerGrid(db.tasks, employees, req.query.month, today, db.holidays || []),
+    todayIsoMonth: today.slice(0, 7)
+  });
+});
+
 module.exports = router;
