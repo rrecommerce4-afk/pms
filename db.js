@@ -121,7 +121,10 @@ function load() {
   const db = raw.trim() ? JSON.parse(raw) : emptyDb();
   if (!db.schemaVersion) db.schemaVersion = 1;
   let dirty = migrate(db);
-  if (catchUpDailyTasks(db.tasks, todayStr())) dirty = true;
+  // Missed-day tracking only counts from the day it was first switched on.
+  if (!db.missedTrackingStart) { db.missedTrackingStart = todayStr(); dirty = true; }
+  db.holidays = db.holidays || [];
+  if (catchUpDailyTasks(db.tasks, todayStr(), db.missedTrackingStart)) dirty = true;
   if (dirty) save(db);
   return db;
 }

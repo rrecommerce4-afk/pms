@@ -1,0 +1,103 @@
+<%- include('partials/header') %>
+<div class="container container-wide">
+  <div class="page-head">
+    <div>
+      <div class="eyebrow-date">ADMIN OVERVIEW</div>
+      <h1><%= heading %></h1>
+      <p>Jo daily task employee ne us din complete nahi kiya, woh yahan dikhega. Sunday aur holidays count nahi hote. Tracking <%= trackingSince %> se shuru hui.</p>
+    </div>
+  </div>
+
+  <div class="list-card" style="margin-bottom:16px;">
+    <div class="list-card-head section-card-head"><h2>Holidays <span class="tag-count"><%= holidays.length %></span></h2></div>
+    <div style="padding:0 24px 20px;display:flex;flex-direction:column;gap:12px;">
+      <form method="POST" action="/admin/holidays" style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;">
+        <input type="date" name="date" required class="filter-select">
+        <button class="btn small" type="submit">Add Holiday</button>
+        <span style="font-size:12px;color:var(--text-faint);">Sundays already off hain — sirf baaki holidays add karein.</span>
+      </form>
+      <% if (holidays.length) { %>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;">
+          <% holidays.forEach(function (h) { %>
+            <form method="POST" action="/admin/holidays/delete" style="display:inline-flex;align-items:center;gap:6px;padding:4px 6px 4px 10px;border:1px solid var(--border-soft);border-radius:6px;font-size:12.5px;">
+              <input type="hidden" name="date" value="<%= h.date %>">
+              <%= h.label %>
+              <button type="submit" class="row-icon-btn" title="Remove holiday" aria-label="Remove holiday <%= h.label %>">&times;</button>
+            </form>
+          <% }) %>
+        </div>
+      <% } %>
+    </div>
+  </div>
+
+  <% if (byEmployee.length) { %>
+    <div class="list-card" style="margin-bottom:16px;">
+      <div class="list-card-head section-card-head"><h2>Misses by Employee</h2></div>
+      <div class="workload-list">
+        <% byEmployee.forEach(function (e) { %>
+          <a class="wl-row" href="/admin/missed?employee=<%= e.id %><%= days ? '&days=' + days : '' %>">
+            <div class="wl-avatar"><%= e.initials %></div>
+            <div><div class="wl-name"><%= e.name %></div></div>
+            <div></div>
+            <div class="wl-stats">
+              <div class="wl-stat"><div class="wl-stat-val red-txt"><%= e.count %></div><div class="wl-stat-label">MISSED</div></div>
+            </div>
+          </a>
+        <% }) %>
+      </div>
+    </div>
+  <% } %>
+
+  <div class="list-card">
+    <div class="cal-toolbar">
+      <div class="cal-toolbar-left">
+        <form method="GET" action="/admin/missed" style="display:flex;gap:10px;flex-wrap:wrap;">
+          <select class="filter-select" name="employee" onchange="this.form.submit()">
+            <option value="all" <%= employeeFilter === 'all' ? 'selected' : '' %>>All employees</option>
+            <% employees.forEach(function (e) { %>
+              <option value="<%= e.id %>" <%= String(employeeFilter) === String(e.id) ? 'selected' : '' %>><%= e.name %></option>
+            <% }) %>
+          </select>
+          <select class="filter-select" name="days" onchange="this.form.submit()">
+            <option value="0" <%= !days ? 'selected' : '' %>>All time</option>
+            <option value="7" <%= days === 7 ? 'selected' : '' %>>Last 7 days</option>
+            <option value="30" <%= days === 30 ? 'selected' : '' %>>Last 30 days</option>
+            <option value="90" <%= days === 90 ? 'selected' : '' %>>Last 90 days</option>
+          </select>
+        </form>
+      </div>
+      <div class="cal-toolbar-right"><span class="attn-badge overdue"><%= rows.length %> missed</span></div>
+    </div>
+
+    <% if (!rows.length) { %>
+      <div class="empty-state"><div class="empty-state-title">No missed daily tasks.</div><div class="empty-state-sub">Jab koi daily task complete kiye bina din nikal jayega, woh yahan aa jayega.</div></div>
+    <% } else { %>
+      <div class="table-scroll">
+        <table>
+          <thead>
+            <tr><th>Missed On</th><th>Task Name</th><th>Assigned To</th><th>Priority</th><th></th></tr>
+          </thead>
+          <tbody>
+            <% rows.forEach(function (r) { var t = r.task; %>
+              <tr>
+                <td>
+                  <div class="due-cell due-overdue"><%= r.dateLabel %></div>
+                  <div class="task-id"><%= r.daysAgo === 1 ? 'Yesterday' : r.daysAgo + ' days ago' %></div>
+                </td>
+                <td>
+                  <div style="font-weight:600;color:var(--text);"><%= t.title %></div>
+                  <div class="task-id">TSK-<%= t.id %></div>
+                </td>
+                <td><div class="name-cell"><div class="mini-avatar"><%= t.assigneeInitials %></div><%= t.assigneeName %></div></td>
+                <td><span class="badge p-<%= t.priority %>"><%= t.priorityText %></span></td>
+                <td><div class="row-actions-cell"><a href="/admin/tasks?task=<%= t.id %>" class="btn small outline">View</a></div></td>
+              </tr>
+            <% }) %>
+          </tbody>
+        </table>
+      </div>
+    <% } %>
+  </div>
+</div>
+<%- include('partials/task-modal') %>
+<%- include('partials/footer') %>

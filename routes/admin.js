@@ -5,6 +5,7 @@ const path = require('path');
 const { load, save, todayStr, logActivity, uniqueSlug, BADGE_COLORS } = require('../db');
 const { requireAdmin } = require('../middleware/auth');
 const T = require('../lib/tasks');
+const { formatIsoDate } = require('../utils');
 const upload = require('../lib/upload');
 
 const router = express.Router();
@@ -142,6 +143,42 @@ router.get('/calendar', (req, res) => {
     detailTask: openTask(req, db, today),
     showCreateButton: true
   });
+});
+
+// Days a Daily task was left incomplete (recorded by catchUpDailyTask when the day rolled over).
+router.get('/missed', (req, res) => {
+  const { db, today, employees, decorated } = loadCommon();
+  const employeeFilter = req.query.employee || 'all';
+  const days = ['7', '30', '90'].includes(req.query.days) ? Number(req.query.days) : 0;
+  const rows = T.missedDailyEntries(decorated, { employee: employeeFilter, days, holidays: db.holidays || [] }, today);
+
+  res.render('admin-missed', {
+    crumb: 'Missed Tasks', heading: 'Missed Daily Tasks',
+    rows, byEmployee: T.missedByEmployee(rows),
+    employees, employeeFilter, days,
+    holidays: (db.holidays || []).slice().sort().reverse().map((h) => ({ date: h, label: formatIsoDate(h) })),
+    trackingSince: formatIsoDate(db.missedTrackingStart || today),
+    pageUrl: pageUrl(req),
+    showCreateButton: true
+  });
+});
+
+// Holidays are off days: a Daily task left undone on one isn't counted as missed.
+router.post('/holidays', (req, res) => {
+  const db = load();
+  const date = (req.body.date || '').trim();
+  if (/^\d{4}-\d{2}-\d{2}$/.test(date) && !(db.holidays || []).includes(date)) {
+    db.holidays = (db.holidays || []).concat(date);
+    save(db);
+  }
+  res.redirect('/admin/missed');
+});
+
+router.post('/holidays/delete', (req, res) => {
+  const db = load();
+  db.holidays = (db.holidays || []).filter((h) => h !== req.body.date);
+  save(db);
+  res.redirect('/admin/missed');
 });
 
 router.get('/workload', (req, res) => {
