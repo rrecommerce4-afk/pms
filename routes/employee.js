@@ -193,6 +193,13 @@ router.post('/tasks/:id/complete-direct', (req, res) => {
     // catch-up in db.js load() resets it to To Do once the date actually rolls over.
     task.status = 'completed';
     task.completedAt = new Date().toISOString();
+    if (task.recurrence === 'daily') {
+      // Remember which day this occurrence was done, so the calendar marks only that
+      // day Completed — the task itself resets to To Do tomorrow.
+      task.completedDates = task.completedDates || [];
+      const today = todayStr();
+      if (task.completedDates.indexOf(today) === -1) task.completedDates.push(today);
+    }
     logActivity(db, `<b>${T.escapeHtml(req.session.name)}</b> completed "${T.escapeHtml(task.title)}" (no review needed) — resets to To Do tomorrow`);
     save(db);
   }
