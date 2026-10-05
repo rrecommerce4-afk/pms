@@ -5,7 +5,7 @@
       <button type="button" class="modal-close" id="taskModalClose">&times;</button>
     </div>
     <div class="modal-body">
-      <form method="POST" action="/admin/tasks">
+      <form method="POST" action="<%= typeof taskFormAction !== 'undefined' ? taskFormAction : '/admin/tasks' %>">
         <input type="hidden" name="back" value="<%= typeof pageUrl !== 'undefined' ? pageUrl : '/admin/tasks' %>">
         <div class="field">
           <label>Task Name</label>

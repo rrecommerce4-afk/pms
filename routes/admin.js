@@ -202,70 +202,11 @@ router.get('/reports', (req, res) => {
 // ---- Task create / edit / delete ----
 
 router.post('/tasks', (req, res) => {
-  const { title, description, assignedTo, priority, recurrence, startDate, dueDate } = req.body;
   const db = load();
-  const today = todayStr();
+  const built = T.buildTaskFromForm(req.body, { id: req.session.userId, name: req.session.name }, todayStr());
+  if (!built) return res.redirect('/admin/tasks');
 
-  // Daily tasks repeat forever, so a due date isn't meaningful up front. Weekly tasks
-  // get their start/due dates computed from the chosen day range instead of typed in.
-  // Monthly tasks get both dates computed from a chosen day-of-month (e.g. "the 12th").
-  // Every-15-days tasks get their due date computed from the Start Date plus 15 days.
-  // All of these skip the "due date required" check that applies to a plain one-time task.
-  const isDaily = recurrence === 'daily';
-  const isWeekly = recurrence === 'weekly';
-  const isMonthly = recurrence === 'monthly';
-  const isBiweekly = recurrence === 'biweekly';
-  if (!title || !title.trim() || !assignedTo || (!isDaily && !isWeekly && !isMonthly && !isBiweekly && !dueDate)) {
-    return res.redirect('/admin/tasks');
-  }
-
-  const checklistRaw = req.body.checklist;
-  const checklistItems = Array.isArray(checklistRaw) ? checklistRaw : (checklistRaw ? [checklistRaw] : []);
-  let finalStartDate = startDate || today;
-  let finalDueDate = isDaily ? (dueDate || finalStartDate) : dueDate;
-  let weeklyFromDay, weeklyToDay, monthlyDay;
-
-  if (isWeekly) {
-    const rawFrom = Number(req.body.weeklyFromDay);
-    weeklyFromDay = Number.isInteger(rawFrom) && rawFrom >= 0 && rawFrom <= 6 ? rawFrom : new Date(today + 'T00:00:00').getDay();
-    const rawTo = Number(req.body.weeklyToDay);
-    weeklyToDay = Number.isInteger(rawTo) && rawTo >= weeklyFromDay && rawTo <= 6 ? rawTo : weeklyFromDay;
-    const range = T.computeWeeklyRange(weeklyFromDay, weeklyToDay, today);
-    finalStartDate = range.startDate;
-    finalDueDate = range.dueDate;
-  } else if (isMonthly) {
-    const rawDay = Number(req.body.monthlyDay);
-    monthlyDay = Number.isInteger(rawDay) && rawDay >= 1 && rawDay <= 31 ? rawDay : new Date(today + 'T00:00:00').getDate();
-    finalStartDate = T.computeMonthlyOccurrence(monthlyDay, today);
-    finalDueDate = finalStartDate;
-  } else if (isBiweekly) {
-    finalDueDate = T.computeNextDueDate(finalStartDate, recurrence);
-  }
-
-  const newTask = {
-    id: db.nextId.tasks++,
-    title: title.trim(),
-    description: (description || '').trim(),
-    assignedTo: Number(assignedTo),
-    assignedById: req.session.userId,
-    assignedByName: req.session.name,
-    priority: ['high', 'medium', 'low'].includes(priority) ? priority : 'medium',
-    status: 'todo',
-    recurrence: T.RECUR_DAYS[recurrence] ? recurrence : 'none',
-    weeklyFromDay: isWeekly ? weeklyFromDay : undefined,
-    weeklyToDay: isWeekly ? weeklyToDay : undefined,
-    monthlyDay: isMonthly ? monthlyDay : undefined,
-    startDate: finalStartDate,
-    dueDate: finalDueDate,
-    checklist: checklistItems.filter((c) => c && c.trim()).map((text) => ({ text: text.trim(), done: false })),
-    files: [],
-    comments: [],
-    blocked: false,
-    blockedReason: '',
-    isMilestone: !!req.body.isMilestone,
-    createdAt: new Date().toISOString(),
-    completedAt: null
-  };
+  const newTask = Object.assign({ id: db.nextId.tasks++ }, built);
   db.tasks.push(newTask);
 
   const assignee = db.users.find((u) => u.id === newTask.assignedTo);
@@ -513,6 +454,8 @@ router.post('/settings/employees', (req, res) => {
     passwordHash: bcrypt.hashSync(password, 10),
     role: finalRole,
     department, roleTitle: finalRoleTitle, color: finalColor,
+    // A department head is an employee who can also create tasks for their own department.
+    isDeptHead: finalRole === 'employee' && !!req.body.isDeptHead,
     active: true
   });
   logActivity(db, `<b>${T.escapeHtml(req.session.name)}</b> added ${T.escapeHtml(name)} to the team`);
@@ -550,10 +493,12 @@ router.post('/settings/employees/:id/edit', (req, res) => {
     user.department = dept.name;
     user.roleTitle = roleTitle;
     user.color = color || user.color || BADGE_COLORS[0];
+    user.isDeptHead = !!req.body.isDeptHead;
   } else {
     user.department = undefined;
     user.roleTitle = undefined;
     user.color = undefined;
+    user.isDeptHead = false;
   }
   if (password) user.passwordHash = bcrypt.hashSync(password, 10);
 

@@ -1,0 +1,25 @@
+<%- include('partials/header') %>
+<div class="container container-wide">
+  <div class="page-head">
+    <div>
+      <div class="eyebrow-date">MY DEPARTMENT</div>
+      <h1><%= heading %></h1>
+      <p>Aapke department ke members ke saare tasks &mdash; aap sirf apne department ko hi task assign kar sakte hain.</p>
+    </div>
+  </div>
+
+  <div class="list-card">
+    <div class="list-card-head section-card-head">
+      <h2>Department Tasks <span class="tag-count"><%= filtered.length %></span></h2>
+      <%- include('partials/view-toggle', { basePath: '/employee/department' }) %>
+    </div>
+    <% if (filters.view === 'kanban') { %>
+      <%- include('partials/kanban', { tasks: filtered, showAssignee: true, pageUrl: pageUrl }) %>
+    <% } else { %>
+      <%- include('partials/task-table', { tasks: filtered, showAssignee: true, pageUrl: pageUrl, emptyTitle: 'Koi task nahi mila' }) %>
+    <% } %>
+  </div>
+</div>
+<%- include('partials/task-detail') %>
+<%- include('partials/task-modal') %>
+<%- include('partials/footer') %>

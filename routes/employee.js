@@ -11,7 +11,7 @@ router.use((req, res, next) => (req.method === 'GET' ? requireEmployee : require
 
 function pageUrl(req) {
   const params = new URLSearchParams();
-  ['q', 'view'].forEach((k) => { if (req.query[k]) params.set(k, req.query[k]); });
+  ['q', 'due', 'employee', 'view'].forEach((k) => { if (req.query[k]) params.set(k, req.query[k]); });
   const qs = params.toString();
   return req.baseUrl + req.path + (qs ? '?' + qs : '');
 }
@@ -51,9 +51,21 @@ function todaysFocus(decorated, today) {
     (t.recurrence === 'daily' || t.dueDate === today));
 }
 
+// The logged-in user if they're a department head (an employee flagged isDeptHead), else null.
+function currentHead(db, req) {
+  const me = db.users.find((u) => u.id === req.session.userId);
+  return me && me.active && me.role === 'employee' && me.isDeptHead && me.department ? me : null;
+}
+
 router.use((req, res, next) => {
   const db = load();
   res.locals.navCounts = { myTasks: db.tasks.filter((t) => t.assignedTo === req.session.userId).length };
+  const head = currentHead(db, req);
+  res.locals.isDeptHead = !!head;
+  if (head) {
+    res.locals.headDepartment = head.department;
+    res.locals.roleLabel = 'Department Head';
+  }
   next();
 });
 
@@ -121,6 +133,56 @@ router.get('/calendar', (req, res) => {
     pageUrl: calendarPageUrl(req),
     detailTask: openTask(req, db, today)
   });
+});
+
+// ---- Department head: view + create tasks for their own department only ----
+
+router.get('/department', (req, res) => {
+  const db = load();
+  const head = currentHead(db, req);
+  if (!head) return res.status(403).send('Forbidden: department heads only');
+  const today = todayStr();
+  const members = T.departmentMembers(db.users, head);
+  const memberIds = members.map((m) => m.id);
+  const deptTasks = T.decorateAll(db.tasks.filter((t) => memberIds.includes(t.assignedTo)), db.users, today);
+  const filters = {
+    q: (req.query.q || '').trim(),
+    due: req.query.due || 'all',
+    employee: req.query.employee || 'all',
+    view: req.query.view === 'kanban' ? 'kanban' : 'list'
+  };
+  const taskId = req.query.task ? Number(req.query.task) : null;
+  const detail = taskId && db.tasks.find((t) => t.id === taskId && memberIds.includes(t.assignedTo));
+
+  res.render('employee-department', {
+    crumb: 'My Department', heading: head.department,
+    filters, pageUrl: pageUrl(req),
+    filtered: T.filterTasks(deptTasks, filters, today),
+    employees: members, assignees: members,
+    taskFormAction: '/employee/department/tasks',
+    detailTask: detail ? T.decorate(detail, db.users, today) : null,
+    showSearch: true, showFilters: true, showCreateButton: true, searchPlaceholder: 'Search department tasks...'
+  });
+});
+
+router.post('/department/tasks', (req, res) => {
+  const db = load();
+  const head = currentHead(db, req);
+  if (!head) return res.status(403).send('Forbidden: department heads only');
+
+  // Enforced here, not just in the dropdown: a head can only assign within their own department.
+  const assignee = T.departmentMembers(db.users, head).find((u) => u.id === Number(req.body.assignedTo));
+  if (!assignee) return res.redirect('/employee/department');
+
+  const built = T.buildTaskFromForm(req.body, { id: head.id, name: head.name }, todayStr());
+  if (!built) return res.redirect('/employee/department');
+  built.isMilestone = false;
+
+  const newTask = Object.assign({ id: db.nextId.tasks++ }, built);
+  db.tasks.push(newTask);
+  logActivity(db, `<b>${T.escapeHtml(head.name)}</b> (${T.escapeHtml(head.department)} head) created task "${T.escapeHtml(newTask.title)}" and assigned it to ${T.escapeHtml(assignee.name)}`);
+  save(db);
+  res.redirect('/employee/department?task=' + newTask.id);
 });
 
 // ---- Additional task: an employee (or admin, for their own list) adding their own

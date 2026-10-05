@@ -2,8 +2,10 @@
 <%
   var t = detailTask;
   var isAdmin = role === 'admin';
-  var isEmployee = role === 'employee';
-  var readOnly = role === 'viewer';
+  // A department head can open teammates' tasks too — they only get employee actions on their own.
+  var isOwnTask = typeof userId !== 'undefined' && t.assignedTo === userId;
+  var isEmployee = role === 'employee' && isOwnTask;
+  var readOnly = role === 'viewer' || (role === 'employee' && !isOwnTask);
   // An admin can also be assigned tasks, and works those like an employee would (start / submit / block).
   var isMine = isAdmin && typeof userId !== 'undefined' && t.assignedTo === userId;
   var basePath = isAdmin ? '/admin' : '/employee';

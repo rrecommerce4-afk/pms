@@ -39,7 +39,7 @@
                   </div>
                 </td>
                 <td class="emp-email-cell"><%= u.email %></td>
-                <td><%= u.department || '—' %></td>
+                <td><%= u.department || '—' %><% if (u.isDeptHead) { %><span class="head-badge">Head</span><% } %></td>
                 <td><%= u.roleTitle || '—' %></td>
                 <td><span class="access-badge role-<%= u.role %>"><%= u.role %></span></td>
                 <td>
@@ -47,7 +47,8 @@
                     <button type="button" class="btn small outline open-edit-employee-btn"
                       data-id="<%= u.id %>" data-name="<%= u.name %>" data-email="<%= u.email %>"
                       data-role="<%= u.role %>" data-department="<%= dept ? dept.id : '' %>"
-                      data-roletitle="<%= u.roleTitle || '' %>" data-color="<%= u.color || '' %>">Edit</button>
+                      data-roletitle="<%= u.roleTitle || '' %>" data-color="<%= u.color || '' %>"
+                      data-ishead="<%= u.isDeptHead ? '1' : '' %>">Edit</button>
                     <form method="POST" action="/admin/settings/employees/<%= u.id %>/delete" onsubmit="return confirm('Remove this employee?');">
                       <button type="submit" class="row-icon-btn" title="Remove employee"><svg width="15" height="15" viewBox="0 0 24 24" fill="none"><path d="M3 6h18M8 6V4a2 2 0 012-2h4a2 2 0 012 2v2m3 0l-1 14a2 2 0 01-2 2H7a2 2 0 01-2-2L4 6h16z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
                     </form>
@@ -75,12 +76,17 @@
       <% if (departments.length) { %>
         <% departments.forEach(function (d) { %>
           <% var empCount = users.filter(function (u) { return u.role === 'employee' && u.department === d.name; }).length; %>
+          <% var heads = users.filter(function (u) { return u.role === 'employee' && u.isDeptHead && u.department === d.name; }); %>
           <div class="dept-card">
             <div class="dept-card-head">
               <div class="dept-card-title"><%= d.name %><span class="tag-count"><%= empCount %> employee<%= empCount === 1 ? '' : 's' %></span></div>
               <form method="POST" action="/admin/settings/departments/<%= d.id %>/delete" onsubmit="return confirm('Remove this department?');">
                 <button type="submit" class="row-icon-btn" title="Remove department"><svg width="15" height="15" viewBox="0 0 24 24" fill="none"><path d="M3 6h18M8 6V4a2 2 0 012-2h4a2 2 0 012 2v2m3 0l-1 14a2 2 0 01-2 2H7a2 2 0 01-2-2L4 6h16z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
               </form>
+            </div>
+            <div class="dept-head-line">
+              <% if (heads.length) { %>Head: <b><%= heads.map(function (h) { return h.name; }).join(', ') %></b>
+              <% } else { %>Abhi koi head nahi &mdash; Employee Management mein kisi employee ko &ldquo;Department Head&rdquo; banayein.<% } %>
             </div>
             <% if (d.roles.length) { %>
               <div class="dept-roles-wrap">

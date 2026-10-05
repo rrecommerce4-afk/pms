@@ -49,6 +49,12 @@
             <select name="roleTitle" id="em-role-title"></select>
           </div>
         </div>
+        <div class="field" id="employeeHeadField">
+          <label class="head-toggle-row">
+            <input type="checkbox" name="isDeptHead" value="1" id="em-is-head">
+            <div><div class="head-toggle-label">Department Head</div><div class="head-toggle-sub">Apne department ke members ko task assign kar sakta hai &mdash; doosre departments ko nahi.</div></div>
+          </label>
+        </div>
         <div class="field" id="employeeColorField">
           <label>Badge Color</label>
           <select name="color" id="em-color">
@@ -82,6 +88,8 @@
     var colorSelect = document.getElementById('em-color');
     var deptFields = document.getElementById('employeeDeptFields');
     var colorField = document.getElementById('employeeColorField');
+    var headField = document.getElementById('employeeHeadField');
+    var headCheckbox = document.getElementById('em-is-head');
     var accessButtons = document.querySelectorAll('#accessRoleToggle .access-role-btn');
 
     function deptById(id) { for (var i = 0; i < DEPARTMENTS.length; i++) { if (DEPARTMENTS[i].id === id) return DEPARTMENTS[i]; } return null; }
@@ -108,6 +116,8 @@
       var isEmployee = role === 'employee';
       deptFields.style.display = isEmployee ? '' : 'none';
       colorField.style.display = isEmployee ? '' : 'none';
+      headField.style.display = isEmployee ? '' : 'none';
+      if (!isEmployee) headCheckbox.checked = false;
       deptSelect.disabled = !isEmployee;
       roleSelect.disabled = !isEmployee;
     }
@@ -143,6 +153,7 @@
       populateRoles(btn.dataset.department, btn.dataset.roletitle);
       setAccessRole(btn.dataset.role || 'employee');
       if (btn.dataset.color) colorSelect.value = btn.dataset.color;
+      headCheckbox.checked = btn.dataset.ishead === '1';
       modal.classList.add('open');
     }
 
