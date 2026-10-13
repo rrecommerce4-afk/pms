@@ -7,6 +7,7 @@ const { requireAdmin } = require('../middleware/auth');
 const T = require('../lib/tasks');
 const { formatIsoDate } = require('../utils');
 const upload = require('../lib/upload');
+const { registerTodoRoutes } = require('../lib/todos');
 
 const router = express.Router();
 router.use(requireAdmin);
@@ -180,6 +181,8 @@ router.post('/holidays/delete', (req, res) => {
   save(db);
   res.redirect('/admin/missed');
 });
+
+registerTodoRoutes(router);
 
 router.get('/workload', (req, res) => {
   const { employees, decorated } = loadCommon();

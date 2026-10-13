@@ -15,7 +15,8 @@ function emptyDb() {
     tasks: [],
     departments: [],
     activity: [],
-    nextId: { users: 1, tasks: 1 }
+    todos: [],
+    nextId: { users: 1, tasks: 1, todos: 1 }
   };
 }
 
@@ -124,6 +125,8 @@ function load() {
   // Missed-day tracking only counts from the day it was first switched on.
   if (!db.missedTrackingStart) { db.missedTrackingStart = todayStr(); dirty = true; }
   db.holidays = db.holidays || [];
+  db.todos = db.todos || [];
+  if (!db.nextId.todos) db.nextId.todos = 1;
   if (catchUpDailyTasks(db.tasks, todayStr(), db.missedTrackingStart)) dirty = true;
   if (dirty) save(db);
   return db;

@@ -3,6 +3,7 @@ const { load, save, todayStr, logActivity } = require('../db');
 const { requireEmployee, requireEmployeeOrAdmin } = require('../middleware/auth');
 const { greetingWord, firstName } = require('../utils');
 const T = require('../lib/tasks');
+const { registerTodoRoutes } = require('../lib/todos');
 
 const router = express.Router();
 // Pages are employee-only; the POST task actions also accept admins (for their own assigned tasks —
@@ -134,6 +135,8 @@ router.get('/calendar', (req, res) => {
     detailTask: openTask(req, db, today)
   });
 });
+
+registerTodoRoutes(router);
 
 // ---- Department head: view + create tasks for their own department only ----
 

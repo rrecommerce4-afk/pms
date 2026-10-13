@@ -1,0 +1,74 @@
+<%- include('partials/header') %>
+<div class="container">
+  <div class="page-head">
+    <div>
+      <div class="eyebrow-date">MY WORK</div>
+      <h1><%= heading %></h1>
+      <p>Apni simple to-do list — kaam ho jaye toh tick karein, woh cut (strike) ho jayega.</p>
+    </div>
+  </div>
+
+  <div class="list-card todo-card">
+    <div class="list-card-head section-card-head">
+      <h2>My List <span class="tag-count" id="todoCount"><%= doneCount %> / <%= todos.length %> done</span></h2>
+      <% if (todos.length) { %>
+        <form method="POST" action="<%= basePath %>/todos/clear-done">
+          <button class="btn small outline" type="submit">Clear completed</button>
+        </form>
+      <% } %>
+    </div>
+
+    <form method="POST" action="<%= basePath %>/todos" class="todo-add-row">
+      <input type="text" name="text" placeholder="Naya kaam likhein aur Enter dabayein..." required autofocus autocomplete="off">
+      <button class="btn" type="submit">Add</button>
+    </form>
+
+    <div class="todo-list">
+      <% if (todos.length) { %>
+        <% todos.forEach(function (td) { %>
+          <div class="todo-item <%= td.done ? 'done' : '' %>">
+            <form method="POST" action="<%= basePath %>/todos/<%= td.id %>/toggle" class="todo-toggle-form">
+              <button type="submit" class="todo-check" aria-label="<%= td.done ? 'Mark as not done' : 'Mark as done' %>">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none"><path d="M20 6L9 17l-5-5" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg>
+              </button>
+            </form>
+            <div class="todo-text"><%= td.text %></div>
+            <form method="POST" action="<%= basePath %>/todos/<%= td.id %>/delete">
+              <button type="submit" class="check-remove" aria-label="Delete"><svg width="13" height="13" viewBox="0 0 24 24" fill="none"><path d="M18 6L6 18M6 6l12 12" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></button>
+            </form>
+          </div>
+        <% }) %>
+      <% } else { %>
+        <div class="empty-state">
+          <div class="empty-state-title">Aapki list khaali hai</div>
+          <div class="empty-state-sub">Upar box mein pehla kaam add karein.</div>
+        </div>
+      <% } %>
+    </div>
+  </div>
+</div>
+
+<script>
+  (function () {
+    var count = document.getElementById('todoCount');
+    function refreshCount() {
+      var all = document.querySelectorAll('.todo-item').length;
+      var done = document.querySelectorAll('.todo-item.done').length;
+      count.textContent = done + ' / ' + all + ' done';
+    }
+    // Tick/untick in place (strike-through right away) and save in the background;
+    // if the save fails, fall back to a normal form submit.
+    document.querySelectorAll('.todo-toggle-form').forEach(function (form) {
+      form.addEventListener('submit', function (e) {
+        e.preventDefault();
+        var item = form.closest('.todo-item');
+        item.classList.toggle('done');
+        refreshCount();
+        fetch(form.action, { method: 'POST', headers: { 'X-Requested-With': 'fetch' }, credentials: 'same-origin' })
+          .then(function (r) { if (!r.ok) throw new Error(); })
+          .catch(function () { form.submit(); });
+      });
+    });
+  })();
+</script>
+<%- include('partials/footer') %>

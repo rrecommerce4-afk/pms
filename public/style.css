@@ -1812,3 +1812,23 @@ form.inline { display: inline; }
 .head-toggle-sub { font-weight: 400; color: var(--text-faint); font-size: 12px; }
 .dept-head-line { font-size: 12.5px; color: var(--text-faint); margin: -4px 0 10px; }
 .dept-head-line b { color: var(--text); }
+
+/* ---- Personal To Do List ---- */
+.todo-card { max-width: 720px; }
+.todo-card .section-card-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.todo-add-row { display: flex; gap: 8px; padding: 0 24px 14px; }
+.todo-add-row input { flex: 1; min-width: 0; border: 1.5px solid var(--border); border-radius: var(--radius-sm); padding: 9px 12px; font-size: 14px; font-family: inherit; outline: none; }
+.todo-add-row input:focus { border-color: var(--primary); }
+.todo-list { border-top: 1px solid var(--border-soft); }
+.todo-item { display: flex; align-items: center; gap: 12px; padding: 11px 24px; border-bottom: 1px solid var(--border-soft); }
+.todo-item:last-child { border-bottom: none; }
+.todo-item form { display: contents; }
+.todo-check { width: 20px; height: 20px; border-radius: 50%; border: 1.8px solid var(--border); background: none; padding: 0; flex-shrink: 0; cursor: pointer; display: flex; align-items: center; justify-content: center; color: transparent; transition: background .15s, border-color .15s; }
+.todo-check:hover { border-color: var(--success); color: var(--success); }
+.todo-text { flex: 1; font-size: 14px; color: var(--text); word-break: break-word; transition: color .15s; }
+.todo-item.done .todo-check { background: var(--success); border-color: var(--success); color: #fff; }
+.todo-item.done .todo-text { color: var(--text-faint); text-decoration: line-through; }
+@media (max-width: 600px) {
+  .todo-add-row { padding: 0 16px 12px; }
+  .todo-item { padding: 10px 16px; }
+}
