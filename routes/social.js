@@ -13,6 +13,7 @@ const V = require('../lib/studio/view');
 const A = require('../lib/studio/actions');
 const Store = require('../lib/studio/store');
 const Nav = require('../lib/studio/nav');
+const IG = require('../lib/studio/instagram');
 
 const router = express.Router();
 router.use(requireLogin);
@@ -128,6 +129,7 @@ router.use((req, res, next) => {
     notifications,
     unread: notifications.filter((n) => n.unread).length,
     nav: Nav.STUDIO_NAV,
+    src: F.sources(ctx.studio),
     unlinkedCount: C.ROSTER.length - linked
   };
   delete req.session.studioFlash;
@@ -200,7 +202,7 @@ router.get('/', (req, res) => {
   const range = res.locals.sm.range;
   const tasks = W.deriveTasks(items, now, settings);
   const progress = pageProgress(items, settings, now);
-  const history = F.generateHistory(settings.followerScenario, now);
+  const history = F.history(studio, now);
   const fw = followerWindow(range, now);
   const summaries = C.PAGES.map((p) => F.summarize(history, p.id, fw.from, fw.to));
   const days = F.dayDiff(fw.from, fw.to) + 1;
@@ -271,7 +273,7 @@ router.get('/', (req, res) => {
 router.get('/pages', (req, res) => {
   const { studio, now } = req.sm;
   const items = live(studio);
-  const history = F.generateHistory(studio.settings.followerScenario, now);
+  const history = F.history(studio, now);
   const fw = followerWindow(res.locals.sm.range, now);
   render(res, 'pages', 'Instagram Pages', {
     progress: pageProgress(items, studio.settings, now),
@@ -290,7 +292,7 @@ router.get('/pages/:pageId', (req, res) => {
   const today = W.localDay(now);
   const from30 = W.localDay(W.addDaysD(now, -29));
   const from90 = W.localDay(W.addDaysD(now, -89));
-  const history = F.generateHistory(settings.followerScenario, now);
+  const history = F.history(studio, now);
   const month = monthBounds(now);
   const byShoot = (a, b) => a.shootAt.localeCompare(b.shootAt);
   const lists = {
@@ -331,7 +333,7 @@ router.get('/pages/:pageId', (req, res) => {
 // ---------------------------------------------------------------- 3. Followers Analytics (demo)
 router.get('/followers', (req, res) => {
   const { studio, now } = req.sm;
-  const history = F.generateHistory(studio.settings.followerScenario, now);
+  const history = F.history(studio, now);
   const minDate = history[0].date;
   const maxDate = history[history.length - 1].date;
   const preset = ['7', '30', '90', 'custom'].includes(req.query.period) ? req.query.period : '30';
@@ -641,20 +643,23 @@ function reportData(req) {
     const pub = mine.filter((i) => i.publishing.completion);
     return { label: p.shortName, onTime: pub.filter((i) => i.publishing.completion.onTime === true).length, late: pub.filter((i) => i.publishing.completion.onTime === false).length, missed: mine.filter((i) => W.isPublishOverdue(i, now)).length };
   });
-  const history = F.generateHistory(settings.followerScenario, now);
+  const history = F.history(studio, now);
   const fw = followerWindow(range, now);
   const followers = pages.map((p) => F.summarize(history, p.id, fw.from, fw.to));
   const closes = F.monthlyClosing(history).slice(-6);
   const mom = closes.map((c, k) => {
-    const total = pageIds.reduce((s, id) => s + c.point[id], 0);
-    const prevTotal = k > 0 ? pageIds.reduce((s, id) => s + closes[k - 1].point[id], 0) : null;
+    // A month total only exists when every selected page has a reading that month.
+    const sumOf = (pt) => (pageIds.every((id) => typeof pt[id] === 'number') ? pageIds.reduce((s, id) => s + pt[id], 0) : null);
+    const total = sumOf(c.point);
+    const prevTotal = k > 0 ? sumOf(closes[k - 1].point) : null;
     const reels = pageItems.filter((i) => involves(i) && i.publishing.completion && W.localDay(i.publishing.completion.at).startsWith(c.month)).length;
     const [y, m] = c.month.split('-').map(Number);
-    return { month: c.month, label: new Date(y, m - 1, 1).toLocaleDateString('en-GB', { month: 'short', year: 'numeric' }), total, net: prevTotal === null ? null : total - prevTotal, pct: prevTotal ? ((total - prevTotal) / prevTotal) * 100 : null, reels };
+    return { month: c.month, label: new Date(y, m - 1, 1).toLocaleDateString('en-GB', { month: 'short', year: 'numeric' }), total, net: prevTotal === null || total === null ? null : total - prevTotal, pct: prevTotal && total !== null ? ((total - prevTotal) / prevTotal) * 100 : null, reels };
   });
   const edTimes = edRows.filter((e) => e.stats.avgCompletionH !== null);
   return {
     range, page, emp, pages, slots, pageRows, empRows, edRows, unattributed, monthly, publishCompliance, followers, mom,
+    followerLabel: V.followerLabel(F.sources(studio), pageIds),
     shootTimeliness: empRows.map((g) => ({ label: g.name, onTime: g.categories.Shoot.onTime, late: g.categories.Shoot.late, overdue: g.categories.Shoot.openOverdue })),
     editingTimeliness: edRows.map((e) => ({ label: e.name, onTime: e.stats.onTime, late: e.stats.late, overdue: e.stats.openOverdue })),
     avgEdit: edTimes.length ? edTimes.reduce((s, e) => s + e.stats.avgCompletionH, 0) / edTimes.length : null
@@ -682,8 +687,8 @@ router.get('/reports/export/:kind', (req, res) => {
       ...r.empRows.map((x) => [x.name, x.status, x.score === null ? '' : x.score, ...W.TASK_TYPES.flatMap((c) => [x.categories[c].claimed, x.categories[c].completed, x.categories[c].onTime, x.categories[c].late]), x.totals.openOverdue, x.totals.onTimeRate === null ? '' : Math.round(x.totals.onTimeRate * 100)])];
   } else if (req.params.kind === 'month-over-month.csv') {
     name = `month-over-month_${W.localDay(new Date())}.csv`;
-    rows = [['Month', 'Closing followers (DEMO DATA — INSTAGRAM NOT CONNECTED)', 'Net change', 'Change %', 'Reels published'],
-      ...r.mom.map((m) => [m.label, m.total, m.net === null ? '' : m.net, m.pct === null ? '' : m.pct.toFixed(2), m.reels])];
+    rows = [['Month', `Closing followers (${r.followerLabel})`, 'Net change', 'Change %', 'Reels published'],
+      ...r.mom.map((m) => [m.label, m.total === null ? '' : m.total, m.net === null ? '' : m.net, m.pct === null ? '' : m.pct.toFixed(2), m.reels])];
   } else return res.status(404).send('Unknown export');
   res.setHeader('Content-Type', 'text/csv; charset=utf-8');
   res.setHeader('Content-Disposition', `attachment; filename="${name}"`);
@@ -702,7 +707,18 @@ router.get('/settings', (req, res) => {
       return { ...r, userId: m.userId, user: u ? { id: u.id, name: u.name, email: u.email, role: u.role, active: u.active } : null, linkedAt: m.linkedAt };
     }),
     candidates: users.filter((u) => u.active && (u.role === 'employee' || u.role === 'admin')).map((u) => ({ id: u.id, name: u.name, email: u.email, role: u.role, takenBy: takenBy.get(u.id) || null })),
-    linkReport: req.session.studioLinkReport || null
+    linkReport: req.session.studioLinkReport || null,
+    instagram: (() => {
+      const state = IG.igState(studio);
+      const tokens = IG.readTokens();
+      return C.PAGES.map((p) => {
+        const snaps = state.snapshots[p.id];
+        const latest = snaps.length ? snaps[snaps.length - 1] : null;
+        return { page: p, status: state.status[p.id], hasToken: !!(tokens[p.id] && tokens[p.id].token), latest, days: snaps.length };
+      });
+    })(),
+    igApiVersion: IG.API_VERSION,
+    IGREMIND: IG.REMIND_DAYS
   });
   delete req.session.studioLinkReport;
 });
@@ -756,6 +772,77 @@ router.post('/settings/:section', requireManager, (req, res) => {
 });
 
 const escapeHtml = (s) => V.esc(s);
+
+// ---------------------------------------------------------------- Instagram connection (admin)
+// The token is sent once from the admin form, checked against the page's handle, and stored in
+// the separate token file (never db.json). It is never rendered back to any page.
+router.post('/instagram/connect', requireManager, async (req, res) => {
+  const pageId = C.PAGE_IDS.includes(req.body.pageId) ? req.body.pageId : null;
+  if (!pageId) return res.status(400).send('Unknown page');
+  try {
+    const result = await IG.connectPage(pageId, req.body.token);
+    const db = load();
+    IG.applyReading(Store.getStudio(db), result);
+    logActivity(db, `<b>${escapeHtml(req.sm.actor.name)}</b> connected ${escapeHtml(C.getPage(pageId).handle)} to Instagram follower sync`);
+    save(db);
+    flash(req, 'success', `${C.getPage(pageId).handle} connected — ${V.fmtNum(result.followers)} followers.`);
+  } catch (e) {
+    const message = e instanceof IG.IgError ? e.message : 'Could not connect. Try again.';
+    if (!(e instanceof IG.IgError)) console.error('[instagram] connect failed:', e.message);
+    const db = load();
+    IG.recordError(Store.getStudio(db), pageId, message);
+    save(db);
+    flash(req, 'error', message);
+  }
+  res.redirect(303, '/social-media/settings#instagram');
+});
+
+router.post('/instagram/disconnect', requireManager, (req, res) => {
+  const pageId = C.PAGE_IDS.includes(req.body.pageId) ? req.body.pageId : null;
+  if (!pageId) return res.status(400).send('Unknown page');
+  const db = load();
+  IG.disconnectPage(Store.getStudio(db), pageId);
+  logActivity(db, `<b>${escapeHtml(req.sm.actor.name)}</b> disconnected ${escapeHtml(C.getPage(pageId).handle)} from Instagram follower sync`);
+  save(db);
+  flash(req, 'success', `${C.getPage(pageId).handle} disconnected. Its saved history is kept; it shows demo data until reconnected.`);
+  res.redirect(303, '/social-media/settings#instagram');
+});
+
+// Reminder popup actions can be used from any admin page, so they may return to any internal page.
+const safeInternal = (v) => (typeof v === 'string' && /^\/[A-Za-z0-9\-_/?=&%.:+#]*$/.test(v) && !v.startsWith('//') ? v : '/admin/dashboard');
+
+router.post('/instagram/dismiss-reminder', requireManager, (req, res) => {
+  req.session.igReminderDismissed = new Date().toDateString(); // popup again tomorrow; the banner stays
+  res.redirect(303, safeInternal(req.body.returnTo));
+});
+
+// Asks Instagram for fresh 60-day tokens for every connected page (Instagram allows this once
+// a token is at least 24 hours old) and fetches today's counts at the same time.
+router.post('/instagram/renew', requireManager, async (req, res) => {
+  try {
+    const r = await IG.syncAll({ loadDb: load, saveDb: save, getStudio: Store.getStudio, force: true, forceRefresh: true });
+    if (!r.synced.length && !r.failed.length) flash(req, 'info', 'No pages are connected yet.');
+    else if (r.failed.length) flash(req, 'error', `Renewed ${r.synced.length} page(s). Could not renew: ${r.failed.map((f) => `${C.getPage(f.pageId).handle} — ${f.message}`).join('; ')}. For these, generate a new token in the Meta app and paste it below.`);
+    else flash(req, 'success', `Access tokens renewed for ${r.synced.length} page(s).`);
+  } catch (e) {
+    console.error('[instagram] renew failed:', e.message);
+    flash(req, 'error', 'Could not renew the tokens. Try again.');
+  }
+  res.redirect(303, '/social-media/settings#instagram');
+});
+
+router.post('/instagram/refresh', requireManager, async (req, res) => {
+  try {
+    const r = await IG.syncAll({ loadDb: load, saveDb: save, getStudio: Store.getStudio, force: true });
+    if (!r.synced.length && !r.failed.length) flash(req, 'info', 'No pages are connected yet.');
+    else if (r.failed.length) flash(req, 'error', `Updated ${r.synced.length} page(s). Failed: ${r.failed.map((f) => `${C.getPage(f.pageId).handle} — ${f.message}`).join('; ')}`);
+    else flash(req, 'success', `Follower counts updated for ${r.synced.length} page(s).`);
+  } catch (e) {
+    console.error('[instagram] refresh failed:', e.message);
+    flash(req, 'error', 'Could not refresh follower counts. Try again.');
+  }
+  res.redirect(303, '/social-media/settings#instagram');
+});
 
 // Links/unlinks roster slots to EXISTING PMS users. Never creates or edits user accounts.
 function saveMembers(req, res, ctx) {

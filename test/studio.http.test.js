@@ -23,6 +23,8 @@ const sha = (s) => crypto.createHash('sha256').update(s).digest('hex');
 const sourceText = fs.existsSync(SOURCE) ? fs.readFileSync(SOURCE, 'utf8') : '';
 const sourceHash = sha(sourceText);
 const seed = sourceText.trim() ? JSON.parse(sourceText) : { users: [], tasks: [], nextId: { users: 1, tasks: 1, todos: 1 } };
+// The tests start every page as "not connected to Instagram", whatever the real db.json has.
+if (seed.socialStudio) delete seed.socialStudio.instagram;
 const hash = bcrypt.hashSync(PW, 4);
 seed.nextId = seed.nextId || { users: 1, tasks: 1, todos: 1 };
 seed.users = seed.users || [];
@@ -72,7 +74,7 @@ const HOUR = 3600000;
 // ---------------------------------------------------------------- server lifecycle
 let server;
 test.before(async () => {
-  server = spawn(process.execPath, ['server.js'], { cwd: ROOT, env: { ...process.env, PORT: String(PORT), PMS_DB_FILE: DB }, stdio: ['ignore', 'pipe', 'pipe'] });
+  server = spawn(process.execPath, ['server.js'], { cwd: ROOT, env: { ...process.env, PORT: String(PORT), PMS_DB_FILE: DB, PMS_IG_SYNC: 'off', PMS_IG_TOKENS_FILE: path.join(TMP, 'ig-tokens.json') }, stdio: ['ignore', 'pipe', 'pipe'] });
   server.stderrText = '';
   server.stderr.on('data', (d) => { server.stderrText += d; });
   await new Promise((resolve, reject) => {
@@ -93,7 +95,14 @@ test('migration preserved every existing record and linked the six Studio member
   assert.equal(db.schemaVersion, 4);
   for (const k of ['users', 'departments', 'todos', 'holidays']) assert.deepEqual(db[k] || [], preBoot[k] || [], `${k} preserved`);
   assert.deepEqual(db.tasks.map((t) => [t.id, t.title, t.assignedTo]), (preBoot.tasks || []).map((t) => [t.id, t.title, t.assignedTo]), 'tasks preserved');
-  const links = Object.fromEntries(db.socialStudio.members.map((m) => [m.key, m.userId]));
+  if ((preBoot.schemaVersion || 1) >= 4) {
+    // The source db was already migrated (the migration only auto-links once), so link the
+    // test users the way an admin would: Settings → Studio members → Auto-link by name.
+    assert.deepEqual(db.socialStudio, preBoot.socialStudio, 'existing Studio data untouched on boot');
+    const admin = await as(U.admin);
+    assert.equal((await admin.post('/social-media/settings/autolink', { _csrf: admin.token })).status, 303);
+  }
+  const links = Object.fromEntries(readDb().socialStudio.members.map((m) => [m.key, m.userId]));
   assert.deepEqual(links, { bansi: U.bansi.id, bhavin: U.bhavin.id, vishnu: U.vishnu.id, krutik: U.krutik.id, dhara: U.dhara.id, ashmita: U.ashmita.id });
   assert.equal(db.users.length, preBoot.users.length);
   assert.equal(sha(fs.readFileSync(SOURCE, 'utf8')), sourceHash, 'real db.json untouched');
@@ -344,6 +353,63 @@ test('admin settings and member links are validated and never create users', asy
   const emails = readDb().users.map((u) => u.email.toLowerCase());
   assert.equal(new Set(emails).size, emails.length, 'no duplicate accounts');
   assert.equal(readDb().users.filter((u) => /^bansi$/i.test(u.name)).length, 1);
+});
+
+test('Instagram connection is admin-only and starts as demo data', async () => {
+  const admin = await as(U.admin);
+  const settings = await admin.get('/social-media/settings');
+  assert.match(settings.text, /Instagram connection/);
+  assert.match(settings.text, /@rajarani_farma_patterns/);
+  assert.equal((settings.text.match(/action="\/social-media\/instagram\/connect"/g) || []).length, 4);
+  for (const who of ['bansi', 'dhara', 'viewer']) {
+    const c = await as(U[who]);
+    assert.doesNotMatch((await c.get('/social-media/settings')).text, /instagram\/connect/, `${who} sees no token form`);
+    assert.equal((await c.post('/social-media/instagram/connect', { _csrf: c.token, pageId: 'product', token: 'x'.repeat(40) })).status, 403);
+    assert.equal((await c.post('/social-media/instagram/refresh', { _csrf: c.token })).status, 403);
+  }
+  // A malformed token is refused before any network call; the error is shown, nothing stored.
+  await admin.post('/social-media/instagram/connect', { _csrf: admin.token, pageId: 'product', token: 'short' });
+  assert.match((await flashOf(admin, '/social-media/settings')).text, /does not look like an Instagram access token/);
+  assert.equal(fs.existsSync(path.join(TMP, 'ig-tokens.json')), false);
+  assert.equal(studio().instagram.status.product.connected, false);
+});
+
+test('admins get a token-expiry popup and banner on every page; others never do', async () => {
+  // Simulate a connected page whose token expires in 3 days (no network involved).
+  fs.writeFileSync(path.join(TMP, 'ig-tokens.json'), JSON.stringify({ product: { token: 'IGAA' + 'k'.repeat(60), savedAt: new Date().toISOString(), refreshedAt: new Date().toISOString(), expiresAt: new Date(Date.now() + 3 * 86400000 - 3600000).toISOString() } }));
+  const db = readDb();
+  db.socialStudio.instagram.status.product = { connected: true, username: 'rajarani_product', lastFetchAt: new Date().toISOString() };
+  db.socialStudio.instagram.snapshots.product = [{ date: new Date().toISOString().slice(0, 10), followers: 1000, at: new Date().toISOString(), source: 'api' }];
+  fs.writeFileSync(DB, JSON.stringify(db, null, 2));
+
+  const admin = await as(U.admin);
+  for (const p of ['/admin/dashboard', '/admin/tasks', '/social-media']) {
+    const html = (await admin.get(p)).text;
+    assert.match(html, /id="igReminderModal"/, `popup on ${p}`);
+    assert.match(html, /@rajarani_product: the access token expires in 3 days/);
+    assert.match(html, /class="ig-bell-count">1</);
+    assert.doesNotMatch(html, /IGAA/, 'token never rendered');
+  }
+  assert.match((await admin.get('/admin/dashboard')).text, /Renew tokens now/);
+  // "Remind me tomorrow" hides the popup for today but keeps the banner.
+  const dismissed = await admin.post('/social-media/instagram/dismiss-reminder', { _csrf: admin.token, returnTo: '/admin/tasks' });
+  assert.equal(dismissed.location, '/admin/tasks');
+  const after = (await admin.get('/admin/dashboard')).text;
+  assert.doesNotMatch(after, /id="igReminderModal"/);
+  assert.match(after, /Instagram access token reminder:/);
+  assert.equal((await admin.post('/social-media/instagram/dismiss-reminder', { _csrf: admin.token, returnTo: 'https://evil.example.com' })).location, '/admin/dashboard');
+
+  for (const who of ['bansi', 'dhara', 'viewer']) {
+    const c = await as(U[who]);
+    const home = (await c.get(who === 'viewer' ? '/viewer/dashboard' : '/employee/dashboard')).text;
+    assert.doesNotMatch(home, /igReminderModal|Instagram access token reminder/, `${who} sees no reminder`);
+    assert.equal((await c.post('/social-media/instagram/renew', { _csrf: c.token })).status, 403);
+    assert.equal((await c.post('/social-media/instagram/dismiss-reminder', { _csrf: c.token })).status, 403);
+  }
+  // Fixed (token renewed far ahead) → reminder disappears everywhere.
+  fs.writeFileSync(path.join(TMP, 'ig-tokens.json'), JSON.stringify({ product: { token: 'IGAA' + 'k'.repeat(60), savedAt: new Date().toISOString(), refreshedAt: new Date().toISOString(), expiresAt: new Date(Date.now() + 55 * 86400000).toISOString() } }));
+  const fine = (await admin.get('/admin/dashboard')).text;
+  assert.doesNotMatch(fine, /Instagram access token reminder|ig-bell-count/);
 });
 
 test('every Studio screen renders for each role without server errors', async () => {

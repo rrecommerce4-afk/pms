@@ -35,7 +35,7 @@
     <%- include('_kpi', { label: 'Overdue tasks', value: totals.overdueClaimed + totals.overdueUnclaimed, hint: totals.overdueClaimed + ' claimed · ' + totals.overdueUnclaimed + ' unclaimed', href: '/social-media/tasks?state=overdue-owned', tone: 'red' }) %>
     <%- include('_kpi', { label: 'Available tasks', value: totals.availableTotal, hint: a.memberKey ? 'on your pages' : 'across all four pages', href: '/social-media/tasks?state=available', tone: 'sky' }) %>
     <% if (a.canWork) { %><%- include('_kpi', { label: 'My tasks', value: totals.myActive, hint: 'claimed by you, still open', href: '/social-media/tasks?emp=' + a.userId + '&state=claimed', tone: 'brand' }) %><% } %>
-    <%- include('_kpi', { label: 'Total followers', value: V.fmtNum(totals.followers), hint: (followerNet >= 0 ? '+' : '') + V.fmtNum(followerNet) + ' · DEMO DATA', href: '/social-media/followers', tone: 'slate' }) %>
+    <%- include('_kpi', { label: 'Total followers', value: V.fmtNum(totals.followers), hint: (followerNet >= 0 ? '+' : '') + V.fmtNum(followerNet) + ' · ' + (V.followerLabel(sm.src).startsWith('LIVE') ? 'from Instagram' : V.followerLabel(sm.src).startsWith('PARTLY') ? 'partly demo data' : 'DEMO DATA'), href: '/social-media/followers', tone: 'slate' }) %>
   </div>
 
   <% if (a.readOnly) { %>
@@ -119,7 +119,7 @@
       <div class="section-card sm-account" style="--pc:<%= p.color %>;--pcs:<%= p.soft %>;">
         <div class="sm-account-head"><span class="sm-page-av"><%= V.initials(p.shortName) %></span><div><b><%= p.name %></b><small><%= p.handle %></small></div></div>
         <div class="sm-account-stats">
-          <div><small>Followers (demo)</small><b><%= V.fmtNum(s.current) %></b></div>
+          <div><small>Followers <%= sm.src[p.id] === 'live' ? '(Instagram)' : '(demo)' %></small><b><%= V.fmtNum(s.current) %></b></div>
           <div class="right"><b class="<%= s.net >= 0 ? 'green-txt' : 'red-txt' %>"><%= s.net >= 0 ? '+' : '' %><%= V.fmtNum(s.net) %></b><small><%= V.fmtPct(s.growthPct, 2) %></small></div>
         </div>
         <div class="sm-progress-label"><span>Published vs target</span><b><%= pr.published %> / <%= pr.target %></b></div>
@@ -132,8 +132,8 @@
 
   <div class="sm-split">
     <div class="list-card sm-section sm-span-3">
-      <div class="list-card-head section-card-head"><div><h2>Follower growth</h2><p class="sm-muted"><%= V.fmtDate(fw.from, 'short') %> – <%= V.fmtDate(fw.to) %></p></div><%- V.demoBadge() %></div>
-      <div class="sm-pad"><%- V.legend(PAGE_SERIES) %><%- V.lineChart(chartRows, PAGE_SERIES, { height: 260, label: 'Follower growth (demo data)' }) %></div>
+      <div class="list-card-head section-card-head"><div><h2>Follower growth</h2><p class="sm-muted"><%= V.fmtDate(fw.from, 'short') %> – <%= V.fmtDate(fw.to) %></p></div><%- V.followerBadge(sm.src) %></div>
+      <div class="sm-pad"><%- V.legend(PAGE_SERIES) %><%- V.lineChart(chartRows, PAGE_SERIES, { height: 260, label: 'Follower growth' }) %></div>
     </div>
     <div class="list-card sm-section sm-span-2">
       <div class="list-card-head section-card-head"><div><h2>Content calendar</h2><p class="sm-muted">Next 7 days (planned publishing, or shoot date if not set)</p></div><a class="view-all" href="/social-media/calendar">Open →</a></div>

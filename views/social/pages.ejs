@@ -8,7 +8,7 @@
       <h1>Instagram Pages</h1>
       <p>Four Rajarani accounts with their page teams, monthly targets and shared task status. Page team members can claim shoots and confirm publishing; editing is claimed by the eligible editors.</p>
     </div>
-    <div class="sm-head-actions"><%- V.demoBadge() %><% if (a.isManager) { %><a class="btn" href="/social-media/reels/new">+ Create reel</a><% } %></div>
+    <div class="sm-head-actions"><%- V.followerBadge(sm.src) %><% if (a.isManager) { %><a class="btn" href="/social-media/reels/new">+ Create reel</a><% } %></div>
   </div>
 
   <div class="sm-cards-2">
@@ -23,7 +23,7 @@
           <div class="sm-stat">Net growth<b class="<%= s.net >= 0 ? 'green-txt' : 'red-txt' %>"><%= s.net >= 0 ? '+' : '' %><%= V.fmtNum(s.net) %></b></div>
           <div class="sm-stat">Growth<b><%= V.fmtPct(s.growthPct, 2) %></b></div>
         </div>
-        <p class="sm-foot-note" style="margin:0">Follower period <%= V.fmtDate(fw.from, 'short') %> – <%= V.fmtDate(fw.to, 'short') %> · DEMO DATA — INSTAGRAM NOT CONNECTED</p>
+        <p class="sm-foot-note" style="margin:0">Follower period <%= V.fmtDate(fw.from, 'short') %> – <%= V.fmtDate(fw.to, 'short') %> · <%= V.followerLabel(sm.src, [p.id]) %></p>
         <div class="sm-progress-label"><span><%= monthName %> target</span><b><%= pr.published %> / <%= pr.target %> published · <%= pr.remaining %> remaining</b></div>
         <div class="sm-progress"><i style="width:<%= pr.pct %>%;background:<%= p.color %>"></i></div>
         <div class="sm-stat-grid">

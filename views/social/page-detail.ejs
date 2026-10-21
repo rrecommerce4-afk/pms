@@ -17,8 +17,8 @@
   </div>
 
   <div class="sm-kpis cols-6">
-    <%- include('_kpi', { label: 'Followers', value: V.fmtNum(s30.current), hint: 'DEMO DATA', tone: 'slate' }) %>
-    <%- include('_kpi', { label: 'Net growth (30d)', value: (s30.net >= 0 ? '+' : '') + V.fmtNum(s30.net), hint: V.fmtPct(s30.growthPct, 2) + ' · demo', tone: 'green' }) %>
+    <%- include('_kpi', { label: 'Followers', value: V.fmtNum(s30.current), hint: sm.src[page.id] === 'live' ? 'from Instagram' + (s30.since ? ' since ' + V.fmtDate(s30.since, 'short') : '') : 'DEMO DATA', tone: 'slate' }) %>
+    <%- include('_kpi', { label: 'Net growth (30d)', value: (s30.net >= 0 ? '+' : '') + V.fmtNum(s30.net), hint: V.fmtPct(s30.growthPct, 2) + (sm.src[page.id] === 'live' ? '' : ' · demo'), tone: 'green' }) %>
     <%- include('_kpi', { label: 'Monthly target', value: progress.target, hint: progress.planned + ' planned', href: '/social-media/settings#targets', tone: 'slate' }) %>
     <%- include('_kpi', { label: 'Published', value: progress.published, hint: Math.round(progress.pct) + '% of target · ' + progress.remaining + ' left', tone: 'green' }) %>
     <%- include('_kpi', { label: 'Open to claim', value: openCount, hint: lists.shootsAvailable.length + ' shoots · ' + lists.editingAvailable.length + ' edits', tone: 'sky' }) %>
@@ -52,9 +52,9 @@
   <% } else if (tab === 'overview') { %>
     <div class="sm-split">
       <div class="list-card sm-section">
-        <div class="list-card-head section-card-head"><div><h2>Follower growth</h2><p class="sm-muted">Last 90 days</p></div><%- V.demoBadge() %></div>
+        <div class="list-card-head section-card-head"><div><h2>Follower growth</h2><p class="sm-muted">Last 90 days</p></div><%- V.followerBadge(sm.src, [page.id]) %></div>
         <div class="sm-pad">
-          <%- V.lineChart(chartRows, series, { height: 260, label: 'Follower growth (demo data)' }) %>
+          <%- V.lineChart(chartRows, series, { height: 260, label: 'Follower growth' }) %>
           <div class="sm-stat-grid" style="margin-top:12px;">
             <div class="sm-stat">90-day net<b><%= s90.net >= 0 ? '+' : '' %><%= V.fmtNum(s90.net) %></b></div>
             <div class="sm-stat">90-day growth<b><%= V.fmtPct(s90.growthPct, 2) %></b></div>

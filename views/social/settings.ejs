@@ -2,7 +2,7 @@
 <%
   var a = sm.actor, st = sm.settings, people = sm.people, can = a.isManager;
   var wTotal = Object.keys(st.weights).reduce(function (s, k) { return s + st.weights[k]; }, 0);
-  var sections = [['members', 'Studio members'], ['targets', 'Monthly targets'], ['teams', 'Page teams'], ['editors', 'Editing team'], ['deadlines', 'Default deadlines'], ['priorities', 'Priorities'], ['weights', 'Scoring weights'], ['ranking', 'Ranking rules'], ['notifications', 'Notifications'], ['display', 'Display'], ['followers', 'Demo followers']];
+  var sections = [['instagram', 'Instagram connection'], ['members', 'Studio members'], ['targets', 'Monthly targets'], ['teams', 'Page teams'], ['editors', 'Editing team'], ['deadlines', 'Default deadlines'], ['priorities', 'Priorities'], ['weights', 'Scoring weights'], ['ranking', 'Ranking rules'], ['notifications', 'Notifications'], ['display', 'Display'], ['followers', 'Demo followers']];
   var hidden = function () { return '<input type="hidden" name="_csrf" value="' + V.esc(sm.csrf) + '">'; };
 %>
 <div class="container container-wide sm">
@@ -18,6 +18,47 @@
   <div class="sm-settings-layout">
     <nav class="sm-settings-nav" aria-label="Settings sections"><% sections.forEach(function (s) { %><a href="#<%= s[0] %>"><%= s[1] %></a><% }) %></nav>
     <div>
+      <div class="list-card sm-section" id="instagram">
+        <div class="list-card-head section-card-head"><div><h2>Instagram connection</h2><p class="sm-muted">Real follower counts through the official Instagram API (Instagram login, <%= igApiVersion %>). Each page needs its own access token from the Meta app → <b>Generate token</b>. Tokens are stored in a private server file — not in the database — and are never shown again after saving. Follower counts update automatically about once a day.</p></div><%- V.followerBadge(sm.src) %></div>
+        <div class="sm-pad">
+          <% instagram.forEach(function (row) { var st = row.status || {}; var connected = !!st.connected; %>
+            <div class="sm-member-row" style="align-items:flex-start">
+              <div class="who" style="--pc:<%= row.page.color %>;--pcs:<%= row.page.soft %>">
+                <b><%= row.page.name %></b> <span class="sm-muted"><%= row.page.handle %></span>
+                <div class="sm-tags" style="margin-top:4px"><%- connected ? V.liveBadge('Connected') : V.demoBadge('Not connected — demo data') %></div>
+                <dl class="sm-kv" style="font-size:12px;margin-top:6px">
+                  <% if (row.latest) { %><dt>Followers</dt><dd><b><%= V.fmtNum(row.latest.followers) %></b> · <%= V.fmtDateTime(row.latest.at) %></dd><% } %>
+                  <% if (st.lastFetchAt) { %><dt>Last fetched</dt><dd><%= V.fmtDateTime(st.lastFetchAt) %></dd><% } %>
+                  <% if (connected && st.tokenExpiresAt) { %><dt>Token valid until</dt><dd><%= V.fmtDate(st.tokenExpiresAt) %> <span class="sm-muted">(renewed automatically)</span></dd><% } %>
+                  <% if (row.days) { %><dt>History</dt><dd><%= row.days %> day(s) saved<% if (st.historyNote) { %> · <span class="sm-muted"><%= st.historyNote %></span><% } %></dd><% } %>
+                  <% if (connected && !row.hasToken) { %><dt>Token</dt><dd class="red-txt">The saved token file is missing for this page, so it can't be refreshed. Paste a new token to reconnect.</dd><% } %>
+                  <% if (st.lastError) { %><dt>Last error</dt><dd class="red-txt"><%= st.lastError %> <span class="sm-muted">(<%= V.fmtDateTime(st.lastErrorAt) %>)</span></dd><% } %>
+                </dl>
+              </div>
+              <% if (can) { %>
+                <div style="display:flex;flex-direction:column;gap:8px;flex:1 1 300px;min-width:0">
+                  <form method="POST" action="/social-media/instagram/connect" class="sm-inline-inputs" autocomplete="off">
+                    <%- hidden() %><input type="hidden" name="pageId" value="<%= row.page.id %>">
+                    <input type="password" name="token" required minlength="20" maxlength="1024" autocomplete="off" placeholder="<%= connected ? 'Paste a new token to replace' : 'Paste access token' %>" aria-label="Access token for <%= row.page.handle %>" style="flex:1;min-width:0;border:1px solid var(--border);border-radius:6px;padding:8px 10px;font:inherit">
+                    <button class="btn small" type="submit"><%= connected ? 'Replace' : 'Connect' %></button>
+                  </form>
+                  <% if (connected) { %>
+                    <form method="POST" action="/social-media/instagram/disconnect" data-confirm="Disconnect <%= row.page.handle %>? Saved history is kept, but this page will show demo data until it is connected again."><%- hidden() %><input type="hidden" name="pageId" value="<%= row.page.id %>"><button class="btn small outline" type="submit">Disconnect</button></form>
+                  <% } %>
+                </div>
+              <% } %>
+            </div>
+          <% }) %>
+          <% if (can) { %>
+            <div class="sm-inline-inputs" style="margin-top:12px">
+              <form method="POST" action="/social-media/instagram/refresh" style="margin:0"><%- hidden() %><button class="btn small outline" type="submit">Fetch follower counts now</button></form>
+              <form method="POST" action="/social-media/instagram/renew" style="margin:0"><%- hidden() %><button class="btn small outline" type="submit">Renew tokens now</button></form>
+              <span class="sm-muted">Counts update and tokens renew automatically while the PMS server is running. Admins get a reminder popup if a token gets within <%= IGREMIND %> days of expiry or a daily update fails.</span>
+            </div>
+          <% } %>
+        </div>
+      </div>
+
       <div class="list-card sm-section" id="members">
         <div class="list-card-head section-card-head"><div><h2>Studio members</h2><p class="sm-muted">Each Studio slot is linked to an <b>existing</b> PMS account. Linking never creates, edits or reactivates a user, and never changes passwords, emails, roles or departments. Studio permissions are fixed per slot.</p></div></div>
         <div class="sm-pad">
@@ -156,7 +197,7 @@
       </div>
 
       <div class="list-card sm-section" id="followers">
-        <div class="list-card-head section-card-head"><div><h2>Demo follower scenario</h2><p class="sm-muted">Switch the mock follower time-series to preview different growth scenarios. Instagram is not connected.</p></div><%- V.demoBadge() %></div>
+        <div class="list-card-head section-card-head"><div><h2>Demo follower scenario</h2><p class="sm-muted">Only used for pages that are not connected to Instagram: switches their mock follower series between growth scenarios.</p></div><%- V.demoBadge() %></div>
         <form class="sm-pad" method="POST" action="/social-media/settings/followers"><%- hidden() %>
           <div class="sm-inline-inputs">
             <select class="filter-select" name="followerScenario" aria-label="Scenario"><% [['conservative', 'Conservative growth'], ['baseline', 'Baseline growth'], ['optimistic', 'Optimistic growth']].forEach(function (o) { %><option value="<%= o[0] %>" <%= st.followerScenario === o[0] ? 'selected' : '' %>><%= o[1] %></option><% }) %></select>

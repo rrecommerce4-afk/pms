@@ -18,7 +18,7 @@
     <div>
       <div class="eyebrow-date">SOCIAL MEDIA STUDIO</div>
       <h1>Performance Reports</h1>
-      <p>Reports for <%= V.fmtDate(r.range.from) %> – <%= V.fmtDate(r.range.to) %>, calculated on the server from recorded claims and completions. Follower figures are demo data.</p>
+      <p>Reports for <%= V.fmtDate(r.range.from) %> – <%= V.fmtDate(r.range.to) %>, calculated on the server from recorded claims and completions. Follower figures: <%= V.followerLabel(sm.src) %>.</p>
     </div>
     <form class="sm-head-actions" method="GET" action="/social-media/reports">
       <select class="filter-select" name="page" data-autosubmit aria-label="Page"><option value="all">All pages</option><% C.PAGES.forEach(function (p) { %><option value="<%= p.id %>" <%= r.page === p.id ? 'selected' : '' %>><%= p.shortName %></option><% }) %></select>
@@ -85,7 +85,7 @@
 
   <div class="sm-cards-2">
     <div class="list-card">
-      <div class="list-card-head section-card-head"><div><h2>Follower growth by page</h2><p class="sm-muted">Net followers gained in the period</p></div><%- V.demoBadge() %></div>
+      <div class="list-card-head section-card-head"><div><h2>Follower growth by page</h2><p class="sm-muted">Net followers gained in the period</p></div><%- V.followerBadge(sm.src, r.pages.map(function (p) { return p.id; })) %></div>
       <div class="sm-scroll"><table class="sm-table">
         <thead><tr><th>Page</th><th class="num">Start</th><th class="num">Current</th><th class="num">Net</th><th class="num">Growth</th></tr></thead>
         <tbody>
@@ -95,10 +95,10 @@
       </table></div>
     </div>
     <div class="list-card">
-      <div class="list-card-head section-card-head"><div><h2>Month-over-month comparison</h2><p class="sm-muted">Closing followers (demo) and reels published (recorded) per month</p></div><span class="sm-head-actions"><%- V.demoBadge('Demo data') %><a class="btn small outline" href="/social-media/reports/export/month-over-month.csv<%= filterQs %>">CSV</a></span></div>
+      <div class="list-card-head section-card-head"><div><h2>Month-over-month comparison</h2><p class="sm-muted">Closing followers and reels published (recorded) per month</p></div><span class="sm-head-actions"><%- V.followerBadge(sm.src, r.pages.map(function (p) { return p.id; })) %><a class="btn small outline" href="/social-media/reports/export/month-over-month.csv<%= filterQs %>">CSV</a></span></div>
       <div class="sm-scroll"><table class="sm-table">
         <thead><tr><th>Month</th><th class="num">Closing followers</th><th class="num">Net change</th><th class="num">MoM %</th><th class="num">Reels published</th></tr></thead>
-        <tbody><% r.mom.forEach(function (m) { %><tr><td><%= m.label %></td><td class="num"><%= V.fmtNum(m.total) %></td><td class="num"><%= m.net === null ? '—' : (m.net >= 0 ? '+' : '') + V.fmtNum(m.net) %></td><td class="num"><%= m.pct === null ? '—' : V.fmtPct(m.pct) %></td><td class="num"><b><%= m.reels %></b></td></tr><% }) %></tbody>
+        <tbody><% r.mom.forEach(function (m) { %><tr><td><%= m.label %></td><td class="num"><%= m.total === null ? '—' : V.fmtNum(m.total) %></td><td class="num"><%= m.net === null ? '—' : (m.net >= 0 ? '+' : '') + V.fmtNum(m.net) %></td><td class="num"><%= m.pct === null ? '—' : V.fmtPct(m.pct) %></td><td class="num"><b><%= m.reels %></b></td></tr><% }) %></tbody>
       </table></div>
     </div>
   </div>

@@ -49,7 +49,7 @@ test('page teams and editor eligibility match the specification exactly', () => 
   assert.deepEqual(P.editorsForPage(s, 'farma'), ['bansi', 'vishnu']);
   assert.deepEqual(P.editorsForPage(s, 'stencil'), ['bhavin']);
   assert.deepEqual(P.editorsForPage(s, 'butterpaper'), ['bhavin']);
-  assert.deepEqual(C.PAGES.map((p) => p.handle), ['@rajarani_product', '@rajarani_farma_pattern', '@rajarani_stencil', '@rajarani_butterpaper']);
+  assert.deepEqual(C.PAGES.map((p) => p.handle), ['@rajarani_product', '@rajarani_farma_patterns', '@rajarani_stencil', '@rajarani_butterpaper']);
 });
 
 test('actor resolution comes from the PMS user, not client input', () => {

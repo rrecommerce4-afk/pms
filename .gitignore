@@ -2,3 +2,5 @@ node_modules/
 db.json
 uploads/
 backups/
+instagram-tokens.json
+instagram-tokens.json.tmp

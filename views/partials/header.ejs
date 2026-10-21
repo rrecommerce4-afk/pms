@@ -179,9 +179,16 @@
         <% } %>
       </div>
       <div class="topbar-right">
+        <% if (typeof igAlerts !== 'undefined' && igAlerts.length) { %>
+          <a class="icon-btn" href="/social-media/settings#instagram" title="Instagram access token reminder (<%= igAlerts.length %>)" style="position:relative">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M18 8a6 6 0 00-12 0c0 7-3 9-3 9h18s-3-2-3-9" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M13.7 21a2 2 0 01-3.4 0" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            <span class="ig-bell-count"><%= igAlerts.length %></span>
+          </a>
+        <% } else { %>
         <button class="icon-btn" type="button" title="Notifications">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M18 8a6 6 0 00-12 0c0 7-3 9-3 9h18s-3-2-3-9" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M13.7 21a2 2 0 01-3.4 0" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
         </button>
+        <% } %>
         <% if (typeof showCreateButton !== 'undefined' && showCreateButton) { %>
           <button class="btn" type="button" id="openCreateTaskBtn">
             <svg width="15" height="15" viewBox="0 0 24 24" fill="none"><path d="M12 5v14M5 12h14" stroke="#fff" stroke-width="2.3" stroke-linecap="round"/></svg>
@@ -197,6 +204,7 @@
       </div>
     </header>
     <main class="main-content">
+<%- include('ig-reminder') %>
 <script>
   (function () {
     var toggle = document.getElementById('userChipToggle');

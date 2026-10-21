@@ -1,0 +1,48 @@
+<%# Instagram access-token reminder for admins (from server.js: igAlerts, igPopup, igCsrf). %>
+<% if (typeof igAlerts !== 'undefined' && igAlerts.length) {
+  var urgent = igAlerts.some(function (x) { return x.kind === 'expired' || x.kind === 'missing'; });
+  var soonest = igAlerts.filter(function (x) { return typeof x.daysLeft === 'number'; }).sort(function (a, b) { return a.daysLeft - b.daysLeft; })[0];
+  var here = (typeof path !== 'undefined' && path) ? path : '/admin/dashboard';
+%>
+<style>
+  .ig-rem-banner { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px; margin: 0 0 16px; padding: 10px 14px; border-radius: var(--radius-sm); font-size: 13px; background: var(--warning-soft); color: #7a5a17; }
+  .ig-rem-banner.urgent { background: var(--danger-soft); color: var(--danger); }
+  .ig-rem-banner b { font-weight: 700; }
+  .ig-rem-banner .grow { flex: 1; min-width: 200px; }
+  .ig-rem-banner a { color: inherit; font-weight: 700; }
+  .ig-rem-list { margin: 0 0 6px; padding-left: 18px; font-size: 13.5px; line-height: 1.5; }
+  .ig-rem-list li { margin-bottom: 6px; }
+  .ig-rem-list li.expired, .ig-rem-list li.missing { color: var(--danger); }
+  .ig-rem-actions { display: flex; flex-wrap: wrap; gap: 8px; justify-content: flex-end; padding: 14px 22px; border-top: 1px solid var(--border); }
+  .ig-rem-actions form { margin: 0; }
+  .ig-bell-count { position: absolute; top: -5px; right: -5px; min-width: 17px; height: 17px; padding: 0 4px; border-radius: 999px; background: var(--danger); color: #fff; font-size: 10px; font-weight: 700; display: flex; align-items: center; justify-content: center; }
+</style>
+<div class="ig-rem-banner<%= urgent ? ' urgent' : '' %>" role="alert">
+  <span class="grow"><b>Instagram access token reminder:</b>
+    <%= urgent ? 'follower counts have stopped updating for ' + igAlerts.filter(function (x) { return x.kind === 'expired' || x.kind === 'missing'; }).length + ' page(s).' : soonest ? 'a token expires in ' + soonest.daysLeft + ' day' + (soonest.daysLeft === 1 ? '' : 's') + '.' : 'the last follower update failed.' %>
+  </span>
+  <a href="/social-media/settings#instagram">Open Instagram connection →</a>
+</div>
+<% if (igPopup) { %>
+<div class="modal-backdrop open" id="igReminderModal" role="dialog" aria-modal="true" aria-labelledby="igRemTitle">
+  <div class="modal-box" style="max-width:560px">
+    <div class="modal-head"><h3 id="igRemTitle"><%= urgent ? 'Instagram connection needs attention' : 'Instagram access token reminder' %></h3>
+      <form method="POST" action="/social-media/instagram/dismiss-reminder" style="margin:0"><input type="hidden" name="_csrf" value="<%= igCsrf %>"><input type="hidden" name="returnTo" value="<%= here %>"><button class="modal-close" type="submit" aria-label="Remind me tomorrow">&times;</button></form>
+    </div>
+    <div class="modal-body">
+      <ul class="ig-rem-list">
+        <% igAlerts.forEach(function (x) { %><li class="<%= x.kind %>"><%= x.text %></li><% }) %>
+      </ul>
+      <p class="helper-text">The PMS renews tokens automatically about 10 days before they expire. This reminder appears when that hasn't happened yet. An expired token can't be renewed — create a new one in the Meta app (Instagram API → API setup with Instagram login → Generate token) and paste it in Instagram connection.</p>
+    </div>
+    <div class="ig-rem-actions">
+      <form method="POST" action="/social-media/instagram/dismiss-reminder"><input type="hidden" name="_csrf" value="<%= igCsrf %>"><input type="hidden" name="returnTo" value="<%= here %>"><button class="btn outline" type="submit">Remind me tomorrow</button></form>
+      <a class="btn outline" href="/social-media/settings#instagram" style="text-decoration:none">Open Instagram connection</a>
+      <% if (igAlerts.some(function (x) { return x.kind === 'expiring'; })) { %>
+        <form method="POST" action="/social-media/instagram/renew"><input type="hidden" name="_csrf" value="<%= igCsrf %>"><button class="btn" type="submit">Renew tokens now</button></form>
+      <% } %>
+    </div>
+  </div>
+</div>
+<% } %>
+<% } %>

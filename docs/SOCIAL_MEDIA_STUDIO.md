@@ -36,6 +36,22 @@ Content Planning → Shoot Scheduled (claimed) → Shoot Completed → (raw foot
 - Follower numbers are generated mock data, always labelled **DEMO DATA — INSTAGRAM NOT CONNECTED**.
 - The JSON file is not transactional. Within one server process, each request loads, validates, changes and saves the data synchronously, so double claims are refused. Don't run several server processes against the same file.
 
+## Real Instagram follower counts
+
+The counts come from the official Instagram API with Instagram Login (`graph.instagram.com`, v26.0). The Meta app is "Social Media" → Instagram API → *API setup with Instagram login*, and needs the permissions `instagram_business_basic` and `instagram_business_manage_insights`. The four accounts are Instagram Testers on that app.
+
+1. In Meta, click **Generate token** next to each account.
+2. In the PMS, go to **Social Media Studio → Settings & Targets → Instagram connection**. Paste each token next to its page and click **Connect** (admin only).
+3. The PMS checks that the token belongs to that page's handle, saves today's count, and tries to estimate the previous ~30 days from Instagram's daily follower change.
+
+How it works:
+- **Tokens** are stored in `instagram-tokens.json`, which is git-ignored and not part of `db.json`. They are never shown again and are refreshed automatically before their 60-day expiry.
+- **Updates:** while the server runs, connected pages update about once a day. *Fetch follower counts now* forces an update.
+- **Storage:** daily snapshots are saved in `db.socialStudio.instagram`.
+- **Unconnected pages** keep showing generated numbers, and every screen says which pages are live and which are demo.
+- **Reminders:** admins get a popup on any PMS page when a connected page's token is within 10 days of expiry, has expired, is missing, or its last update failed. "Remind me tomorrow" hides the popup for the day. A banner and a red count on the bell stay until the problem is fixed, and *Renew tokens now* asks Instagram for fresh 60-day tokens.
+- **Turning sync off:** set `PMS_IG_SYNC=off` to stop background syncing. The tests do this.
+
 ## Tests
 
 ```

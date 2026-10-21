@@ -52,7 +52,7 @@
   </div>
 </div>
 <% if (sm.flash) { %><div class="sm-flash <%= sm.flash.type %>" role="status"><%= sm.flash.text %></div><% } %>
-<div class="sm-banner">Follower counts and post metrics are <b>DEMO DATA — INSTAGRAM NOT CONNECTED</b>. Reels, tasks, ownership, history and rankings are live PMS data.</div>
+<% var fl = V.followerLabel(sm.src); %><div class="sm-banner<%= fl.startsWith('LIVE') ? ' live' : '' %>">Follower counts: <b><%= fl %></b>. Reels, tasks, ownership, history and rankings are live PMS data.</div>
 <% if (a.isManager && sm.unlinkedCount > 0) { %>
   <div class="sm-flash info"><%= sm.unlinkedCount %> of 6 Studio members aren't linked to a PMS account yet, so they can't use the Studio. <a href="/social-media/settings#members">Link members in Settings</a>.</div>
 <% } %>
