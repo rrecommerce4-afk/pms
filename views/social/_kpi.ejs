@@ -1,0 +1,6 @@
+<% var tag = typeof href !== 'undefined' && href ? 'a' : 'div'; %>
+<<%= tag %> class="sum-card sm-kpi tone-<%= typeof tone !== 'undefined' ? tone : 'slate' %>"<% if (tag === 'a') { %> href="<%= href %>"<% } %>>
+  <div class="sum-card-top"><span class="sum-label"><%= label %></span></div>
+  <div class="sum-value"><%= value %></div>
+  <% if (typeof hint !== 'undefined' && hint) { %><div class="sum-sub"><%= hint %></div><% } %>
+</<%= tag %>>

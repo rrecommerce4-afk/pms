@@ -1,0 +1,72 @@
+<%- include('../partials/header') %>
+<%
+  var people = sm.people;
+  var base = { state: f.state, type: f.type, page: f.page, emp: f.emp, priority: f.priority, q: f.q, sort: f.sort, dir: f.dir === -1 ? 'desc' : 'asc', pg: pg };
+  var qs = function (over) {
+    var o = Object.assign({}, base, over);
+    var p = new URLSearchParams();
+    Object.keys(o).forEach(function (k) { if (o[k] !== '' && o[k] !== 'all' && o[k] !== undefined && !(k === 'pg' && o[k] === 1) && !(k === 'sort' && o[k] === 'deadline') && !(k === 'dir' && o[k] === 'asc')) p.set(k, o[k]); });
+    return '?' + p.toString();
+  };
+  var sortLink = function (key, label) {
+    var on = f.sort === key;
+    return '<a href="' + qs({ sort: key, dir: on && f.dir === 1 ? 'desc' : 'asc', pg: 1 }) + '">' + label + (on ? (f.dir === 1 ? ' ↑' : ' ↓') : ' ↕') + '</a>';
+  };
+  var states = [['all', 'All'], ['available', 'Available to claim'], ['claimed', 'Claimed (open)'], ['overdue-owned', 'Overdue (owned)'], ['overdue-unclaimed', 'Overdue (unclaimed)'], ['done', 'Completed']];
+  var timing = function (t) { if (!t.done) return ''; if (t.excused) return V.badge('excused', 'slate'); if (t.onTime === undefined) return V.badge('no deadline', 'slate'); return t.onTime ? V.badge('on time', 'green') : V.badge('late', 'amber'); };
+%>
+<div class="container container-wide sm">
+  <%- include('_bar') %>
+  <div class="page-head">
+    <div>
+      <div class="eyebrow-date">SOCIAL MEDIA STUDIO</div>
+      <h1>Task Management</h1>
+      <p>Every shoot, editing and publishing task across the four pages. Unclaimed work belongs to nobody until an employee takes it — it is never counted against anyone. These Studio tasks are separate from the general PMS task list.</p>
+    </div>
+  </div>
+  <div class="list-card sm-section">
+    <div class="sm-pad" style="padding-top:16px;padding-bottom:0"><div class="tabs sm-tabs"><% states.forEach(function (s) { %><a class="tab-btn <%= f.state === s[0] ? 'active' : '' %>" href="<%= qs({ state: s[0], pg: 1 }) %>"><%= s[1] %> <span class="tag-count"><%= counts[s[0]] %></span></a><% }) %></div></div>
+    <% if (f.state === 'overdue-unclaimed') { %><p class="sm-note" style="margin:0 24px 6px">These tasks are past their deadline but nobody claimed them, so they are not attributed to any employee. Missed publishing deadlines appear here because publishing is only owned once someone confirms the upload.</p><% } %>
+    <form class="sm-filters" method="GET" action="/social-media/tasks">
+      <input type="hidden" name="state" value="<%= f.state %>"><input type="hidden" name="sort" value="<%= f.sort %>"><input type="hidden" name="dir" value="<%= f.dir === -1 ? 'desc' : 'asc' %>">
+      <input type="search" name="q" value="<%= f.q %>" placeholder="Search task or owner…" aria-label="Search tasks">
+      <select class="filter-select" name="type" data-autosubmit aria-label="Task type"><option value="all">All types</option><% W.TASK_TYPES.forEach(function (t) { %><option <%= f.type === t ? 'selected' : '' %>><%= t %></option><% }) %></select>
+      <select class="filter-select" name="page" data-autosubmit aria-label="Page"><option value="all">All pages</option><% C.PAGES.forEach(function (p) { %><option value="<%= p.id %>" <%= f.page === p.id ? 'selected' : '' %>><%= p.shortName %></option><% }) %></select>
+      <select class="filter-select" name="emp" data-autosubmit aria-label="Owner"><option value="all"><%= f.type === 'Editing' ? 'All editors' : 'All owners' %></option><option value="unclaimed" <%= f.emp === 'unclaimed' ? 'selected' : '' %>>Unclaimed</option><% members.forEach(function (m) { %><option value="<%= m.userId %>" <%= f.emp === m.userId ? 'selected' : '' %>><%= m.name %></option><% }) %></select>
+      <select class="filter-select" name="priority" data-autosubmit aria-label="Priority"><option value="all">All priorities</option><% C.PRIORITIES.forEach(function (p) { %><option <%= f.priority === p ? 'selected' : '' %>><%= p %></option><% }) %></select>
+      <button class="btn small outline" type="submit">Search</button>
+    </form>
+    <% if (!rows.length) { %>
+      <div class="empty-state"><div class="empty-state-title">No tasks match these filters</div><div class="empty-state-sub">Try clearing the search or widening your filters.</div></div>
+    <% } else { %>
+      <div class="sm-scroll"><table class="sm-table min-1100">
+        <thead><tr><th><%- sortLink('title', 'Task') %></th><th>Type</th><th><%- sortLink('assignee', 'Owner') %></th><th><%- sortLink('deadline', 'Deadline') %></th><th><%- sortLink('status', 'Status') %></th><th><%- sortLink('priority', 'Priority') %></th><th>Claimed</th><th>Completed</th><th style="text-align:right">Action</th></tr></thead>
+        <tbody>
+          <% rows.forEach(function (r) { var t = r.t; %>
+            <tr class="<%= t.overdue && t.assignee ? 'overdue' : t.overdue ? 'warnrow' : '' %>">
+              <td style="max-width:260px"><a class="reel-link <%= t.overdue && t.assignee ? 'red-txt' : '' %>" href="/social-media/reels/<%= t.contentId %>"><%= t.title %></a><div class="sub"><%- V.pageBadge(t.pageId) %></div></td>
+              <td><%- V.typeBadge(t.type) %></td>
+              <td><%- people.ownerChip(t.assignee, t.type === 'Publishing' && !t.done ? 'Not yet published' : 'Unclaimed') %></td>
+              <td class="nowrap <%= t.overdue ? 'red-txt' : '' %>"><%= t.deadline ? V.fmtDateTime(t.deadline) : 'not set' %></td>
+              <td><%- V.statusBadge(t.overdue && !t.assignee ? 'Overdue' : t.status) %><% if (t.overdue && !t.assignee) { %><div class="muted warn-txt" style="font-size:10.5px">unclaimed — not attributed</div><% } %></td>
+              <td><%- V.priorityBadge(t.priority) %></td>
+              <td class="nowrap muted"><%= t.claimedAt ? V.fmtDateTime(t.claimedAt) : '—' %></td>
+              <td class="nowrap muted"><% if (t.done && t.completedAt) { %><%= V.fmtDate(t.completedAt, 'short') %> <%- timing(t) %><% } else { %>—<% } %></td>
+              <td><div style="display:flex;justify-content:flex-end"><% if (r.item) { %><%- include('_actions', { item: r.item, stage: t.type }) %><% } %></div></td>
+            </tr>
+          <% }) %>
+        </tbody>
+      </table></div>
+    <% } %>
+    <div class="sm-pager">
+      <span>Showing <%= total ? (pg - 1) * 15 + 1 : 0 %>–<%= Math.min(pg * 15, total) %> of <%= total %> tasks</span>
+      <span class="sm-head-actions">
+        <% if (pg > 1) { %><a class="btn small outline" href="<%= qs({ pg: pg - 1 }) %>">‹ Previous</a><% } %>
+        <span>Page <%= pg %> of <%= pageCount %></span>
+        <% if (pg < pageCount) { %><a class="btn small outline" href="<%= qs({ pg: pg + 1 }) %>">Next ›</a><% } %>
+      </span>
+    </div>
+  </div>
+</div>
+<%- include('_modals') %>
+<%- include('../partials/footer') %>

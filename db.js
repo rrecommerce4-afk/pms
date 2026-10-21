@@ -3,9 +3,11 @@ const path = require('path');
 const bcrypt = require('bcryptjs');
 const { addDays } = require('./utils');
 const { catchUpDailyTasks } = require('./lib/tasks');
+const { emptyStudio, migrateStudio } = require('./lib/studio/store');
 
-const DB_FILE = path.join(__dirname, 'db.json');
-const SCHEMA_VERSION = 3;
+// PMS_DB_FILE lets the automated tests run against a throwaway copy; normal runs use db.json.
+const DB_FILE = process.env.PMS_DB_FILE ? path.resolve(process.env.PMS_DB_FILE) : path.join(__dirname, 'db.json');
+const SCHEMA_VERSION = 4;
 const BADGE_COLORS = ['var(--info)', 'var(--purple)', 'var(--success)', 'var(--warning)', 'var(--primary)', 'var(--danger)'];
 
 function emptyDb() {
@@ -16,7 +18,8 @@ function emptyDb() {
     departments: [],
     activity: [],
     todos: [],
-    nextId: { users: 1, tasks: 1, todos: 1 }
+    nextId: { users: 1, tasks: 1, todos: 1 },
+    socialStudio: emptyStudio()
   };
 }
 
@@ -47,10 +50,21 @@ function todayStr() {
 
 // Upgrades tasks created under the old daily-checklist model (no `status` field)
 // into the new workflow-task shape, and drops the retired taskLogs table.
-// Runs once, guarded by schemaVersion, so it's safe to call on every load().
+// Each step runs once, guarded by schemaVersion, so it's safe to call on every load().
 function migrate(db) {
   if (db.schemaVersion >= SCHEMA_VERSION) return false;
 
+  if (db.schemaVersion < 3) migrateToV3(db);
+
+  // v4: Social Media Studio data under db.socialStudio (separate from general tasks). Only
+  // added when missing; existing users, tasks and everything else are left untouched.
+  if (db.schemaVersion < 4) migrateStudio(db);
+
+  db.schemaVersion = SCHEMA_VERSION;
+  return true;
+}
+
+function migrateToV3(db) {
   const today = todayStr();
   const defaultDue = addDays(today, 7);
 
@@ -107,9 +121,6 @@ function migrate(db) {
     if (!u.color) u.color = BADGE_COLORS[colorIdx % BADGE_COLORS.length];
     colorIdx++;
   });
-
-  db.schemaVersion = SCHEMA_VERSION;
-  return true;
 }
 
 function load() {

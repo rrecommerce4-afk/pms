@@ -1,0 +1,172 @@
+<%- include('../partials/header') %>
+<%
+  var a = sm.actor, st = sm.settings, people = sm.people, can = a.isManager;
+  var wTotal = Object.keys(st.weights).reduce(function (s, k) { return s + st.weights[k]; }, 0);
+  var sections = [['members', 'Studio members'], ['targets', 'Monthly targets'], ['teams', 'Page teams'], ['editors', 'Editing team'], ['deadlines', 'Default deadlines'], ['priorities', 'Priorities'], ['weights', 'Scoring weights'], ['ranking', 'Ranking rules'], ['notifications', 'Notifications'], ['display', 'Display'], ['followers', 'Demo followers']];
+  var hidden = function () { return '<input type="hidden" name="_csrf" value="' + V.esc(sm.csrf) + '">'; };
+%>
+<div class="container container-wide sm">
+  <%- include('_bar') %>
+  <div class="page-head">
+    <div>
+      <div class="eyebrow-date">SOCIAL MEDIA STUDIO</div>
+      <h1>Settings &amp; Targets</h1>
+      <p><%= can ? 'Saved on the server and applied across every Studio screen. Only admins can change these settings.' : 'Read-only view of the Studio configuration. Only an admin can change these settings.' %></p>
+    </div>
+  </div>
+
+  <div class="sm-settings-layout">
+    <nav class="sm-settings-nav" aria-label="Settings sections"><% sections.forEach(function (s) { %><a href="#<%= s[0] %>"><%= s[1] %></a><% }) %></nav>
+    <div>
+      <div class="list-card sm-section" id="members">
+        <div class="list-card-head section-card-head"><div><h2>Studio members</h2><p class="sm-muted">Each Studio slot is linked to an <b>existing</b> PMS account. Linking never creates, edits or reactivates a user, and never changes passwords, emails, roles or departments. Studio permissions are fixed per slot.</p></div></div>
+        <div class="sm-pad">
+          <% if (linkReport) { %>
+            <div class="sm-note"><b>Auto-link report</b><ul class="sm-rules"><% linkReport.forEach(function (x) { %><li><b><%= x.name %></b>: <%= x.status === 'unresolved' ? 'not linked — ' + x.reason : x.status === 'auto-linked' ? 'linked to user #' + x.userId : 'already linked (#' + x.userId + ')' %></li><% }) %></ul></div>
+          <% } %>
+          <form method="POST" action="/social-media/settings/members">
+            <%- hidden() %>
+            <fieldset <%= can ? '' : 'disabled' %>>
+              <% members.forEach(function (m) { %>
+                <div class="sm-member-row">
+                  <div class="who">
+                    <b><%= m.name %></b>
+                    <div class="sm-tags" style="margin-top:4px"><%- m.canEdit ? V.badge('Can edit videos', 'brand') : '' %><%- m.ranked ? V.badge('Ranked', 'green') : '' %><%- m.canWork ? V.badge('Claims & completes work', 'sky') : V.badge('View preparation info only', 'slate') %></div>
+                    <small class="sm-muted">Pages: <%= C.PAGE_IDS.filter(function (p) { return P.teamFor(st, p).includes(m.key); }).map(function (p) { return C.getPage(p).shortName; }).join(', ') || 'none' %></small>
+                  </div>
+                  <% if (can) { %>
+                    <select class="filter-select" name="member_<%= m.key %>" aria-label="PMS account for <%= m.name %>">
+                      <option value="">— Not linked —</option>
+                      <% candidates.forEach(function (u) { %><option value="<%= u.id %>" <%= m.userId === u.id ? 'selected' : '' %> <%= u.takenBy && u.takenBy !== m.key ? 'disabled' : '' %>>#<%= u.id %> <%= u.name %> (<%= u.email %>, <%= u.role %>)<%= u.takenBy && u.takenBy !== m.key ? ' — linked to ' + C.getRosterEntry(u.takenBy).name : '' %></option><% }) %>
+                    </select>
+                  <% } else { %>
+                    <span><%- m.user ? people.ownerChip(m.userId) : V.badge('Not linked', 'slate') %></span>
+                  <% } %>
+                  <% if (m.userId && !m.user) { %><span class="warn-txt">Linked user #<%= m.userId %> no longer exists</span><% } else if (m.user && !m.user.active) { %><span class="warn-txt">Linked account is inactive</span><% } %>
+                </div>
+              <% }) %>
+              <div class="sm-form-actions" style="margin-top:12px"><button class="btn" type="submit">Save member links</button></div>
+            </fieldset>
+          </form>
+          <% if (can) { %>
+            <form method="POST" action="/social-media/settings/autolink" style="margin-top:8px">
+              <%- hidden() %>
+              <button class="btn small outline" type="submit">Auto-link unlinked slots by name</button>
+              <span class="sm-muted">Links a slot only when exactly one active employee/admin has that name (full or first name). Ambiguous or missing names are reported, never guessed. Missing people must be added first in <a class="view-all" href="/admin/settings">PMS Settings → Employees</a>.</span>
+            </form>
+          <% } %>
+        </div>
+      </div>
+
+      <fieldset <%= can ? '' : 'disabled' %>>
+      <div class="list-card sm-section" id="targets">
+        <div class="list-card-head section-card-head"><div><h2>Monthly reel targets</h2><p class="sm-muted">Target number of reels published per page each month. Drives progress bars on Overview and Instagram Pages.</p></div></div>
+        <form class="sm-pad" method="POST" action="/social-media/settings/targets"><%- hidden() %>
+          <div class="sm-cards-2" style="margin-bottom:12px">
+            <% C.PAGES.forEach(function (p) { %><label class="sm-target-row" style="--pc:<%= p.color %>;--pcs:<%= p.soft %>"><span class="sm-page-av"><%= V.initials(p.shortName) %></span><span class="grow"><b><%= p.name %></b><small><%= progress[p.id].published %> published this month</small></span><input class="sm-num" type="number" min="0" max="200" name="target_<%= p.id %>" value="<%= st.targets[p.id] %>" aria-label="<%= p.name %> monthly target"></label><% }) %>
+          </div>
+          <div class="sm-form-actions"><button class="btn" type="submit">Save targets</button></div>
+        </form>
+      </div>
+
+      <div class="list-card sm-section" id="teams">
+        <div class="list-card-head section-card-head"><div><h2>Page team assignments</h2><p class="sm-muted">The page team can see the page's reels, claim its shoots and confirm its uploads. Page membership does not grant editing permission — editing eligibility is fixed separately below.</p></div></div>
+        <form method="POST" action="/social-media/settings/teams"><%- hidden() %>
+          <div class="sm-scroll"><table class="sm-table sm-settings-table min-640">
+            <thead><tr><th>Page</th><% C.ROSTER.forEach(function (r) { %><th><%= people.keyName(r.key) %></th><% }) %></tr></thead>
+            <tbody><% C.PAGES.forEach(function (p) { %><tr><td><b><%= p.shortName %></b></td><% C.ROSTER.forEach(function (r) { %><td><input type="checkbox" name="team_<%= p.id %>" value="<%= r.key %>" <%= P.teamFor(st, p.id).includes(r.key) ? 'checked' : '' %> aria-label="<%= r.name %> on <%= p.name %>"></td><% }) %></tr><% }) %></tbody>
+          </table></div>
+          <div class="sm-pad" style="padding-top:12px">
+            <div class="sm-cards-2" style="margin-bottom:12px"><% C.PAGES.forEach(function (p) { var eds = P.teamFor(st, p.id).filter(function (k) { return C.EDITOR_KEYS.includes(k); }); %><p class="sm-note" style="margin:0"><b><%= p.shortName %></b> can claim editing: <%= eds.length ? eds.map(function (k) { return people.keyName(k); }).join(', ') : 'no editor on team — all four editors offered' %></p><% }) %></div>
+            <div class="sm-form-actions"><button class="btn" type="submit">Save page teams</button></div>
+          </div>
+        </form>
+        <% if (can) { %><form class="sm-pad" method="POST" action="/social-media/settings/restore-teams" data-confirm="Restore the default page teams (Product: Bansi & Krutik · Farma Pattern: Bansi & Vishnu · Stencil: Dhara & Bhavin · Butterpaper: Ashmita & Bhavin)?"><%- hidden() %><button class="btn small outline" type="submit">Restore default teams</button> <span class="sm-muted">Product: Bansi &amp; Krutik · Farma Pattern: Bansi &amp; Vishnu · Stencil: Dhara &amp; Bhavin · Butterpaper: Ashmita &amp; Bhavin</span></form><% } %>
+      </div>
+
+      <div class="list-card sm-section" id="editors">
+        <div class="list-card-head section-card-head"><div><h2>Eligible editing team</h2><p class="sm-muted">Only these four can claim (or be assigned) editing tasks. The list is fixed in the server code and cannot be changed from any form.</p></div></div>
+        <div class="sm-pad sm-editor-cards">
+          <% C.ROSTER.filter(function (r) { return r.canEdit; }).forEach(function (r) { %><div class="sm-target-row"><%- people.keyChip(r.key, C.PAGE_IDS.filter(function (p) { return P.teamFor(st, p).includes(r.key); }).map(function (p) { return C.getPage(p).shortName; }).join(' · ') || 'No page team') %></div><% }) %>
+        </div>
+      </div>
+
+      <div class="list-card sm-section" id="deadlines">
+        <div class="list-card-head section-card-head"><div><h2>Default task deadlines</h2><p class="sm-muted">Reels can be created without an editing deadline or publishing date. These defaults fill the gaps.</p></div></div>
+        <form class="sm-pad" method="POST" action="/social-media/settings/deadlines"><%- hidden() %>
+          <div class="sm-two">
+            <div class="field"><label>Default editing deadline (days after raw footage arrives)</label><input type="number" min="0" max="30" name="editDaysAfterShoot" value="<%= st.deadlines.editDaysAfterShoot %>"></div>
+            <div class="field"><label>Suggested publishing date (days after the editing deadline)</label><input type="number" min="0" max="30" name="publishDaysAfterEdit" value="<%= st.deadlines.publishDaysAfterEdit %>"></div>
+          </div>
+          <div class="sm-form-actions"><button class="btn" type="submit">Save deadlines</button></div>
+        </form>
+      </div>
+
+      <div class="list-card sm-section" id="priorities">
+        <div class="list-card-head section-card-head"><div><h2>Priority definitions</h2></div></div>
+        <form class="sm-pad" method="POST" action="/social-media/settings/priorities"><%- hidden() %>
+          <% st.priorities.forEach(function (p, i) { %><div class="sm-target-row" style="margin-bottom:8px"><%- V.priorityBadge(p.priority) %><input class="grow" style="border:1px solid var(--border);border-radius:6px;padding:7px 9px;font:inherit;min-width:0" name="desc_<%= i %>" maxlength="300" value="<%= p.description %>" aria-label="<%= p.priority %> description"><input class="sm-num" type="number" min="1" max="720" name="sla_<%= i %>" value="<%= p.slaHours %>" aria-label="<%= p.priority %> SLA hours"><small class="sm-muted">h SLA</small></div><% }) %>
+          <div class="sm-form-actions"><button class="btn" type="submit">Save priorities</button></div>
+        </form>
+      </div>
+
+      <div class="list-card sm-section" id="weights">
+        <div class="list-card-head section-card-head"><div><h2>Performance scoring weights</h2><p class="sm-muted">Configurable 100-point model (default 35 / 25 / 25 / 15). Categories an employee had no due work in are excluded and the remaining weights re-normalised.</p></div></div>
+        <form class="sm-pad" method="POST" action="/social-media/settings/weights"><%- hidden() %>
+          <% Object.keys(S.COMPONENT_LABELS).forEach(function (k) { %><div class="sm-target-row" style="margin-bottom:8px"><span class="grow"><b><%= S.COMPONENT_LABELS[k] %></b></span><input class="sm-num" type="number" min="0" max="100" name="w_<%= k %>" value="<%= st.weights[k] %>" aria-label="<%= S.COMPONENT_LABELS[k] %>"></div><% }) %>
+          <p class="sm-muted">Total <%- V.badge(wTotal + ' / 100', wTotal === 100 ? 'green' : 'amber') %><%= wTotal !== 100 ? ' — weights should add up to 100' : '' %></p>
+          <div class="sm-form-actions"><button class="btn outline" type="submit" name="reset" value="1">Reset to 35 / 25 / 25 / 15</button><button class="btn" type="submit">Save weights</button></div>
+        </form>
+      </div>
+
+      <div class="list-card sm-section" id="ranking">
+        <div class="list-card-head section-card-head"><div><h2>Ranking rules</h2><p class="sm-muted">Minimum-data thresholds, applied identically to every ranked employee.</p></div></div>
+        <form class="sm-pad" method="POST" action="/social-media/settings/ranking"><%- hidden() %>
+          <div class="sm-two">
+            <div class="field"><label>“Insufficient data” below (scored tasks in the period)</label><input type="number" min="0" max="50" name="minDueTasks" value="<%= st.ranking.minDueTasks %>"></div>
+            <div class="field"><label>“Provisional” below (scored tasks)</label><input type="number" min="0" max="100" name="provisionalBelow" value="<%= st.ranking.provisionalBelow %>"><div class="helper-text">Raised to the minimum automatically if set lower.</div></div>
+          </div>
+          <div class="sm-form-actions"><button class="btn" type="submit">Save ranking rules</button></div>
+          <div class="sm-two" style="margin-top:12px">
+            <div class="sm-note"><b>Fairness rules (fixed)</b><ul class="sm-rules"><% S.SCORING_PRINCIPLES.forEach(function (x) { %><li><%= x %></li><% }) %></ul></div>
+            <div class="sm-note"><b>Deadline &amp; on-time rules (fixed)</b><ul class="sm-rules"><% W.DEADLINE_RULES.forEach(function (x) { %><li><%= x %></li><% }) %></ul></div>
+          </div>
+        </form>
+      </div>
+
+      <div class="list-card sm-section" id="notifications">
+        <div class="list-card-head section-card-head"><div><h2>Notification preferences</h2><p class="sm-muted">Controls what appears in the Studio notifications list. Notifications are shown inside the PMS only (no email is sent).</p></div></div>
+        <form class="sm-pad" method="POST" action="/social-media/settings/notifications"><%- hidden() %>
+          <% [['overdue', 'Overdue tasks', 'Shoots, edits or posts past their deadline'], ['editing', 'Editing completed', 'A reel’s editing is marked completed and it moves to Ready to Publish'], ['publishing', 'Publishing reminders', 'Ready or scheduled reels planned within 24 hours']].forEach(function (n) { %>
+            <label class="sm-check" style="display:flex"><input type="checkbox" name="n_<%= n[0] %>" <%= st.notifications[n[0]] ? 'checked' : '' %>> <span><b><%= n[1] %></b> <span class="sm-muted">— <%= n[2] %></span></span></label>
+          <% }) %>
+          <div class="sm-form-actions"><button class="btn" type="submit">Save notifications</button></div>
+        </form>
+      </div>
+
+      <div class="list-card sm-section" id="display">
+        <div class="list-card-head section-card-head"><div><h2>Display preferences</h2></div></div>
+        <form class="sm-pad" method="POST" action="/social-media/settings/display"><%- hidden() %>
+          <div class="sm-two">
+            <div class="field"><label>Week starts on</label><select name="weekStartsOn"><option value="1" <%= st.display.weekStartsOn === 1 ? 'selected' : '' %>>Monday</option><option value="0" <%= st.display.weekStartsOn === 0 ? 'selected' : '' %>>Sunday</option></select></div>
+            <div class="field"><label>Default calendar view</label><select name="defaultCalendarView"><% ['month', 'week', 'day'].forEach(function (v) { %><option value="<%= v %>" <%= st.display.defaultCalendarView === v ? 'selected' : '' %>><%= v.charAt(0).toUpperCase() + v.slice(1) %></option><% }) %></select></div>
+          </div>
+          <div class="sm-form-actions"><button class="btn" type="submit">Save display</button></div>
+        </form>
+      </div>
+
+      <div class="list-card sm-section" id="followers">
+        <div class="list-card-head section-card-head"><div><h2>Demo follower scenario</h2><p class="sm-muted">Switch the mock follower time-series to preview different growth scenarios. Instagram is not connected.</p></div><%- V.demoBadge() %></div>
+        <form class="sm-pad" method="POST" action="/social-media/settings/followers"><%- hidden() %>
+          <div class="sm-inline-inputs">
+            <select class="filter-select" name="followerScenario" aria-label="Scenario"><% [['conservative', 'Conservative growth'], ['baseline', 'Baseline growth'], ['optimistic', 'Optimistic growth']].forEach(function (o) { %><option value="<%= o[0] %>" <%= st.followerScenario === o[0] ? 'selected' : '' %>><%= o[1] %></option><% }) %></select>
+            <button class="btn" type="submit">Save scenario</button>
+          </div>
+        </form>
+      </div>
+      </fieldset>
+    </div>
+  </div>
+</div>
+<%- include('_modals') %>
+<%- include('../partials/footer') %>

@@ -1,0 +1,131 @@
+<%- include('../partials/header') %>
+<%
+  var a = sm.actor, st = sm.settings, people = sm.people, i = item;
+  var page = C.getPage(i.pageId);
+  var overdue = W.isItemOverdue(i, sm.now, st);
+  var stageField = { shootAt: 'Shoot date', editDeadline: 'Editing deadline', publishAt: 'Planned publishing' };
+  var completionLine = function (c) {
+    if (!c) return '';
+    var t = c.excused ? 'blocker recorded (excluded from timeliness)' : c.onTime === undefined ? 'no deadline' : c.onTime ? '<b class="green-txt">on time</b>' : '<b class="red-txt">late</b>';
+    return 'Completed ' + V.esc(V.fmtDateTime(c.at)) + ' by ' + V.esc(c.byName || people.nameOf(c.by)) + ' · ' + t + (c.deadline ? ' <span class="sm-muted">(deadline ' + V.esc(V.fmtDateTime(c.deadline)) + ')</span>' : '');
+  };
+  var blockerLine = function (b) { if (!b) return ''; return '⚠ ' + V.esc(b.reason) + ' — ' + V.esc(b.byName || '') + ', ' + V.esc(V.fmtDateTime(b.at)) + (b.resolvedAt ? ' (resolved ' + V.esc(V.fmtDateTime(b.resolvedAt)) + ')' : ' <b>(active)</b>'); };
+  var hiddenFields = '<input type="hidden" name="_csrf" value="' + V.esc(sm.csrf) + '"><input type="hidden" name="returnTo" value="' + V.esc(sm.currentUrl) + '">';
+%>
+<% function stageCard(stage) {
+  var owner = stage === 'Shoot' ? i.shootOwner : stage === 'Editing' ? i.editor : i.publishingOwner;
+  var target = stage === 'Shoot' ? i.shoot : stage === 'Editing' ? i.editing : i.publishing;
+  var status = stage === 'Shoot' ? (i.shoot.status === 'Unclaimed' ? 'Available' : i.shoot.status) : stage === 'Editing' ? (i.editing.status === 'Not Started' ? (W.footageReady(i) ? 'Available' : 'Waiting for footage') : i.editing.status) : W.getPublishStatus(i, sm.now);
+  var ed = W.editingDeadline(i, st);
+  var deadline = stage === 'Shoot' ? W.effectiveShootDeadline(i) : stage === 'Editing' ? (ed || i.editDeadline) : i.publishAt;
+  var canAssign = a.isManager && stage !== 'Publishing' && !(stage === 'Shoot' ? W.isShootDone(i) : W.isEditingDone(i));
+  var assignable = stage === 'Shoot' ? P.workingTeam(st, i.pageId) : P.editorsForPage(st, i.pageId);
+%>
+  <div class="sm-stage" id="stage-<%= stage %>">
+    <div class="sm-stage-head"><h3><%= stage %> <%- V.statusBadge(status) %><% if (stage !== 'Publishing' && W.activeBlocker(target.blocker)) { %><%- V.statusBadge('Blocked') %><% } %></h3><%- people.ownerChip(owner, stage === 'Publishing' ? 'Set when published' : 'Unclaimed') %></div>
+    <dl>
+      <dt><%= stage === 'Publishing' ? 'Planned' : 'Deadline' %></dt><dd><%= deadline ? V.fmtDateTime(deadline) : (stage === 'Editing' ? 'not set (default rule applies after footage)' : 'not set') %></dd>
+      <% if (target.claimedAt) { %><dt>Claimed</dt><dd><%= V.fmtDateTime(target.claimedAt) %></dd><% } %>
+      <% if (stage === 'Shoot') { %><dt>Script</dt><dd><%= i.shoot.scriptReady ? 'Ready' : 'Pending' %></dd><% } %>
+      <% if (stage === 'Shoot' && W.isShootDone(i)) { %><dt>Raw footage</dt><dd><%- i.shoot.rawSubmitted ? '<b class="green-txt">ready</b> · ' + V.esc(V.fmtDateTime(i.shoot.rawSubmittedAt)) : '<b class="warn-txt">pending</b> — editing cannot start yet' %></dd><% } %>
+      <% if (stage === 'Publishing' && i.publishing.scheduledAt && !W.isPublished(i)) { %><dt>Scheduled</dt><dd><%= V.fmtDateTime(i.publishing.scheduledAt) %> by <%= i.publishing.scheduledByName || people.nameOf(i.publishing.scheduledBy) %> — not yet published</dd><% } %>
+      <% if (stage === 'Publishing' && i.publishing.confirmedAt) { %><dt>Confirmed in PMS</dt><dd><%= V.fmtDateTime(i.publishing.confirmedAt) %></dd><% } %>
+      <% if (stage === 'Publishing' && i.publishing.postUrl) { %><dt>Post URL</dt><dd><a href="<%= i.publishing.postUrl %>" target="_blank" rel="noopener noreferrer nofollow"><%= i.publishing.postUrl %></a> <%- V.badge('entered manually · not verified', 'amber') %></dd><% } %>
+      <% if (stage === 'Publishing' && i.publishing.status === 'Delayed' && i.publishing.delayReason) { %><dt>Delayed</dt><dd class="warn-txt"><%= i.publishing.delayReason %></dd><% } %>
+      <% if (target.completion) { %><dt>Completion</dt><dd><%- completionLine(target.completion) %></dd><% } %>
+      <% if (stage !== 'Publishing' && target.blocker) { %><dt>Blocker</dt><dd><%- blockerLine(target.blocker) %></dd><% } %>
+      <% (target.pastBlockers || []).forEach(function (b) { %><dt>Earlier blocker</dt><dd class="sm-muted"><%- blockerLine(b) %></dd><% }) %>
+      <% if (stage === 'Editing') { (i.editing.previousCompletions || []).forEach(function (pc) { %><dt>Superseded</dt><dd class="sm-muted"><%- completionLine(pc) %> — reopened <%= V.fmtDateTime(pc.supersededAt) %>: <%= pc.reason %></dd><% }); } %>
+      <% if (target.notes) { %><dt>Notes</dt><dd style="white-space:pre-wrap"><%= target.notes %></dd><% } %>
+    </dl>
+    <%- include('_actions', { item: i, stage: stage, extended: true }) %>
+    <% if (canAssign) { %>
+      <form class="sm-assign" id="assign-<%= stage %>" method="POST" action="/social-media/reels/<%= i.id %>/assign">
+        <%- hiddenFields %><input type="hidden" name="stage" value="<%= stage %>">
+        <div class="field"><label><%= owner ? 'Reassign' : 'Assign' %> <%= stage === 'Editing' ? 'video editor' : 'shoot owner' %></label>
+          <select name="memberKey"><option value="">— Unassigned (open to claim) —</option><% assignable.forEach(function (k) { var uid = P.userIdForKey(sm.studio, k); %><option value="<%= k %>" <%= uid && uid === owner ? 'selected' : '' %> <%= uid ? '' : 'disabled' %>><%= people.keyName(k) %><%= uid ? '' : ' (not linked)' %></option><% }) %></select>
+        </div>
+        <div class="field"><label>Reason (required, kept in history)</label><input type="text" name="reason" maxlength="500" required placeholder="e.g. Krutik on leave this week"></div>
+        <button class="btn small outline" type="submit">Save (recorded)</button>
+        <% if (stage === 'Editing') { %><small class="sm-muted" style="flex-basis:100%">Editing team only: Bansi, Bhavin, Vishnu, Krutik (eligible for this page).<% if (!W.footageReady(i)) { %> Assignment opens once raw footage is ready.<% } %></small><% } %>
+      </form>
+    <% } %>
+    <% if (P.canEditNotes(a, i, stage)) { %>
+      <form class="sm-notes-form" method="POST" action="/social-media/reels/<%= i.id %>/notes">
+        <%- hiddenFields %><input type="hidden" name="stage" value="<%= stage %>">
+        <div class="field"><label><%= stage %> notes</label><textarea name="notes" rows="2" maxlength="2000"><%= target.notes %></textarea></div>
+        <button class="btn small outline" type="submit">Save notes</button>
+      </form>
+    <% } %>
+    <% if (stage === 'Shoot' && P.canToggleScript(a, st, i)) { %>
+      <form method="POST" action="/social-media/reels/<%= i.id %>/toggle-script" class="sm-inline-form"><%- hiddenFields %><button class="btn small ghost" type="submit">Mark script <%= i.shoot.scriptReady ? 'not ready' : 'ready' %></button></form>
+    <% } %>
+  </div>
+<% } %>
+<div class="container container-wide sm">
+  <%- include('_bar') %>
+  <div class="page-head">
+    <div>
+      <div class="eyebrow-date">REEL #<%= i.id %> · <%= page.name.toUpperCase() %></div>
+      <h1><%= i.title %></h1>
+      <div class="sm-tags" style="margin-top:6px"><%- V.pageBadge(i.pageId, true) %><%- V.statusBadge(W.getStage(i)) %><%- V.priorityBadge(i.priority) %><% if (overdue) { %><%- V.badge('Overdue', 'red') %><% } %></div>
+    </div>
+    <% if (a.isManager) { %>
+      <div class="sm-head-actions">
+        <a class="btn outline" href="/social-media/reels/<%= i.id %>/edit">Edit reel</a>
+        <form method="POST" action="/social-media/reels/<%= i.id %>/delete" data-confirm="Delete this reel? It will be hidden everywhere and its completed work will no longer count in rankings. The record and history are kept in the database."><input type="hidden" name="_csrf" value="<%= sm.csrf %>"><button class="btn soft-danger" type="submit">Delete</button></form>
+      </div>
+    <% } %>
+  </div>
+
+  <div class="tabs sm-tabs">
+    <a class="tab-btn <%= tab === 'tasks' ? 'active' : '' %>" href="?tab=tasks">Tasks</a>
+    <a class="tab-btn <%= tab === 'details' ? 'active' : '' %>" href="?tab=details">Details &amp; preparation</a>
+    <a class="tab-btn <%= tab === 'activity' ? 'active' : '' %>" href="?tab=activity">Activity <span class="tag-count"><%= (i.activity || []).length %></span></a>
+  </div>
+
+  <% if (tab === 'tasks') { %>
+    <% if (a.readOnly) { %><p class="sm-note">You can see every task and its preparation details. Task actions are not available for your account.</p><% } %>
+    <div class="sm-cards-3"><% stageCard('Shoot'); stageCard('Editing'); stageCard('Publishing'); %></div>
+  <% } else if (tab === 'details') { %>
+    <div class="sm-split">
+      <div class="list-card sm-section"><div class="sm-pad" style="padding-top:20px">
+        <p class="sm-h4">Content idea / description</p><p class="sm-text-block"><%= i.idea || 'No description added.' %></p>
+        <p class="sm-h4">Preparation notes</p><p class="sm-text-block"><%= i.prepNotes || 'No preparation notes yet.' %></p>
+        <p class="sm-h4">Caption</p><p class="sm-text-block"><%= i.caption || 'No caption yet.' %></p>
+        <% if (i.shoot.notes) { %><p class="sm-h4">Shoot notes</p><p class="sm-text-block"><%= i.shoot.notes %></p><% } %>
+      </div></div>
+      <div>
+        <div class="list-card sm-section"><div class="sm-pad" style="padding-top:20px">
+          <p class="sm-h4">Plan</p>
+          <dl class="sm-kv">
+            <dt>Instagram page</dt><dd><%= page.name %> <span class="sm-muted"><%= page.handle %></span></dd>
+            <dt>Planned shoot</dt><dd><%= V.fmtDateTime(i.shootAt) %></dd>
+            <dt>Editing deadline</dt><dd><%= i.editDeadline ? V.fmtDateTime(i.editDeadline) : 'Not set (default rule)' %></dd>
+            <dt>Planned publishing</dt><dd><%= i.publishAt ? V.fmtDateTime(i.publishAt) : 'Not set' %></dd>
+            <dt>Script</dt><dd><%= i.shoot.scriptReady ? 'Ready' : 'Pending' %></dd>
+            <dt>Shoot owner</dt><dd><%- people.ownerChip(i.shootOwner, 'Not yet claimed') %></dd>
+            <dt>Page team</dt><dd><%= P.teamFor(st, i.pageId).map(function (k) { return people.keyName(k); }).join(', ') %></dd>
+            <dt>Created</dt><dd><%= V.fmtDateTime(i.createdAt) %> by <%= people.nameOf(i.createdBy) %></dd>
+          </dl>
+        </div></div>
+        <div class="list-card sm-section"><div class="sm-pad" style="padding-top:20px">
+          <p class="sm-h4">Deadline history</p>
+          <% if (!(i.deadlineChanges || []).length) { %><p class="sm-muted">No date changes. Original dates are shown above.</p><% } %>
+          <ul class="sm-rows"><% (i.deadlineChanges || []).forEach(function (c) { %><li class="sm-row" style="display:block"><b><%= stageField[c.field] %></b>: <%= c.from ? V.fmtDateTime(c.from) : 'not set' %> → <%= c.to ? V.fmtDateTime(c.to) : 'not set' %><div class="sm-muted"><%= V.fmtDateTime(c.at) %> · <%= c.byName || people.nameOf(c.by) %><%= c.reason ? ' · ' + c.reason : '' %></div></li><% }) %></ul>
+          <p class="sm-h4" style="margin-top:16px">Ownership history</p>
+          <% if (!(i.ownershipHistory || []).length) { %><p class="sm-muted">Nobody has claimed work on this reel yet.</p><% } %>
+          <ul class="sm-rows"><% (i.ownershipHistory || []).forEach(function (o) { %><li class="sm-row" style="display:block"><b><%= o.stage %></b>: <%= o.from ? people.nameOf(o.from) : 'unclaimed' %> → <%= o.to ? people.nameOf(o.to) : 'unclaimed' %><div class="sm-muted"><%= V.fmtDateTime(o.at) %> · by <%= o.byName || people.nameOf(o.by) %><%= o.reason ? ' · ' + o.reason : '' %></div></li><% }) %></ul>
+        </div></div>
+      </div>
+    </div>
+  <% } else { %>
+    <div class="list-card sm-section"><div class="sm-pad" style="padding-top:20px">
+      <% var evs = (i.activity || []).slice().sort(function (x, y) { return x.at.localeCompare(y.at); }); %>
+      <% if (!evs.length) { %><p class="sm-muted">No activity yet.</p><% } %>
+      <ol class="sm-activity"><% evs.forEach(function (ev) { %><li style="--pc:<%= page.color %>"><div class="ev"><span><%= ev.text %></span><small><%= V.fmtDateTime(ev.at) %> · <%= ev.byName || people.nameOf(ev.by) %><%= ev.stage ? ' · ' + ev.stage : '' %></small></div></li><% }) %></ol>
+    </div></div>
+  <% } %>
+</div>
+<%- include('_modals') %>
+<%- include('../partials/footer') %>

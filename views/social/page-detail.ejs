@@ -1,0 +1,138 @@
+<%- include('../partials/header') %>
+<%
+  var a = sm.actor, e = V.esc, people = sm.people;
+  var openCount = lists.shootsAvailable.length + lists.editingAvailable.length;
+  var tabs = [['tasks', 'Shared task list', openCount], ['overview', 'Overview', null], ['calendar', 'Content Calendar', monthItems.length], ['shoots', 'Upcoming Shoots', upcomingShoots.length], ['editing', 'Editing Progress', activeEdits.length], ['history', 'Publishing History', lists.published.length]];
+  var series = [{ key: page.id, label: page.shortName, color: C.PAGE_CHART[page.id] }];
+%>
+<div class="container container-wide sm">
+  <%- include('_bar') %>
+  <p style="margin:0 0 10px;"><a class="view-all" href="/social-media/pages">← All Instagram pages</a></p>
+  <div class="page-head" style="--pc:<%= page.color %>;--pcs:<%= page.soft %>;">
+    <div class="sm-account-head"><span class="sm-page-av lg"><%= V.initials(page.shortName) %></span><div><h1 style="margin:0"><%= page.name %></h1><p><%= page.handle %></p></div></div>
+    <div class="sm-head-actions">
+      <div class="sm-people"><% team.forEach(function (k) { var r = C.getRosterEntry(k); %><%- people.keyChip(k, r.canEdit ? 'Page team · Editor' : 'Page team') %><% }) %></div>
+      <% if (a.isManager) { %><a class="btn" href="/social-media/reels/new?page=<%= page.id %>&returnTo=<%= encodeURIComponent('/social-media/pages/' + page.id) %>">+ Create reel</a><% } %>
+    </div>
+  </div>
+
+  <div class="sm-kpis cols-6">
+    <%- include('_kpi', { label: 'Followers', value: V.fmtNum(s30.current), hint: 'DEMO DATA', tone: 'slate' }) %>
+    <%- include('_kpi', { label: 'Net growth (30d)', value: (s30.net >= 0 ? '+' : '') + V.fmtNum(s30.net), hint: V.fmtPct(s30.growthPct, 2) + ' · demo', tone: 'green' }) %>
+    <%- include('_kpi', { label: 'Monthly target', value: progress.target, hint: progress.planned + ' planned', href: '/social-media/settings#targets', tone: 'slate' }) %>
+    <%- include('_kpi', { label: 'Published', value: progress.published, hint: Math.round(progress.pct) + '% of target · ' + progress.remaining + ' left', tone: 'green' }) %>
+    <%- include('_kpi', { label: 'Open to claim', value: openCount, hint: lists.shootsAvailable.length + ' shoots · ' + lists.editingAvailable.length + ' edits', tone: 'sky' }) %>
+    <%- include('_kpi', { label: 'Ready to publish', value: progress.readyToPublish, hint: progress.scheduled + ' scheduled', href: '/social-media/publishing?page=' + page.id, tone: 'brand' }) %>
+  </div>
+
+  <div class="tabs sm-tabs">
+    <% tabs.forEach(function (t) { %><a class="tab-btn <%= tab === t[0] ? 'active' : '' %>" href="?tab=<%= t[0] %>"><%= t[1] %><% if (t[2] !== null) { %> <span class="tag-count"><%= t[2] %></span><% } %></a><% }) %>
+  </div>
+
+  <% function section(title, hint, items, stage, empty, metaFn) { %>
+    <div class="list-card sm-section">
+      <div class="list-card-head section-card-head"><div><h2><%= title %> <span class="tag-count"><%= items.length %></span></h2><p class="sm-muted"><%= hint %></p></div></div>
+      <div class="sm-pad">
+        <% if (!items.length) { %><p class="sm-muted"><%= empty %></p><% } %>
+        <ul class="sm-rows sm-scroll-y"><% items.forEach(function (i) { %><%- include('_row', { item: i, meta: metaFn(i), stage: stage }) %><% }) %></ul>
+      </div>
+    </div>
+  <% } %>
+
+  <% if (tab === 'tasks') { %>
+    <p class="sm-note">Everyone on the <%= page.shortName %> team sees the same list. Claim a shoot or edit to become its owner; whoever confirms the upload is recorded as the publishing owner. Unclaimed tasks are never counted against anyone.</p>
+    <div class="sm-cards-2">
+      <% section('Shoots available to claim', 'Page team members can take these', lists.shootsAvailable, 'Shoot', 'No open shoots.', function (i) { return '<span>Shoot ' + e(V.fmtDateTime(i.shootAt)) + '</span> ' + (W.isShootOverdue(i, sm.now) ? V.badge('Unclaimed · past shoot date', 'orange') : people.ownerChip(null)); }) %>
+      <% section('Completed shoots — editing open to claim', 'Bansi, Bhavin, Vishnu, Krutik only', lists.editingAvailable, 'Editing', 'No footage waiting for an editor.', function (i) { return '<span>Shot by ' + e(people.nameOf(i.shoot.completion.by)) + ' · ' + e(V.fmtRelative(i.shoot.rawSubmittedAt || i.shoot.completion.at, sm.now)) + '</span> ' + people.ownerChip(null); }) %>
+      <% section('Shoots in progress', 'Claimed — current owner shown', lists.shootsInProgress, 'Shoot', 'No shoots in progress.', function (i) { return people.ownerChip(i.shootOwner) + ' <span>Shoot ' + e(V.fmtDateTime(i.shootAt)) + '</span>' + (W.isShootOverdue(i, sm.now) ? ' ' + V.badge('Overdue', 'red') : '') + (W.isShootDone(i) && !i.shoot.rawSubmitted ? ' ' + V.badge('Raw footage pending', 'amber') : ''); }) %>
+      <% section('Editing in progress', 'Claimed by an editor', lists.editingInProgress, 'Editing', 'No editing in progress.', function (i) { var d = W.editingDeadline(i, sm.settings); return people.ownerChip(i.editor) + ' <span>' + e(d ? 'Due ' + V.fmtDateTime(d) : 'No deadline') + '</span>' + (W.isEditOverdue(i, sm.now, sm.settings) ? ' ' + V.badge('Overdue', 'red') : ''); }) %>
+      <% section('Ready to publish', 'Any page team member can confirm the upload', lists.ready, 'Publishing', 'Nothing waiting to be published.', function (i) { return '<span>Edited by ' + e(people.nameOf(i.editing.completion.by)) + '</span> <span>' + e(i.publishAt ? 'Planned ' + V.fmtDateTime(i.publishAt) : 'No planned time') + '</span> ' + V.statusBadge(W.getPublishStatus(i, sm.now)); }) %>
+      <% section('Published', 'Confirmed by the employee who uploaded the reel', lists.published.slice(0, 12), null, 'No published reels yet.', function (i) { return people.ownerChip(i.publishingOwner) + ' <span>Posted ' + e(V.fmtDateTime(i.publishing.completion.at)) + '</span>' + (i.publishing.completion.onTime === false ? ' ' + V.badge('Late', 'amber') : ''); }) %>
+    </div>
+  <% } else if (tab === 'overview') { %>
+    <div class="sm-split">
+      <div class="list-card sm-section">
+        <div class="list-card-head section-card-head"><div><h2>Follower growth</h2><p class="sm-muted">Last 90 days</p></div><%- V.demoBadge() %></div>
+        <div class="sm-pad">
+          <%- V.lineChart(chartRows, series, { height: 260, label: 'Follower growth (demo data)' }) %>
+          <div class="sm-stat-grid" style="margin-top:12px;">
+            <div class="sm-stat">90-day net<b><%= s90.net >= 0 ? '+' : '' %><%= V.fmtNum(s90.net) %></b></div>
+            <div class="sm-stat">90-day growth<b><%= V.fmtPct(s90.growthPct, 2) %></b></div>
+            <div class="sm-stat">Best day (30d)<b><%= s30.bestDay ? '+' + V.fmtNum(s30.bestDay.gain) + ' · ' + V.fmtDate(s30.bestDay.date, 'short') : '—' %></b></div>
+          </div>
+        </div>
+      </div>
+      <div>
+        <div class="section-card sm-section">
+          <p class="sm-h4"><%= sm.now.toLocaleDateString('en-GB', { month: 'long' }) %> reel target</p>
+          <p style="font-family:var(--font-serif);font-size:28px;font-weight:700;margin:0;"><%= progress.published %><span class="sm-muted"> / <%= progress.target %></span></p>
+          <div class="sm-progress" style="margin:10px 0 6px;"><i style="width:<%= progress.pct %>%;background:<%= page.color %>"></i></div>
+          <p class="sm-muted"><%= progress.remaining %> remaining · <%= progress.inProduction %> in production</p>
+        </div>
+        <div class="section-card sm-section">
+          <p class="sm-h4">Page performance (recorded completions)</p>
+          <dl class="sm-kv">
+            <dt>On-time publishing</dt><dd><%= perf.onTimeRate === null ? '—' : Math.round(perf.onTimeRate) + '%' %></dd>
+            <dt>On-time editing</dt><dd><%= perf.editOnTime === null ? '—' : Math.round(perf.editOnTime) + '%' %></dd>
+            <dt>Avg edit time</dt><dd><%= V.fmtHours(perf.turnaround) %></dd>
+          </dl>
+        </div>
+      </div>
+    </div>
+  <% } else if (tab === 'calendar') { %>
+    <div class="list-card sm-section">
+      <div class="list-card-head section-card-head"><div><h2><%= V.fmtDate(sm.now, 'month') %> content</h2><p class="sm-muted">Planned publishing dates (shoot date when publishing is not set yet)</p></div><a class="view-all" href="/social-media/calendar?page=<%= page.id %>">Open full calendar →</a></div>
+      <div class="sm-pad">
+        <% if (!monthItems.length) { %><div class="empty-state"><div class="empty-state-title">No content planned this month</div><% if (a.isManager) { %><div class="empty-state-sub"><a href="/social-media/reels/new?page=<%= page.id %>">Create a reel</a></div><% } %></div><% } %>
+        <% var lastDay = ''; monthItems.forEach(function (i) { var d = W.localDay(W.plannedDate(i)); if (d !== lastDay) { lastDay = d; %><p class="sm-day-label"><%= V.fmtDate(d, 'weekday') %></p><% } %>
+          <ul class="sm-rows"><%- include('_row', { item: i, meta: e(V.fmtTime(W.plannedDate(i)) + (i.publishAt ? '' : ' · shoot (publishing not set)')), right: V.statusBadge(W.getStage(i)) }) %></ul>
+        <% }) %>
+      </div>
+    </div>
+  <% } else if (tab === 'shoots') { %>
+    <div class="list-card sm-section">
+      <div class="list-card-head section-card-head"><div><h2>Upcoming shoots</h2><p class="sm-muted">Shoots not yet completed — claimed or open</p></div><a class="view-all" href="/social-media/shoots?page=<%= page.id %>">Shoot planner →</a></div>
+      <div class="sm-pad">
+        <% if (!upcomingShoots.length) { %><p class="sm-muted">No upcoming shoots.</p><% } %>
+        <ul class="sm-rows"><% upcomingShoots.forEach(function (i) { %>
+          <%- include('_row', { item: i, meta: e(V.fmtDateTime(i.shootAt)) + ' ' + people.ownerChip(i.shootOwner) + ' ' + (i.shoot.scriptReady ? V.badge('Script ready', 'green') : V.badge('Script pending', 'amber')), right: V.priorityBadge(i.priority) + ' ' + V.statusBadge(W.isShootOverdue(i, sm.now) ? (i.shootOwner ? 'Overdue' : 'Unclaimed') : i.shoot.status === 'Unclaimed' ? 'Available' : i.shoot.status), stage: 'Shoot' }) %>
+        <% }) %></ul>
+      </div>
+    </div>
+  <% } else if (tab === 'editing') { %>
+    <div class="section-card sm-section">
+      <p class="sm-h4">Editors who can claim this page's edits</p>
+      <p class="sm-muted">Only the four-person editing team (Bansi, Bhavin, Vishnu, Krutik) can take editing tasks.</p>
+      <div class="sm-people" style="margin-top:10px;"><% editors.forEach(function (k) { var uid = P.userIdForKey(sm.studio, k); %><%- people.keyChip(k, activeEdits.filter(function (i) { return uid && i.editor === uid; }).length + ' active edit(s)') %><% }) %></div>
+    </div>
+    <div class="sm-cards-3">
+      <% [['Not Started', 'Available'], ['Editing', 'Editing'], ['Editing Completed', 'Editing Completed']].forEach(function (col) { var list = inEditing.filter(function (i) { return i.editing.status === col[0]; }); %>
+        <div class="list-card sm-section">
+          <div class="list-card-head section-card-head"><div><%- V.statusBadge(col[1]) %></div><span class="tag-count"><%= list.length %></span></div>
+          <div class="sm-pad">
+            <% if (!list.length) { %><p class="sm-faint">Empty</p><% } %>
+            <ul class="sm-rows"><% list.forEach(function (i) { var d = W.editingDeadline(i, sm.settings); %><%- include('_row', { item: i, meta: people.ownerChip(i.editor) + ' <span>' + e(i.editing.completion ? 'done ' + V.fmtDate(i.editing.completion.at, 'short') : d ? 'due ' + V.fmtDate(d, 'short') : 'no deadline') + '</span>' }) %><% }) %></ul>
+          </div>
+        </div>
+      <% }) %>
+    </div>
+  <% } else { %>
+    <div class="list-card sm-section">
+      <div class="list-card-head section-card-head"><div><h2>Publishing history</h2><p class="sm-muted">Confirmed uploads with the employee who published them</p></div><a class="view-all" href="/social-media/publishing?page=<%= page.id %>">Queue →</a></div>
+      <% if (!lists.published.length) { %><div class="empty-state"><div class="empty-state-title">No reels published yet</div></div><% } else { %>
+      <div class="sm-scroll"><table class="sm-table min-900">
+        <thead><tr><th>Reel</th><th>Published by</th><th>Planned</th><th>Actual</th><th>Timing</th><th>Post URL</th></tr></thead>
+        <tbody>
+          <% lists.published.forEach(function (i) { var c = i.publishing.completion; %>
+            <tr><td><a class="reel-link" href="/social-media/reels/<%= i.id %>"><%= i.title %></a></td><td><%- people.ownerChip(i.publishingOwner, '—') %></td><td class="nowrap"><%= V.fmtDateTime(i.publishAt) %></td><td class="nowrap"><%= V.fmtDateTime(c.at) %></td><td><%- c.onTime === undefined ? V.badge('No planned time', 'slate') : c.onTime ? V.badge('On time', 'green') : V.badge('Late', 'amber') %></td>
+            <td class="muted"><a href="<%= i.publishing.postUrl %>" target="_blank" rel="noopener noreferrer nofollow"><%= i.publishing.postUrl %></a></td></tr>
+          <% }) %>
+        </tbody>
+      </table></div>
+      <% } %>
+      <p class="sm-foot-note sm-pad">Post URLs are entered manually by the publishing employee and are not verified. The PMS does not connect to Instagram.</p>
+    </div>
+  <% } %>
+</div>
+<%- include('_modals') %>
+<%- include('../partials/footer') %>

@@ -1,0 +1,96 @@
+<%- include('../partials/header') %>
+<%
+  var a = sm.actor;
+  var today = W.localDay(sm.now);
+  var qs = function (over) {
+    var o = Object.assign({ view: view, date: W.localDay(cursor), page: f.page, emp: f.emp, stage: f.stage, shoots: f.shoots ? '1' : '' }, over);
+    var p = new URLSearchParams();
+    Object.keys(o).forEach(function (k) { if (o[k] !== '' && o[k] !== 'all' && o[k] !== undefined) p.set(k, o[k]); });
+    return '?' + p.toString();
+  };
+  var chip = function (ev, compact) {
+    var p = C.getPage(ev.item.pageId);
+    return '<a class="sm-ev' + (ev.kind === 'shoot' || ev.tbd ? ' dashed' : '') + (ev.overdue ? ' overdue' : '') + '" style="--pc:' + p.color + ';--pcs:' + p.soft + '" href="/social-media/reels/' + ev.item.id + '" title="' + V.esc((ev.kind === 'shoot' ? 'Shoot: ' : '') + ev.item.title + ' · ' + p.shortName + (ev.tbd ? ' · publishing date TBD' : '')) + '">'
+      + (ev.tbd ? '<span class="tbd">TBD</span>' : '') + (ev.kind === 'shoot' ? '📷 ' : '') + (compact ? '' : '<span>' + V.esc(V.fmtTime(ev.at)) + '</span> ') + '<span class="t">' + V.esc(ev.item.title) + '</span></a>';
+  };
+  var addLink = function (d) { return a.isManager ? '<a class="sm-cal-add" href="/social-media/reels/new?date=' + W.localDay(d) + '&returnTo=' + encodeURIComponent('/social-media/calendar' + qs({})) + '" title="Create reel on this day">+</a>' : ''; };
+%>
+<div class="container container-wide sm">
+  <%- include('_bar') %>
+  <div class="page-head">
+    <div>
+      <div class="eyebrow-date">SOCIAL MEDIA STUDIO</div>
+      <h1>Content Calendar</h1>
+      <p>Plan reels across all four Instagram pages. Events sit on their planned publishing date (or the shoot date, marked TBD, when publishing is not planned yet).</p>
+    </div>
+    <% if (a.isManager) { %><a class="btn" href="/social-media/reels/new?date=<%= W.localDay(cursor) %>">+ Create reel</a><% } %>
+  </div>
+
+  <div class="list-card sm-section">
+    <div class="sm-filters">
+      <a class="btn small outline" href="<%= qs({ date: W.localDay(prev) }) %>" aria-label="Previous">‹</a>
+      <a class="btn small outline" href="<%= qs({ date: W.localDay(next) }) %>" aria-label="Next">›</a>
+      <a class="btn small outline" href="<%= qs({ date: today }) %>">Today</a>
+      <h2 class="grow" style="margin:0 6px;font-size:16px;"><%= title %></h2>
+      <span class="sm-seg"><% ['month', 'week', 'day'].forEach(function (v) { %><a class="<%= view === v ? 'active' : '' %>" href="<%= qs({ view: v }) %>"><%= v.charAt(0).toUpperCase() + v.slice(1) %></a><% }) %></span>
+    </div>
+    <form class="sm-filters" method="GET" action="/social-media/calendar" style="border-top:1px solid var(--border-soft);">
+      <input type="hidden" name="view" value="<%= view %>">
+      <input type="date" name="date" value="<%= W.localDay(cursor) %>" aria-label="Jump to date" data-autosubmit>
+      <select class="filter-select" name="page" data-autosubmit aria-label="Page"><option value="all">All pages</option><% C.PAGES.forEach(function (p) { %><option value="<%= p.id %>" <%= f.page === p.id ? 'selected' : '' %>><%= p.shortName %></option><% }) %></select>
+      <select class="filter-select" name="emp" data-autosubmit aria-label="Employee"><option value="all">Anyone (any claimed role)</option><% members.forEach(function (m) { %><option value="<%= m.userId %>" <%= f.emp === m.userId ? 'selected' : '' %>><%= m.name %></option><% }) %></select>
+      <select class="filter-select" name="stage" data-autosubmit aria-label="Status"><option value="all">All statuses</option><% W.STAGES.forEach(function (s) { %><option <%= f.stage === s ? 'selected' : '' %>><%= s %></option><% }) %></select>
+      <label class="sm-check"><input type="checkbox" name="shoots" value="1" <%= f.shoots ? 'checked' : '' %> data-autosubmit> Show shoots</label>
+      <noscript><button class="btn small outline" type="submit">Apply</button></noscript>
+      <span class="grow"></span>
+      <span class="sm-legend-row"><% C.PAGES.forEach(function (p) { %><span style="--pc:<%= p.color %>;--pcs:<%= p.soft %>"><i></i><%= p.shortName %></span><% }) %><span><b class="red-txt">●</b> Overdue</span><span>TBD = publishing date not set</span></span>
+    </form>
+  </div>
+
+  <% if (view === 'month') { %>
+    <div class="list-card sm-section"><div class="sm-scroll"><div class="sm-cal">
+      <% monthDays.slice(0, 7).forEach(function (d) { %><div class="sm-cal-head"><%= d.toLocaleDateString('en-GB', { weekday: 'short' }) %></div><% }) %>
+      <% monthDays.forEach(function (d) { var evs = eventsOn(d); var key = W.localDay(d); %>
+        <div class="sm-cal-day <%= d.getMonth() !== cursor.getMonth() ? 'out' : '' %> <%= key === today ? 'today' : '' %>">
+          <div class="sm-cal-num"><a href="<%= qs({ view: 'day', date: key }) %>"><%= d.getDate() %></a><%- addLink(d) %></div>
+          <% evs.slice(0, 3).forEach(function (ev) { %><%- chip(ev, true) %><% }) %>
+          <% if (evs.length > 3) { %><a class="sm-ev-more" href="<%= qs({ view: 'day', date: key }) %>">+<%= evs.length - 3 %> more</a><% } %>
+        </div>
+      <% }) %>
+    </div></div></div>
+  <% } else if (view === 'week') { %>
+    <div class="list-card sm-section"><div class="sm-scroll"><div class="sm-week">
+      <% weekDays.forEach(function (d) { var key = W.localDay(d); %>
+        <div class="sm-week-col <%= key === today ? 'today' : '' %>">
+          <a class="head" href="<%= qs({ view: 'day', date: key }) %>"><small><%= d.toLocaleDateString('en-GB', { weekday: 'short' }) %></small><b><%= d.getDate() %></b></a>
+          <div class="sm-week-body">
+            <% eventsOn(d).forEach(function (ev) { var p = C.getPage(ev.item.pageId); %>
+              <a class="sm-week-ev <%= ev.kind === 'shoot' || ev.tbd ? 'dashed' : '' %> <%= ev.overdue ? 'overdue' : '' %>" style="--pc:<%= p.color %>;--pcs:<%= p.soft %>" href="/social-media/reels/<%= ev.item.id %>">
+                <small><%= ev.kind === 'shoot' ? '📷 Shoot · ' + V.fmtTime(ev.at) : ev.tbd ? 'Shoot day · publish TBD' : V.fmtTime(ev.at) %></small><b><%= ev.item.title %></b><em><%= W.getStage(ev.item) %></em>
+              </a>
+            <% }) %>
+            <% if (a.isManager) { %><a class="sm-week-add" href="/social-media/reels/new?date=<%= key %>">+ Add</a><% } %>
+          </div>
+        </div>
+      <% }) %>
+    </div></div></div>
+  <% } else { var evs = eventsOn(cursor); %>
+    <div class="list-card sm-section">
+      <% if (!evs.length) { %>
+        <div class="empty-state"><div class="empty-state-title">Nothing scheduled</div><div class="empty-state-sub">No reels match the current filters on <%= V.fmtDate(cursor) %>.<% if (a.isManager) { %> <a href="/social-media/reels/new?date=<%= W.localDay(cursor) %>">Create a reel</a><% } %></div></div>
+      <% } else { %>
+        <ul class="sm-day-list">
+          <% evs.forEach(function (ev) { var i = ev.item; %>
+            <li><a href="/social-media/reels/<%= i.id %>">
+              <span class="when"><b><%= V.fmtTime(ev.at) %></b><small><%= ev.kind === 'shoot' ? 'Shoot' : ev.tbd ? 'Shoot · publish TBD' : 'Publishing' %></small></span>
+              <span class="what"><b><%= i.title %><% if (ev.overdue) { %> <%- V.statusBadge('Overdue') %><% } %></b><span class="sm-tags"><%- V.pageBadge(i.pageId) %><%- V.statusBadge(W.getStage(i)) %><%- V.statusBadge(W.getPublishStatus(i, sm.now)) %><%- V.priorityBadge(i.priority) %></span></span>
+              <span class="who"><span>Shoot: <%- sm.people.ownerChip(i.shootOwner) %></span><span>Editor: <%- sm.people.ownerChip(i.editor) %></span><span>Publish: <%- sm.people.ownerChip(i.publishingOwner, 'Not yet') %></span></span>
+            </a></li>
+          <% }) %>
+        </ul>
+      <% } %>
+    </div>
+  <% } %>
+</div>
+<%- include('_modals') %>
+<%- include('../partials/footer') %>

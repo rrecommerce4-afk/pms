@@ -1,0 +1,201 @@
+<%- include('../partials/header') %>
+<%
+  var a = sm.actor, e = V.esc, people = sm.people;
+  var monthName = sm.now.toLocaleDateString('en-GB', { month: 'long', year: 'numeric' });
+  var followerNet = totals.followers - totals.followersPrev;
+  var followerGrowth = totals.followersPrev ? (followerNet / totals.followersPrev) * 100 : 0;
+  var medal = function (r) { return r === 1 ? 'gold' : r === 2 ? 'silver' : r === 3 ? 'bronze' : ''; };
+%>
+<div class="container container-wide sm">
+  <%- include('_bar') %>
+  <div class="page-head">
+    <div>
+      <div class="eyebrow-date">SOCIAL MEDIA STUDIO</div>
+      <h1>Social Media Studio</h1>
+      <p>Production and growth snapshot for <%= monthName %>. Reels are created without owners — employees claim and complete the work themselves.</p>
+    </div>
+    <div class="sm-head-actions">
+      <a class="btn outline" href="/social-media/calendar">Calendar</a>
+      <% if (a.isManager) { %><a class="btn" href="/social-media/reels/new">+ Create reel</a><% } %>
+    </div>
+  </div>
+
+  <div class="sm-kpis">
+    <%- include('_kpi', { label: 'Reels planned', value: totals.planned, hint: 'this month', href: '/social-media/calendar', tone: 'slate' }) %>
+    <%- include('_kpi', { label: 'Shoots pending', value: totals.shootsPending, hint: 'not yet completed', href: '/social-media/shoots?tab=available', tone: 'slate' }) %>
+    <%- include('_kpi', { label: 'Shoots available to claim', value: totals.shootsAvailable, hint: "unclaimed · not anyone's backlog", href: '/social-media/shoots?tab=available', tone: 'sky' }) %>
+    <%- include('_kpi', { label: 'Shooting in progress', value: totals.shootsInProgress, hint: 'claimed, not yet completed', href: '/social-media/shoots?tab=progress', tone: 'brand' }) %>
+    <%- include('_kpi', { label: 'Shoots completed', value: totals.shootsCompleted, hint: 'this month', href: '/social-media/shoots?tab=completed', tone: 'green' }) %>
+    <%- include('_kpi', { label: 'Editing available', value: totals.editingAvailable, hint: 'footage ready · no editor yet', href: '/social-media/editing', tone: 'sky' }) %>
+    <%- include('_kpi', { label: 'Editing in progress', value: totals.editingInProgress, hint: 'claimed by an editor', href: '/social-media/editing', tone: 'brand' }) %>
+    <%- include('_kpi', { label: 'Editing completed', value: totals.editingCompleted, hint: 'this month', href: '/social-media/editing', tone: 'green' }) %>
+    <%- include('_kpi', { label: 'Ready to publish', value: totals.ready, hint: 'edited, not scheduled', href: '/social-media/publishing?tab=Ready%20to%20Publish', tone: 'brand' }) %>
+    <%- include('_kpi', { label: 'Upcoming scheduled posts', value: totals.scheduled, hint: 'scheduled ≠ published', href: '/social-media/publishing?tab=Scheduled', tone: 'sky' }) %>
+    <%- include('_kpi', { label: 'Published this month', value: totals.published + ' / ' + totals.target, hint: Math.round((totals.published / Math.max(1, totals.target)) * 100) + '% of monthly target', href: '/social-media/publishing?tab=Published', tone: 'green' }) %>
+    <%- include('_kpi', { label: 'Overdue tasks', value: totals.overdueClaimed + totals.overdueUnclaimed, hint: totals.overdueClaimed + ' claimed · ' + totals.overdueUnclaimed + ' unclaimed', href: '/social-media/tasks?state=overdue-owned', tone: 'red' }) %>
+    <%- include('_kpi', { label: 'Available tasks', value: totals.availableTotal, hint: a.memberKey ? 'on your pages' : 'across all four pages', href: '/social-media/tasks?state=available', tone: 'sky' }) %>
+    <% if (a.canWork) { %><%- include('_kpi', { label: 'My tasks', value: totals.myActive, hint: 'claimed by you, still open', href: '/social-media/tasks?emp=' + a.userId + '&state=claimed', tone: 'brand' }) %><% } %>
+    <%- include('_kpi', { label: 'Total followers', value: V.fmtNum(totals.followers), hint: (followerNet >= 0 ? '+' : '') + V.fmtNum(followerNet) + ' · DEMO DATA', href: '/social-media/followers', tone: 'slate' }) %>
+  </div>
+
+  <% if (a.readOnly) { %>
+    <% var byDay = {}; prep.forEach(function (i) { var k = W.localDay(i.shootAt); (byDay[k] = byDay[k] || []).push(i); }); %>
+    <div class="list-card sm-section">
+      <div class="list-card-head section-card-head"><div><h2>Upcoming shoots</h2><p class="sm-muted">Next 14 days on <%= a.memberKey ? 'your pages' : 'all pages' %> — dates, scripts, ideas and preparation notes</p></div><a class="view-all" href="/social-media/shoots">Shoot planner →</a></div>
+      <div class="sm-pad">
+        <% if (!prep.length) { %><div class="empty-state"><div class="empty-state-title">No shoots in the next 14 days</div><div class="empty-state-sub">New reels will appear here as soon as they are planned.</div></div><% } %>
+        <div class="sm-prep-grid">
+          <% Object.keys(byDay).forEach(function (day) { %>
+            <div>
+              <p class="sm-day-label <%= day === W.localDay(sm.now) ? 'today' : '' %>"><%= day === W.localDay(sm.now) ? 'Today' : V.fmtDate(day, 'weekday') %></p>
+              <% byDay[day].forEach(function (i) { %>
+                <a class="sm-prep-card" href="/social-media/reels/<%= i.id %>?tab=details">
+                  <span class="sm-prep-top"><b><%= i.title %></b><span><%= V.fmtTime(i.shootAt) %></span></span>
+                  <span class="sm-prep-tags"><%- V.pageBadge(i.pageId) %> <%- i.shoot.scriptReady ? V.badge('Script ready', 'green') : V.badge('Script pending', 'amber') %> <%- people.ownerChip(i.shootOwner, 'Not yet claimed') %></span>
+                  <% if (i.idea) { %><span class="sm-clamp"><%= i.idea %></span><% } %>
+                  <% if (i.prepNotes) { %><span class="sm-clamp sm-prep-notes">Prep: <%= i.prepNotes %></span><% } %>
+                </a>
+              <% }) %>
+            </div>
+          <% }) %>
+        </div>
+      </div>
+    </div>
+  <% } else { %>
+    <div class="sm-split">
+      <div class="list-card sm-section sm-span-3">
+        <div class="list-card-head section-card-head"><div><h2>Available tasks</h2><p class="sm-muted"><%= a.memberKey ? "Unclaimed work on your pages" : 'Unclaimed work across all four pages' %></p></div><a class="view-all" href="/social-media/tasks?state=available">All tasks →</a></div>
+        <div class="sm-pad">
+          <div class="tabs sm-tabs">
+            <% [['shoot', 'Shoots'], ['editing', 'Editing'], ['publishing', 'Publishing']].forEach(function (t) { %>
+              <a class="tab-btn <%= availTab === t[0] ? 'active' : '' %>" href="?avail=<%= t[0] %>"><%= t[1] %> <span class="tag-count"><%= available[t[0]].length %></span></a>
+            <% }) %>
+          </div>
+          <% if (availTab === 'editing' && a.canWork && !a.canEditVideo) { %><p class="sm-note">Editing tasks can only be claimed by Bansi, Bhavin, Vishnu or Krutik. You can still see their status.</p><% } %>
+          <% var list = available[availTab]; var stageFor = { shoot: 'Shoot', editing: 'Editing', publishing: 'Publishing' }[availTab]; %>
+          <% if (!list.length) { %>
+            <div class="empty-state"><div class="empty-state-title">Nothing available right now</div><div class="empty-state-sub">New reels appear here as soon as they are created or the previous step is completed.</div></div>
+          <% } else { %>
+            <ul class="sm-rows sm-scroll-y">
+              <% list.slice(0, 25).forEach(function (i) {
+                var meta = V.pageBadge(i.pageId) + ' ';
+                if (availTab === 'shoot') meta += '<span>Shoot ' + e(V.fmtDateTime(i.shootAt)) + '</span> ' + (sm.now > W.shootDeadline(i) ? V.badge('Unclaimed · past shoot date', 'orange') : people.ownerChip(null));
+                else if (availTab === 'editing') meta += '<span>Footage ready ' + e(V.fmtRelative(i.shoot.rawSubmittedAt || i.shoot.completion.at, sm.now)) + '</span> ' + people.ownerChip(null);
+                else meta += '<span>' + e(i.publishAt ? 'Planned ' + V.fmtDateTime(i.publishAt) : 'No planned time') + '</span> ' + V.statusBadge(W.getPublishStatus(i, sm.now));
+              %>
+                <%- include('_row', { item: i, meta: meta, stage: stageFor }) %>
+              <% }) %>
+            </ul>
+          <% } %>
+          <p class="sm-foot-note">Unclaimed tasks are not counted against anyone. Overdue counts and scores only apply to work an employee has claimed.</p>
+        </div>
+      </div>
+      <div class="list-card sm-section sm-span-2">
+        <div class="list-card-head section-card-head"><div><h2>My tasks</h2><p class="sm-muted"><%= a.canWork ? a.name + ' · claimed and completed work' : 'Studio manager view' %></p></div></div>
+        <div class="sm-pad">
+          <% if (!a.canWork) { %>
+            <p class="sm-muted">Your account manages the Studio (create reels, reassign, settings). Claiming and completing work is done by the Studio team members from their own PMS logins.</p>
+          <% } else { %>
+            <p class="sm-day-label">Active (<%= mine.active.length %>)</p>
+            <% if (!mine.active.length) { %><p class="sm-muted">No active claims. Take a task from “Available tasks”.</p><% } %>
+            <ul class="sm-rows">
+              <% mine.active.forEach(function (m) {
+                var meta = '<span>' + m.stage + '</span> <span>' + e(m.stage === 'Shoot' ? (W.isShootDone(m.item) ? 'Raw footage pending' : 'Shoot ' + V.fmtDateTime(m.item.shootAt)) : 'Claimed ' + V.fmtRelative(m.item.editing.claimedAt, sm.now)) + '</span>';
+              %><%- include('_row', { item: m.item, meta: meta, stage: m.stage }) %><% }) %>
+            </ul>
+            <p class="sm-day-label">Recently completed</p>
+            <% if (!mine.done.length) { %><p class="sm-muted">No completed tasks yet.</p><% } %>
+            <ul class="sm-rows">
+              <% mine.done.forEach(function (m) { %><%- include('_row', { item: m.item, meta: e(m.stage + ' · ' + V.fmtDateTime(m.c.at)), right: V.timingBadge(m.c) }) %><% }) %>
+            </ul>
+          <% } %>
+        </div>
+      </div>
+    </div>
+  <% } %>
+
+  <div class="sm-cards-4">
+    <% C.PAGES.forEach(function (p, idx) { var s = summaries[idx], pr = progress[p.id]; %>
+      <div class="section-card sm-account" style="--pc:<%= p.color %>;--pcs:<%= p.soft %>;">
+        <div class="sm-account-head"><span class="sm-page-av"><%= V.initials(p.shortName) %></span><div><b><%= p.name %></b><small><%= p.handle %></small></div></div>
+        <div class="sm-account-stats">
+          <div><small>Followers (demo)</small><b><%= V.fmtNum(s.current) %></b></div>
+          <div class="right"><b class="<%= s.net >= 0 ? 'green-txt' : 'red-txt' %>"><%= s.net >= 0 ? '+' : '' %><%= V.fmtNum(s.net) %></b><small><%= V.fmtPct(s.growthPct, 2) %></small></div>
+        </div>
+        <div class="sm-progress-label"><span>Published vs target</span><b><%= pr.published %> / <%= pr.target %></b></div>
+        <div class="sm-progress"><i style="width:<%= pr.pct %>%;background:<%= p.color %>"></i></div>
+        <div class="sm-tags"><%- V.badge(pr.shootsAvailable + ' shoots open', 'sky') %><%- V.badge(pr.editingAvailable + ' edits open', 'sky') %><%- V.badge(pr.readyToPublish + ' ready', 'brand') %></div>
+        <div class="sm-account-foot"><span class="sm-avs"><% P.teamFor(sm.settings, p.id).forEach(function (k) { %><span class="sm-av" title="<%= people.keyName(k) %>"><%= V.initials(people.keyName(k)) %></span><% }) %></span><a class="view-all" href="/social-media/pages/<%= p.id %>">View details →</a></div>
+      </div>
+    <% }) %>
+  </div>
+
+  <div class="sm-split">
+    <div class="list-card sm-section sm-span-3">
+      <div class="list-card-head section-card-head"><div><h2>Follower growth</h2><p class="sm-muted"><%= V.fmtDate(fw.from, 'short') %> – <%= V.fmtDate(fw.to) %></p></div><%- V.demoBadge() %></div>
+      <div class="sm-pad"><%- V.legend(PAGE_SERIES) %><%- V.lineChart(chartRows, PAGE_SERIES, { height: 260, label: 'Follower growth (demo data)' }) %></div>
+    </div>
+    <div class="list-card sm-section sm-span-2">
+      <div class="list-card-head section-card-head"><div><h2>Content calendar</h2><p class="sm-muted">Next 7 days (planned publishing, or shoot date if not set)</p></div><a class="view-all" href="/social-media/calendar">Open →</a></div>
+      <div class="sm-pad sm-scroll-y">
+        <% next7.forEach(function (d) { var isToday = W.localDay(d.day) === W.localDay(sm.now); %>
+          <p class="sm-day-label <%= isToday ? 'today' : '' %>"><%= isToday ? 'Today' : V.fmtDate(d.day, 'weekday') %></p>
+          <% if (!d.items.length) { %><p class="sm-faint">Nothing planned</p><% } %>
+          <ul class="sm-rows">
+            <% d.items.forEach(function (i) { %><%- include('_row', { item: i, meta: e(V.fmtTime(W.plannedDate(i)) + ' · ' + C.getPage(i.pageId).shortName + (i.publishAt ? '' : ' · shoot')), right: V.statusBadge(W.getStage(i)) }) %><% }) %>
+          </ul>
+        <% }) %>
+      </div>
+    </div>
+  </div>
+
+  <div class="sm-cards-3">
+    <div class="list-card sm-section">
+      <div class="list-card-head section-card-head"><div><h2>Overdue tasks</h2><p class="sm-muted"><%= totals.overdueClaimed %> claimed · <%= totals.overdueUnclaimed %> unclaimed (not attributed)</p></div><a class="view-all" href="/social-media/tasks?state=overdue-owned">View →</a></div>
+      <div class="sm-pad">
+        <% if (!overdue.length) { %><div class="empty-state"><div class="empty-state-title">Nothing overdue</div><div class="empty-state-sub">Every actionable task is on schedule.</div></div><% } %>
+        <ul class="sm-rows">
+          <% overdue.forEach(function (t) { var item = { id: t.contentId, title: t.title, pageId: t.pageId }; %>
+            <%- include('_row', { item: item, meta: e(t.type + ' · due ' + V.fmtRelative(t.deadline, sm.now)) + ' ' + (t.assignee ? people.ownerChip(t.assignee) : V.badge('Unclaimed — not attributed', 'orange')), right: V.typeBadge(t.type) }) %>
+          <% }) %>
+        </ul>
+      </div>
+    </div>
+    <div class="list-card sm-section">
+      <div class="list-card-head section-card-head"><div><h2>Employee leaderboard</h2><p class="sm-muted">Fair normalised score · selected period</p></div><a class="view-all" href="/social-media/ranking">Ranking →</a></div>
+      <div class="sm-pad">
+        <% if (!general.length) { %><p class="sm-muted">No ranked Studio members are linked to PMS accounts yet.</p><% } %>
+        <ol class="sm-board-list">
+          <% general.forEach(function (g) { %>
+            <li><span class="sm-rank <%= medal(g.rank) %>"><%= g.rank || '–' %></span><span class="sm-av"><%= V.initials(g.name) %></span><span class="grow"><b><%= g.name %></b><small><%= g.totals.completed %> completed · <%= g.totals.due %> scored</small></span><% if (g.status !== 'Ranked') { %><%- V.statusBadge(g.status) %><% } %><b class="sm-score <%= g.status === 'Provisional' ? 'prov' : '' %>"><%= g.score === null ? '—' : g.score %></b></li>
+          <% }) %>
+        </ol>
+        <p class="sm-foot-note">Equal scores share a rank. Open “Employee Ranking” for full score breakdowns.</p>
+      </div>
+    </div>
+    <div class="list-card sm-section">
+      <div class="list-card-head section-card-head"><div><h2>Editing leaderboard</h2><p class="sm-muted">Editing team only (4 editors)</p></div><a class="view-all" href="/social-media/ranking?board=editing">View →</a></div>
+      <div class="sm-pad">
+        <ol class="sm-board-list">
+          <% editingScores.forEach(function (s) { %>
+            <li><span class="sm-rank"><%= s.rank || '–' %></span><span class="sm-av"><%= V.initials(s.name) %></span><span class="grow"><b><%= s.name %></b><small><%= s.stats.completed %>/<%= s.stats.due %> done</small></span><b class="sm-score <%= s.status === 'Provisional' ? 'prov' : '' %>"><%= s.score === null ? 'Insufficient data' : s.score %></b></li>
+          <% }) %>
+        </ol>
+      </div>
+    </div>
+  </div>
+
+  <div class="list-card sm-section">
+    <div class="list-card-head section-card-head"><div><h2>Recent activity</h2><p class="sm-muted">Claims, completions and ownership changes</p></div><a class="view-all" href="/social-media/tasks">All tasks →</a></div>
+    <div class="sm-pad">
+      <% if (!activity.length) { %><div class="empty-state"><div class="empty-state-title">No Studio activity yet</div><div class="empty-state-sub"><%= a.isManager ? 'Create the first reel to get started.' : 'Activity appears here once reels are created.' %></div></div><% } %>
+      <ol class="sm-activity two-col">
+        <% activity.forEach(function (ev) { %>
+          <li style="--pc:<%= C.getPage(ev.item.pageId).color %>"><a href="/social-media/reels/<%= ev.item.id %>?tab=activity"><span><%= ev.text %></span><small><%= ev.item.title %> · <%= V.fmtDateTime(ev.at) %></small></a></li>
+        <% }) %>
+      </ol>
+    </div>
+  </div>
+</div>
+<%- include('_modals') %>
+<%- include('../partials/footer') %>

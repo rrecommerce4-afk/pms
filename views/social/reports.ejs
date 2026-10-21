@@ -1,0 +1,107 @@
+<%- include('../partials/header') %>
+<%
+  var people = sm.people;
+  var filterQs = (function () { var p = new URLSearchParams(); if (r.page !== 'all') p.set('page', r.page); if (r.emp !== 'all') p.set('emp', r.emp); var s = p.toString(); return s ? '?' + s : ''; })();
+  var totPlanned = r.pageRows.reduce(function (s, x) { return s + x.planned; }, 0);
+  var totPublished = r.pageRows.reduce(function (s, x) { return s + x.published; }, 0);
+  var pubTimed = r.publishCompliance.reduce(function (s, x) { return s + x.onTime + x.late; }, 0);
+  var pubOnTime = r.publishCompliance.reduce(function (s, x) { return s + x.onTime; }, 0);
+  var unclaimedOverdue = r.unattributed.reduce(function (s, u) { return s + u.overdue; }, 0);
+  var tSeries = [{ key: 'onTime', label: 'On time', color: '#3F7A56' }, { key: 'late', label: 'Late', color: '#B5862A' }, { key: 'overdue', label: 'Claimed & overdue', color: '#B0362E' }];
+  var pSeries = [{ key: 'onTime', label: 'On schedule', color: '#3F7A56' }, { key: 'late', label: 'Late', color: '#B5862A' }, { key: 'missed', label: 'Missed / delayed (unattributed)', color: '#B0362E' }];
+  var mSeries = r.pages.map(function (p) { return { key: p.id, label: p.shortName, color: C.PAGE_CHART[p.id] }; });
+  var cn = r.followers.reduce(function (s, f) { return s + f.current; }, 0), cp = r.followers.reduce(function (s, f) { return s + f.previous; }, 0);
+%>
+<div class="container container-wide sm">
+  <%- include('_bar') %>
+  <div class="page-head">
+    <div>
+      <div class="eyebrow-date">SOCIAL MEDIA STUDIO</div>
+      <h1>Performance Reports</h1>
+      <p>Reports for <%= V.fmtDate(r.range.from) %> – <%= V.fmtDate(r.range.to) %>, calculated on the server from recorded claims and completions. Follower figures are demo data.</p>
+    </div>
+    <form class="sm-head-actions" method="GET" action="/social-media/reports">
+      <select class="filter-select" name="page" data-autosubmit aria-label="Page"><option value="all">All pages</option><% C.PAGES.forEach(function (p) { %><option value="<%= p.id %>" <%= r.page === p.id ? 'selected' : '' %>><%= p.shortName %></option><% }) %></select>
+      <select class="filter-select" name="emp" data-autosubmit aria-label="Employee"><option value="all">All employees</option><% r.slots.forEach(function (s) { %><option value="<%= s.userId %>" <%= r.emp === s.userId ? 'selected' : '' %>><%= s.name %></option><% }) %></select>
+      <noscript><button class="btn small outline" type="submit">Apply</button></noscript>
+    </form>
+  </div>
+
+  <div class="sm-kpis cols-4">
+    <%- include('_kpi', { label: 'Planned vs published', value: totPublished + ' / ' + totPlanned, hint: 'reels planned in period', tone: 'brand' }) %>
+    <%- include('_kpi', { label: 'Publishing on schedule', value: pubTimed ? Math.round((pubOnTime / pubTimed) * 100) + '%' : '—', hint: pubOnTime + ' of ' + pubTimed + ' confirmed posts', tone: 'green' }) %>
+    <%- include('_kpi', { label: 'Avg editing time', value: V.fmtHours(r.avgEdit), hint: 'claim → completed · editing team', tone: 'sky' }) %>
+    <%- include('_kpi', { label: 'Overdue & unclaimed', value: unclaimedOverdue, hint: 'not attributed to anyone', tone: 'amber' }) %>
+  </div>
+
+  <div class="sm-split">
+    <div class="list-card sm-section">
+      <div class="list-card-head section-card-head"><div><h2>Page-wise performance</h2><p class="sm-muted">Planned and published reels in the period; on schedule = published within <%= W.PUBLISH_GRACE_HOURS %>h of the planned time</p></div><a class="btn small outline" href="/social-media/reports/export/page-performance.csv<%= filterQs %>">CSV</a></div>
+      <div class="sm-scroll"><table class="sm-table min-640">
+        <thead><tr><th>Page</th><th class="num">Planned</th><th class="num">Published</th><th class="num">Monthly target</th><th class="num">On schedule</th></tr></thead>
+        <tbody><% r.pageRows.forEach(function (x) { %><tr><td><%- V.pageBadge(x.pageId, true) %></td><td class="num"><%= x.planned %></td><td class="num"><b><%= x.published %></b></td><td class="num"><%= x.target %></td><td class="num"><%= S.fmtRatio(x.onTimeRate) %></td></tr><% }) %></tbody>
+      </table></div>
+    </div>
+    <div class="list-card sm-section">
+      <div class="list-card-head section-card-head"><div><h2>Planned vs published</h2><p class="sm-muted">Per page in the selected period</p></div></div>
+      <% var ppSeries = [{ key: 'planned', label: 'Planned', color: '#C9C0DA' }, { key: 'published', label: 'Published', color: '#6C4E96' }]; %>
+      <div class="sm-pad"><%- V.legend(ppSeries) %><%- V.barChart(r.pageRows.map(function (x) { return { label: x.name, planned: x.planned, published: x.published }; }), ppSeries, { height: 230, label: 'Planned vs published' }) %></div>
+    </div>
+  </div>
+
+  <div class="list-card sm-section">
+    <div class="list-card-head section-card-head"><div><h2>Employee contribution</h2><p class="sm-muted">Recorded claims and completions per category for the four ranked employees. Scores use the same fair, rate-based model as Employee Ranking.</p></div><a class="btn small outline" href="/social-media/reports/export/employee-contribution.csv<%= filterQs %>">CSV</a></div>
+    <% if (!r.empRows.length) { %><div class="empty-state"><div class="empty-state-title">No ranked members linked yet</div></div><% } else { %>
+    <div class="sm-scroll"><table class="sm-table min-1100">
+      <thead><tr><th>Employee</th><% W.TASK_TYPES.forEach(function (c) { %><th style="text-align:center"><%= c %><br><small style="text-transform:none;font-weight:500">claimed · done · on time · late</small></th><% }) %><th class="num">Overdue (owned)</th><th class="num">On-time rate</th><th>Status</th><th class="num">Score</th></tr></thead>
+      <tbody>
+        <% r.empRows.forEach(function (x) { %>
+          <tr><td><span class="sm-person"><span class="sm-av"><%= V.initials(x.name) %></span><b><%= x.name %></b></span></td>
+          <% W.TASK_TYPES.forEach(function (c) { var k = x.categories[c]; %><td style="text-align:center" class="nowrap"><%= k.claimed %> · <b><%= k.completed %></b> · <span class="green-txt"><%= k.onTime %></span> · <span class="warn-txt"><%= k.late %></span></td><% }) %>
+          <td class="num red-txt"><%= x.totals.openOverdue %></td><td class="num"><%= S.fmtRatio(x.totals.onTimeRate) %></td><td><%- V.statusBadge(x.status) %></td><td class="num"><b class="sm-score <%= x.status === 'Provisional' ? 'prov' : '' %> <%= x.score === null ? 'none' : '' %>"><%= x.score === null ? 'Insufficient data' : x.score %></b></td></tr>
+        <% }) %>
+      </tbody>
+    </table></div>
+    <% } %>
+  </div>
+
+  <div class="sm-cards-3 sm-section">
+    <div class="list-card"><div class="list-card-head section-card-head"><div><h2>Shooting timeliness</h2><p class="sm-muted">Completed shoots and claimed shoots now overdue, by owner</p></div></div><div class="sm-pad"><%- V.legend(tSeries) %><%- V.barChart(r.shootTimeliness, tSeries, { stacked: true, height: 220, label: 'Shooting timeliness' }) %></div></div>
+    <div class="list-card"><div class="list-card-head section-card-head"><div><h2>Editing completion &amp; timeliness</h2><p class="sm-muted">Editing team only — Bansi, Bhavin, Vishnu, Krutik</p></div></div><div class="sm-pad"><%- V.legend(tSeries) %><%- V.barChart(r.editingTimeliness, tSeries, { stacked: true, height: 220, label: 'Editing timeliness' }) %></div></div>
+    <div class="list-card"><div class="list-card-head section-card-head"><div><h2>Publishing schedule compliance</h2><p class="sm-muted">Confirmed posts vs planned time, per page</p></div></div><div class="sm-pad"><%- V.legend(pSeries) %><%- V.barChart(r.publishCompliance, pSeries, { stacked: true, height: 220, label: 'Publishing compliance' }) %></div></div>
+  </div>
+
+  <div class="sm-cards-2">
+    <div class="list-card"><div class="list-card-head section-card-head"><div><h2>Monthly production</h2><p class="sm-muted">Reels confirmed as published per month (last 6 months)</p></div></div><div class="sm-pad"><%- V.legend(mSeries) %><%- V.barChart(r.monthly, mSeries, { stacked: true, height: 240, label: 'Monthly production' }) %></div></div>
+    <div class="list-card">
+      <div class="list-card-head section-card-head"><div><h2>Unclaimed work</h2><p class="sm-muted">Tasks nobody has taken yet. Shown for planning only — never attributed to an employee.</p></div></div>
+      <div class="sm-scroll"><table class="sm-table">
+        <thead><tr><th>Task type</th><th class="num">Available to claim</th><th class="num">Overdue &amp; unclaimed</th></tr></thead>
+        <tbody><% r.unattributed.forEach(function (u) { %><tr><td><%= u.type === 'Publishing' ? 'Publishing (awaiting upload confirmation)' : u.type %></td><td class="num"><%= u.available %></td><td class="num warn-txt"><%= u.overdue %></td></tr><% }) %></tbody>
+      </table></div>
+      <p class="sm-foot-note sm-pad">Current snapshot for the selected page(s); not limited to the reporting period.</p>
+    </div>
+  </div>
+
+  <div class="sm-cards-2">
+    <div class="list-card">
+      <div class="list-card-head section-card-head"><div><h2>Follower growth by page</h2><p class="sm-muted">Net followers gained in the period</p></div><%- V.demoBadge() %></div>
+      <div class="sm-scroll"><table class="sm-table">
+        <thead><tr><th>Page</th><th class="num">Start</th><th class="num">Current</th><th class="num">Net</th><th class="num">Growth</th></tr></thead>
+        <tbody>
+          <% r.followers.forEach(function (f) { %><tr><td><%- V.pageBadge(f.pageId) %></td><td class="num"><%= V.fmtNum(f.previous) %></td><td class="num"><%= V.fmtNum(f.current) %></td><td class="num <%= f.net >= 0 ? 'green-txt' : 'red-txt' %>"><%= f.net >= 0 ? '+' : '' %><%= V.fmtNum(f.net) %></td><td class="num"><%= V.fmtPct(f.growthPct) %></td></tr><% }) %>
+          <tr class="total"><td>Combined</td><td class="num"><%= V.fmtNum(cp) %></td><td class="num"><%= V.fmtNum(cn) %></td><td class="num"><%= cn - cp >= 0 ? '+' : '' %><%= V.fmtNum(cn - cp) %></td><td class="num"><%= V.fmtPct(cp ? ((cn - cp) / cp) * 100 : 0) %></td></tr>
+        </tbody>
+      </table></div>
+    </div>
+    <div class="list-card">
+      <div class="list-card-head section-card-head"><div><h2>Month-over-month comparison</h2><p class="sm-muted">Closing followers (demo) and reels published (recorded) per month</p></div><span class="sm-head-actions"><%- V.demoBadge('Demo data') %><a class="btn small outline" href="/social-media/reports/export/month-over-month.csv<%= filterQs %>">CSV</a></span></div>
+      <div class="sm-scroll"><table class="sm-table">
+        <thead><tr><th>Month</th><th class="num">Closing followers</th><th class="num">Net change</th><th class="num">MoM %</th><th class="num">Reels published</th></tr></thead>
+        <tbody><% r.mom.forEach(function (m) { %><tr><td><%= m.label %></td><td class="num"><%= V.fmtNum(m.total) %></td><td class="num"><%= m.net === null ? '—' : (m.net >= 0 ? '+' : '') + V.fmtNum(m.net) %></td><td class="num"><%= m.pct === null ? '—' : V.fmtPct(m.pct) %></td><td class="num"><b><%= m.reels %></b></td></tr><% }) %></tbody>
+      </table></div>
+    </div>
+  </div>
+</div>
+<%- include('_modals') %>
+<%- include('../partials/footer') %>

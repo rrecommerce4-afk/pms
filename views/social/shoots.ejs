@@ -1,0 +1,99 @@
+<%- include('../partials/header') %>
+<%
+  var a = sm.actor, people = sm.people;
+  var qs = function (over) {
+    var o = Object.assign({ tab: tab, page: f.page, owner: f.owner, q: f.q, view: f.view }, over);
+    var p = new URLSearchParams();
+    Object.keys(o).forEach(function (k) { if (o[k] !== '' && o[k] !== 'all' && o[k] !== undefined && !(k === 'view' && o[k] === 'list')) p.set(k, o[k]); });
+    return '?' + p.toString();
+  };
+  var tabs = [['available', 'Available to claim']].concat(a.canWork ? [['mine', 'My shoots']] : []).concat([['progress', 'In progress'], ['completed', 'Completed'], ['overdue', 'Overdue']]);
+  var shootStatus = function (i) { return W.activeBlocker(i.shoot.blocker) ? 'Blocked' : W.isShootOverdue(i, sm.now) ? 'Overdue' : i.shoot.status === 'Unclaimed' ? 'Available' : i.shoot.status; };
+%>
+<% function table(rows) { %>
+  <div class="sm-scroll"><table class="sm-table min-1100">
+    <thead><tr><th>Reel</th><th>Shoot owner</th><th>Planned shoot</th><th>Claimed</th><th>Script / footage</th><th>Completed</th><th>Status</th><th style="text-align:right">Action</th></tr></thead>
+    <tbody>
+      <% rows.forEach(function (i) { var c = i.shoot.completion; %>
+        <tr class="<%= W.isShootOverdue(i, sm.now) ? 'overdue' : '' %>">
+          <td style="max-width:280px">
+            <a class="reel-link" href="/social-media/reels/<%= i.id %>"><%= i.title %></a>
+            <div class="sub"><%- V.pageBadge(i.pageId) %><%- V.priorityBadge(i.priority) %></div>
+            <% if (i.prepNotes) { %><div class="muted sm-clamp">Prep: <%= i.prepNotes %></div><% } %>
+            <% if (i.shoot.notes) { %><div class="muted sm-clamp">Notes: <%= i.shoot.notes %></div><% } %>
+            <% if (i.shoot.blocker) { %><div class="muted <%= W.activeBlocker(i.shoot.blocker) ? 'warn-txt' : '' %>">⚠ <%= i.shoot.blocker.reason %></div><% } %>
+          </td>
+          <td><%- people.ownerChip(i.shootOwner) %></td>
+          <td class="nowrap"><%= V.fmtDateTime(i.shootAt) %></td>
+          <td class="nowrap muted"><%= i.shoot.claimedAt ? V.fmtDateTime(i.shoot.claimedAt) : '—' %></td>
+          <td><div class="sub" style="flex-direction:column;align-items:flex-start;margin:0"><%- i.shoot.scriptReady ? V.badge('Script ready', 'green') : V.badge('Script pending', 'slate') %><% if (W.isShootDone(i)) { %><%- i.shoot.rawSubmitted ? V.badge('Raw footage ready', 'green') : V.badge('Raw footage pending', 'amber') %><% } %></div></td>
+          <td class="nowrap"><% if (c) { %><%= V.fmtDateTime(c.at) %><br><%- c.excused ? V.badge('Blocker · excluded', 'slate') : c.onTime ? V.badge('On time', 'green') : V.badge('Late', 'red') %><% } else { %><span class="muted">—</span><% } %></td>
+          <td><%- V.statusBadge(shootStatus(i)) %></td>
+          <td><div style="display:flex;justify-content:flex-end"><%- include('_actions', { item: i, stage: 'Shoot' }) %></div></td>
+        </tr>
+      <% }) %>
+    </tbody>
+  </table></div>
+<% } %>
+<div class="container container-wide sm">
+  <%- include('_bar') %>
+  <div class="page-head">
+    <div>
+      <div class="eyebrow-date">SOCIAL MEDIA STUDIO</div>
+      <h1>Shoot Planner</h1>
+      <p>Reels start unassigned. Any page team member can take a shoot, then mark it completed with the raw footage — editing opens automatically after that.</p>
+    </div>
+    <% if (a.isManager) { %><a class="btn" href="/social-media/reels/new">+ Create reel</a><% } %>
+  </div>
+
+  <% if (a.memberKey) { %>
+    <p class="sm-note"><b><%= a.name %></b> — <%= a.canWork ? 'you can claim shoots for' : 'your pages' %>: <%= myPages && myPages.length ? myPages.map(function (p) { return C.getPage(p).shortName; }).join(', ') : 'no pages (not on any page team)' %>.<% if (!a.canWork) { %> You can see every shoot, its schedule, script status and preparation notes.<% } %></p>
+  <% } %>
+
+  <div class="sm-kpis">
+    <%- include('_kpi', { label: 'Available to claim', value: counts.available, hint: 'unassigned — no one penalised', tone: 'sky', href: qs({ tab: 'available' }) }) %>
+    <%- include('_kpi', { label: 'In progress', value: counts.progress, tone: 'brand', href: qs({ tab: 'progress' }) }) %>
+    <%- include('_kpi', { label: 'Completed', value: counts.completed, tone: 'green', href: qs({ tab: 'completed' }) }) %>
+    <%- include('_kpi', { label: 'Overdue · claimed', value: overdueClaimed, hint: 'counts for the owner', tone: 'red', href: qs({ tab: 'overdue' }) }) %>
+    <%- include('_kpi', { label: 'Overdue · unclaimed', value: overdueUnclaimed, hint: 'not attributed', tone: 'amber', href: qs({ tab: 'overdue' }) }) %>
+  </div>
+
+  <div class="list-card sm-section">
+    <form class="sm-filters" method="GET" action="/social-media/shoots">
+      <input type="hidden" name="tab" value="<%= tab %>"><input type="hidden" name="view" value="<%= f.view %>">
+      <input type="search" name="q" value="<%= f.q %>" placeholder="Search shoots…" aria-label="Search shoots">
+      <select class="filter-select" name="page" data-autosubmit aria-label="Page"><option value="all">All pages</option><% C.PAGES.forEach(function (p) { %><option value="<%= p.id %>" <%= f.page === p.id ? 'selected' : '' %>><%= p.shortName %></option><% }) %></select>
+      <select class="filter-select" name="owner" data-autosubmit aria-label="Shoot owner"><option value="all">All shoot owners</option><option value="unclaimed" <%= f.owner === 'unclaimed' ? 'selected' : '' %>>Unclaimed</option><% members.forEach(function (m) { %><option value="<%= m.userId %>" <%= f.owner === m.userId ? 'selected' : '' %>><%= m.name %></option><% }) %></select>
+      <button class="btn small outline" type="submit">Search</button>
+      <span class="grow"></span>
+      <span class="sm-seg"><a class="<%= f.view === 'list' ? 'active' : '' %>" href="<%= qs({ view: 'list' }) %>">List</a><a class="<%= f.view === 'calendar' ? 'active' : '' %>" href="<%= qs({ view: 'calendar' }) %>">Calendar</a></span>
+    </form>
+    <div class="sm-pad" style="padding-bottom:0"><div class="tabs sm-tabs"><% tabs.forEach(function (t) { %><a class="tab-btn <%= tab === t[0] ? 'active' : '' %>" href="<%= qs({ tab: t[0] }) %>"><%= t[1] %> <span class="tag-count"><%= counts[t[0]] %></span></a><% }) %></div></div>
+
+    <% if (f.view === 'list') { %>
+      <% if (!list.length) { %>
+        <div class="empty-state"><div class="empty-state-title"><%= tab === 'mine' ? 'You have no shoots' : tab === 'available' ? 'No shoots waiting to be claimed' : 'No shoots here' %></div><div class="empty-state-sub"><%= tab === 'mine' ? 'Take a shoot from “Available to claim”.' : 'Try another tab or adjust the filters.' %></div></div>
+      <% } else if (tab === 'overdue') { var own = list.filter(function (i) { return i.shootOwner; }), un = list.filter(function (i) { return !i.shootOwner; }); %>
+        <% if (own.length) { %><p class="sm-day-label sm-pad" style="padding-top:8px">Claimed &amp; overdue — counts against the current owner (unless a blocker is recorded)</p><% table(own); %><% } %>
+        <% if (un.length) { %><p class="sm-day-label sm-pad" style="padding-top:14px">Unclaimed &amp; overdue — nobody took these shoots; not attributed to any employee</p><% table(un); %><% } %>
+      <% } else { table(list); } %>
+    <% } else { var mq = function (d) { return qs({ month: W.localDay(d).slice(0, 7) }); }; %>
+      <div class="sm-filters" style="padding-top:0">
+        <a class="btn small outline" href="<%= mq(new Date(monthCursor.getFullYear(), monthCursor.getMonth() - 1, 1)) %>">‹</a>
+        <a class="btn small outline" href="<%= mq(new Date(monthCursor.getFullYear(), monthCursor.getMonth() + 1, 1)) %>">›</a>
+        <b><%= V.fmtDate(monthCursor, 'month') %></b><span class="sm-muted">Showing “<%= tabs.find(function (t) { return t[0] === tab; })[1] %>” · dashed = unclaimed</span>
+      </div>
+      <div class="sm-pad"><div class="sm-scroll"><div class="sm-cal">
+        <% monthDays.slice(0, 7).forEach(function (d) { %><div class="sm-cal-head"><%= d.toLocaleDateString('en-GB', { weekday: 'short' }) %></div><% }) %>
+        <% monthDays.forEach(function (d) { var key = W.localDay(d); var day = list.filter(function (i) { return W.localDay(i.shootAt) === key; }); %>
+          <div class="sm-cal-day small <%= d.getMonth() !== monthCursor.getMonth() ? 'out' : '' %> <%= key === W.localDay(sm.now) ? 'today' : '' %>">
+            <div class="sm-cal-num"><span><%= d.getDate() %></span></div>
+            <% day.forEach(function (i) { var p = C.getPage(i.pageId); %><a class="sm-ev <%= i.shootOwner ? '' : 'dashed' %> <%= W.isShootOverdue(i, sm.now) ? 'overdue' : '' %>" style="--pc:<%= p.color %>;--pcs:<%= p.soft %>" href="/social-media/reels/<%= i.id %>" title="<%= i.title %> · <%= i.shootOwner ? people.nameOf(i.shootOwner) : 'Unclaimed' %>"><span class="t"><%= V.fmtTime(i.shootAt) %> <%= i.title %></span></a><% }) %>
+          </div>
+        <% }) %>
+      </div></div></div>
+    <% } %>
+  </div>
+</div>
+<%- include('_modals') %>
+<%- include('../partials/footer') %>

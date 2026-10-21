@@ -1,0 +1,9 @@
+<%- include('../partials/header') %>
+<div class="container container-wide sm">
+  <%- include('_bar') %>
+  <div class="list-card"><div class="empty-state">
+    <div class="empty-state-title"><%= what %> not found</div>
+    <div class="empty-state-sub">It may have been deleted. <a href="<%= back %>">Go back</a></div>
+  </div></div>
+</div>
+<%- include('../partials/footer') %>

@@ -1,0 +1,105 @@
+<%- include('../partials/header') %>
+<%
+  var a = sm.actor, people = sm.people, st = sm.settings;
+  var qs = function (over) {
+    var o = Object.assign({ view: f.view, editor: f.editor, page: f.page, q: f.q }, over);
+    var p = new URLSearchParams();
+    Object.keys(o).forEach(function (k) { if (o[k] !== '' && o[k] !== 'all' && o[k] !== undefined && !(k === 'view' && o[k] === 'board')) p.set(k, o[k]); });
+    return '?' + p.toString();
+  };
+  var columns = [['waiting', 'Waiting for footage', 'Shoot claimed / raw footage pending'], ['available', 'Available to claim', 'Footage ready — no editor yet'], ['editing', 'Editing', 'Claimed by an editor'], ['done', 'Editing completed', 'Moved to Ready to Publish (selected period)']];
+  var deadlineText = function (i) {
+    if (W.isEditingDone(i)) { var c = i.editing.completion; return 'Completed ' + V.esc(V.fmtDateTime(c.at)) + ' · ' + V.timingBadge(c); }
+    var d = W.editingDeadline(i, st), over = W.isEditOverdue(i, sm.now, st);
+    if (!d) return '<span>Deadline: default rule after footage</span>';
+    return '<span class="' + (over ? 'red-txt' : '') + '">Due ' + V.esc(V.fmtDateTime(d)) + (over ? ' · overdue' : '') + '</span>';
+  };
+  var statusOf = function (i) { return W.isEditOverdue(i, sm.now, st) ? 'Overdue' : W.activeBlocker(i.editing.blocker) ? 'Blocked' : i.editing.status === 'Not Started' ? (W.footageReady(i) ? 'Available' : 'Waiting for footage') : i.editing.status; };
+%>
+<% function card(i) { %>
+  <div class="sm-card-item <%= W.isEditOverdue(i, sm.now, st) ? 'overdue' : '' %>">
+    <a href="/social-media/reels/<%= i.id %>"><%= i.title %></a>
+    <div class="meta"><%- V.pageBadge(i.pageId) %><%- V.priorityBadge(i.priority) %><% if (W.activeBlocker(i.editing.blocker)) { %><%- V.statusBadge('Blocked') %><% } %></div>
+    <div class="meta"><%- people.ownerChip(i.editor) %></div>
+    <div class="meta"><%- deadlineText(i) %></div>
+    <% if (i.editing.notes) { %><div class="meta sm-clamp">Notes: <%= i.editing.notes %></div><% } %>
+    <%- include('_actions', { item: i, stage: 'Editing' }) %>
+  </div>
+<% } %>
+<div class="container container-wide sm">
+  <%- include('_bar') %>
+  <div class="page-head">
+    <div>
+      <div class="eyebrow-date">SOCIAL MEDIA STUDIO</div>
+      <h1>Editing Studio <%- V.badge('4 eligible editors', 'brand') %></h1>
+      <p>Editors claim available edits themselves. Only Bansi, Bhavin, Vishnu and Krutik can take editing tasks, and only on pages where they are eligible. Completed edits move straight to Ready to Publish — there is no review step.</p>
+    </div>
+  </div>
+
+  <% if (myActive) { %>
+    <div class="list-card sm-section">
+      <div class="list-card-head section-card-head"><div><h2>My active workload <%- V.badge(myActive.length + ' editing', 'blue') %></h2><p class="sm-muted"><%= cols.available.length %> available to claim</p></div></div>
+      <div class="sm-pad">
+        <% if (!myActive.length) { %><p class="sm-muted">You have no edits in progress. Take one from “Available to claim”.</p><% } else { %><div class="sm-cards-3"><% myActive.forEach(function (i) { card(i); }) %></div><% } %>
+      </div>
+    </div>
+  <% } %>
+
+  <div class="sm-editor-cards">
+    <% scores.forEach(function (s) { var on = f.editor === s.userId; var stt = s.stats; %>
+      <a class="sm-editor-card <%= on ? 'active' : '' %>" href="<%= qs({ editor: on ? 'all' : s.userId }) %>">
+        <div class="top"><span class="sm-av"><%= V.initials(s.name) %></span><span class="grow"><b><%= s.name %></b><small><%= stt.claimed %> claimed · <%= stt.completed %> completed</small><%- V.statusBadge(s.status) %></span><span style="text-align:right"><b class="sm-score <%= s.status === 'Provisional' ? 'prov' : '' %> <%= s.score === null ? 'none' : '' %>"><%= s.score === null ? 'Insufficient data' : s.score %></b><br><small class="sm-muted">Editing score</small></span></div>
+        <div class="sm-mini4"><div><b><%= stt.onTime %></b>On time</div><div><b class="<%= stt.late ? 'warn-txt' : '' %>"><%= stt.late %></b>Late</div><div><b class="<%= stt.openOverdue ? 'red-txt' : '' %>"><%= stt.openOverdue %></b>Overdue</div><div><b><%= stt.openNotDue %></b>Not due</div></div>
+        <p class="sm-foot-note">Completion <%= S.fmtRatio(stt.completionRate) %> · On-time <%= S.fmtRatio(stt.onTimeRate) %> · Avg <%= V.fmtHours(stt.avgCompletionH) %></p>
+      </a>
+    <% }) %>
+    <% if (!scores.length) { %><p class="sm-muted">No editors are linked to PMS accounts yet.</p><% } %>
+  </div>
+  <p class="sm-foot-note" style="margin-bottom:16px">Workload for <%= V.fmtDate(sm.range.from) %> – <%= V.fmtDate(sm.range.to) %>. Editing score = 50% completion rate + 50% on-time rate over due edits (completed, or claimed and past the deadline). Unclaimed edits are never counted against anyone. Click an editor to filter.</p>
+
+  <div class="list-card sm-section">
+    <form class="sm-filters" method="GET" action="/social-media/editing">
+      <input type="hidden" name="view" value="<%= f.view %>">
+      <input type="search" name="q" value="<%= f.q %>" placeholder="Search reels…" aria-label="Search reels">
+      <select class="filter-select" name="editor" data-autosubmit aria-label="Editor"><option value="all">All editors</option><% editors.forEach(function (m) { %><option value="<%= m.userId %>" <%= f.editor === m.userId ? 'selected' : '' %>><%= m.name %></option><% }) %></select>
+      <select class="filter-select" name="page" data-autosubmit aria-label="Page"><option value="all">All pages</option><% C.PAGES.forEach(function (p) { %><option value="<%= p.id %>" <%= f.page === p.id ? 'selected' : '' %>><%= p.shortName %></option><% }) %></select>
+      <button class="btn small outline" type="submit">Search</button>
+      <span class="grow"></span>
+      <span class="sm-seg"><a class="<%= f.view === 'board' ? 'active' : '' %>" href="<%= qs({ view: 'board' }) %>">Board</a><a class="<%= f.view === 'list' ? 'active' : '' %>" href="<%= qs({ view: 'list' }) %>">List</a></span>
+    </form>
+  </div>
+
+  <% if (f.view === 'board') { %>
+    <div class="sm-scroll" style="padding-bottom:6px"><div class="sm-board">
+      <% columns.forEach(function (c) { %>
+        <div class="sm-board-col">
+          <div class="sm-board-col-head"><b><span><%= c[1] %></span><span class="tag-count"><%= cols[c[0]].length %></span></b><small><%= c[2] %></small></div>
+          <div class="sm-board-col-body"><% if (!cols[c[0]].length) { %><p class="sm-faint" style="text-align:center">Empty</p><% } %><% cols[c[0]].forEach(function (i) { card(i); }) %></div>
+        </div>
+      <% }) %>
+    </div></div>
+  <% } else { var rows = cols.editing.concat(cols.available, cols.waiting, cols.done); %>
+    <div class="list-card sm-section">
+      <% if (!rows.length) { %><div class="empty-state"><div class="empty-state-title">No editing tasks</div><div class="empty-state-sub">Adjust the filters or the reporting period.</div></div><% } else { %>
+      <div class="sm-scroll"><table class="sm-table min-900">
+        <thead><tr><th>Reel</th><th>Editor</th><th>Deadline</th><th>Status</th><th>Completed</th><th>Notes</th><th style="text-align:right">Action</th></tr></thead>
+        <tbody>
+          <% rows.forEach(function (i) { var d = W.editingDeadline(i, st), c = i.editing.completion; %>
+            <tr class="<%= W.isEditOverdue(i, sm.now, st) ? 'overdue' : '' %>">
+              <td><a class="reel-link" href="/social-media/reels/<%= i.id %>"><%= i.title %></a><div class="sub"><%- V.pageBadge(i.pageId) %></div></td>
+              <td><%- people.ownerChip(i.editor) %></td>
+              <td class="nowrap"><%= c && c.deadline ? V.fmtDateTime(c.deadline) : d ? V.fmtDateTime(d) : 'Default rule' %></td>
+              <td><%- V.statusBadge(statusOf(i)) %></td>
+              <td class="nowrap"><% if (c) { %><%= V.fmtDateTime(c.at) %><br><%- V.timingBadge(c) %><% } else { %>—<% } %></td>
+              <td class="muted" style="max-width:220px"><span class="sm-clamp"><%= i.editing.notes || '—' %></span></td>
+              <td><div style="display:flex;justify-content:flex-end"><%- include('_actions', { item: i, stage: 'Editing' }) %></div></td>
+            </tr>
+          <% }) %>
+        </tbody>
+      </table></div>
+      <% } %>
+    </div>
+  <% } %>
+</div>
+<%- include('_modals') %>
+<%- include('../partials/footer') %>

@@ -1,0 +1,93 @@
+<%- include('../partials/header') %>
+<%
+  var a = sm.actor, people = sm.people;
+  var qs = function (over) {
+    var o = Object.assign({ tab: f.tab, view: f.view, q: f.q, page: f.page, owner: f.owner }, over);
+    var p = new URLSearchParams();
+    Object.keys(o).forEach(function (k) { if (o[k] !== '' && o[k] !== 'all' && o[k] !== undefined && !(k === 'view' && o[k] === 'list')) p.set(k, o[k]); });
+    return '?' + p.toString();
+  };
+%>
+<div class="container container-wide sm">
+  <%- include('_bar') %>
+  <div class="page-head">
+    <div>
+      <div class="eyebrow-date">SOCIAL MEDIA STUDIO</div>
+      <h1>Publishing Queue</h1>
+      <p>Reels arrive here as soon as editing is completed. Page team members can schedule a post; the employee who actually uploads it confirms with “Mark as Published”, entering the real post URL and time.</p>
+    </div>
+    <span class="sm-seg"><a class="<%= f.view === 'list' ? 'active' : '' %>" href="<%= qs({ view: 'list' }) %>">List</a><a class="<%= f.view === 'calendar' ? 'active' : '' %>" href="<%= qs({ view: 'calendar' }) %>">Calendar</a></span>
+  </div>
+
+  <div class="sm-cards-2">
+    <p class="sm-note warn" style="margin:0"><b>Not connected to Instagram.</b> “Mark as Published” records the employee’s confirmation, the post URL they paste and the actual posting time. Nothing is posted to Instagram and the URL is not verified.</p>
+    <p class="sm-note" style="margin:0"><b>Scheduling is not publishing.</b> A scheduled post still counts as not published until someone confirms the upload. Posts are on schedule if published within <%= W.PUBLISH_GRACE_HOURS %>h of the planned time.</p>
+  </div>
+
+  <div class="sm-kpis">
+    <% W.PUBLISH_STATUSES.forEach(function (s) { %>
+      <a class="sum-card sm-kpi tone-<%= V.STATUS_TONE[s] === 'red' ? 'red' : V.STATUS_TONE[s] === 'green' ? 'green' : V.STATUS_TONE[s] === 'amber' ? 'amber' : V.STATUS_TONE[s] === 'sky' ? 'sky' : 'brand' %> <%= f.tab === s ? 'active' : '' %>" href="<%= qs({ tab: s }) %>"><div class="sum-card-top"><span class="sum-label"><%= s %></span></div><div class="sum-value"><%= counts[s] %></div></a>
+    <% }) %>
+  </div>
+
+  <div class="list-card sm-section">
+    <form class="sm-filters" method="GET" action="/social-media/publishing">
+      <input type="hidden" name="tab" value="<%= f.tab %>"><input type="hidden" name="view" value="<%= f.view %>">
+      <input type="search" name="q" value="<%= f.q %>" placeholder="Search title or caption…" aria-label="Search">
+      <select class="filter-select" name="page" data-autosubmit aria-label="Page"><option value="all">All pages</option><% C.PAGES.forEach(function (p) { %><option value="<%= p.id %>" <%= f.page === p.id ? 'selected' : '' %>><%= p.shortName %></option><% }) %></select>
+      <select class="filter-select" name="owner" data-autosubmit aria-label="Published by"><option value="all">Published by: anyone</option><% members.forEach(function (m) { %><option value="<%= m.userId %>" <%= f.owner === m.userId ? 'selected' : '' %>><%= m.name %></option><% }) %></select>
+      <button class="btn small outline" type="submit">Search</button>
+    </form>
+    <div class="sm-pad" style="padding-bottom:0"><div class="tabs sm-tabs">
+      <a class="tab-btn <%= f.tab === 'all' ? 'active' : '' %>" href="<%= qs({ tab: 'all' }) %>">All <span class="tag-count"><%= counts.all %></span></a>
+      <% W.PUBLISH_STATUSES.forEach(function (s) { %><a class="tab-btn <%= f.tab === s ? 'active' : '' %>" href="<%= qs({ tab: s }) %>"><%= s %> <span class="tag-count"><%= counts[s] %></span></a><% }) %>
+    </div></div>
+
+    <% if (f.view === 'list') { %>
+      <% if (!rows.length) { %>
+        <div class="empty-state"><div class="empty-state-title">Nothing in this queue</div><div class="empty-state-sub">Reels appear here automatically as soon as their editing is marked completed.</div></div>
+      <% } else { %>
+        <div class="sm-scroll"><table class="sm-table min-1100">
+          <thead><tr><th>Reel</th><th>Planned</th><th>Actual publishing</th><th>Status</th><th>Published by</th><th>Scheduled by</th><th>Post URL</th><th style="text-align:right">Action</th></tr></thead>
+          <tbody>
+            <% rows.forEach(function (r) { var i = r.item, c = i.publishing.completion; %>
+              <tr class="<%= r.status === 'Missed Deadline' ? 'overdue' : '' %>">
+                <td style="max-width:240px"><a class="reel-link" href="/social-media/reels/<%= i.id %>"><%= i.title %></a><div class="sub"><%- V.pageBadge(i.pageId) %></div><% if (i.caption) { %><div class="muted sm-clamp"><%= i.caption %></div><% } %></td>
+                <td class="nowrap"><%= i.publishAt ? V.fmtDateTime(i.publishAt) : 'not set' %></td>
+                <td class="nowrap"><% if (c) { %><%= V.fmtDateTime(c.at) %> <% if (c.onTime !== undefined) { %><span class="<%= c.onTime ? 'green-txt' : 'red-txt' %>"><%= c.onTime ? 'on time' : 'late' %></span><% } %><% } else { %>—<% } %></td>
+                <td><%- V.statusBadge(r.status) %><% if (r.status === 'Delayed' && i.publishing.delayReason) { %><div class="muted"><%= i.publishing.delayReason %></div><% } %></td>
+                <td><%- people.ownerChip(i.publishingOwner, 'Not yet published') %></td>
+                <td class="nowrap muted"><%= i.publishing.scheduledAt ? (i.publishing.scheduledByName || people.nameOf(i.publishing.scheduledBy)) + ' · ' + V.fmtDateTime(i.publishing.scheduledAt) : '—' %></td>
+                <td class="muted" style="max-width:200px;overflow-wrap:anywhere"><% if (i.publishing.postUrl) { %><a href="<%= i.publishing.postUrl %>" target="_blank" rel="noopener noreferrer nofollow"><%= i.publishing.postUrl.replace(/^https?:\/\/(www\.)?/, '') %></a><br><span class="warn-txt" style="font-size:10.5px">entered manually · not verified</span><% } else { %>—<% } %></td>
+                <td><div style="display:flex;justify-content:flex-end"><%- include('_actions', { item: i, stage: 'Publishing' }) %></div></td>
+              </tr>
+            <% }) %>
+          </tbody>
+        </table></div>
+      <% } %>
+    <% } else {
+      var mq = function (d) { return qs({ month: W.localDay(d).slice(0, 7) }); };
+      var dateOf = function (i) { return (i.publishing.completion && i.publishing.completion.at) || i.publishAt; };
+      var unplanned = rows.filter(function (r) { return !dateOf(r.item); }).length; %>
+      <div class="sm-filters" style="padding-top:0">
+        <a class="btn small outline" href="<%= mq(new Date(monthCursor.getFullYear(), monthCursor.getMonth() - 1, 1)) %>">‹</a>
+        <a class="btn small outline" href="<%= mq(new Date(sm.now.getFullYear(), sm.now.getMonth(), 1)) %>">Today</a>
+        <a class="btn small outline" href="<%= mq(new Date(monthCursor.getFullYear(), monthCursor.getMonth() + 1, 1)) %>">›</a>
+        <b><%= V.fmtDate(monthCursor, 'month') %></b>
+        <% if (unplanned) { %><span class="sm-muted"><%= unplanned %> reel(s) without a planned publishing date are shown in the List view only.</span><% } %>
+      </div>
+      <div class="sm-pad"><div class="sm-scroll"><div class="sm-cal">
+        <% monthDays.slice(0, 7).forEach(function (d) { %><div class="sm-cal-head"><%= d.toLocaleDateString('en-GB', { weekday: 'short' }) %></div><% }) %>
+        <% monthDays.forEach(function (d) { var key = W.localDay(d); var dayRows = rows.filter(function (r) { var dt = dateOf(r.item); return dt && W.localDay(dt) === key; }); %>
+          <div class="sm-cal-day small <%= d.getMonth() !== monthCursor.getMonth() ? 'out' : '' %> <%= key === W.localDay(sm.now) ? 'today' : '' %>">
+            <div class="sm-cal-num"><span><%= d.getDate() %></span></div>
+            <% dayRows.slice(0, 3).forEach(function (r) { var p = C.getPage(r.item.pageId); %><a class="sm-ev <%= r.status === 'Missed Deadline' ? 'overdue' : '' %>" style="--pc:<%= p.color %>;--pcs:<%= p.soft %>" href="/social-media/reels/<%= r.item.id %>" title="<%= r.item.title %> · <%= r.status %>"><span class="t"><%= r.status === 'Published' ? '✓ ' : r.status === 'Scheduled' ? '⏱ ' : '' %><%= r.item.title %></span></a><% }) %>
+            <% if (dayRows.length > 3) { %><span class="sm-ev-more">+<%= dayRows.length - 3 %> more</span><% } %>
+          </div>
+        <% }) %>
+      </div></div></div>
+    <% } %>
+  </div>
+</div>
+<%- include('_modals') %>
+<%- include('../partials/footer') %>

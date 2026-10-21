@@ -1,0 +1,9 @@
+<%# One reel row. Expects: item, meta (escaped HTML); optional: right (escaped HTML), stage (shows actions). %>
+<li class="sm-row">
+  <a class="sm-row-main" href="/social-media/reels/<%= item.id %>">
+    <span class="sm-stripe" style="background:<%= C.getPage(item.pageId).color %>"></span>
+    <span class="sm-row-text"><b><%= item.title %></b><span class="sm-row-meta"><%- meta %></span></span>
+  </a>
+  <% if (typeof right !== 'undefined' && right) { %><span class="sm-row-right"><%- right %></span><% } %>
+  <% if (typeof stage !== 'undefined' && stage) { %><%- include('_actions', { item: item, stage: stage, extended: false }) %><% } %>
+</li>

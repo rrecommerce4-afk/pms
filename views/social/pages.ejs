@@ -1,0 +1,56 @@
+<%- include('../partials/header') %>
+<% var a = sm.actor, people = sm.people; var monthName = sm.now.toLocaleDateString('en-GB', { month: 'long' }); %>
+<div class="container container-wide sm">
+  <%- include('_bar') %>
+  <div class="page-head">
+    <div>
+      <div class="eyebrow-date">SOCIAL MEDIA STUDIO</div>
+      <h1>Instagram Pages</h1>
+      <p>Four Rajarani accounts with their page teams, monthly targets and shared task status. Page team members can claim shoots and confirm publishing; editing is claimed by the eligible editors.</p>
+    </div>
+    <div class="sm-head-actions"><%- V.demoBadge() %><% if (a.isManager) { %><a class="btn" href="/social-media/reels/new">+ Create reel</a><% } %></div>
+  </div>
+
+  <div class="sm-cards-2">
+    <% C.PAGES.forEach(function (p) { var s = summaries[p.id], pr = progress[p.id]; var team = P.teamFor(sm.settings, p.id), editors = P.editorsForPage(sm.settings, p.id); %>
+      <div class="section-card sm-account" style="--pc:<%= p.color %>;--pcs:<%= p.soft %>;">
+        <div class="sm-account-foot" style="border:none;padding:0;">
+          <div class="sm-account-head"><span class="sm-page-av lg"><%= V.initials(p.shortName) %></span><div><b><%= p.name %></b><small><%= p.handle %></small></div></div>
+          <a class="btn small outline" href="/social-media/pages/<%= p.id %>">View details →</a>
+        </div>
+        <div class="sm-stat-grid">
+          <div class="sm-stat">Followers<b><%= V.fmtNum(s.current) %></b></div>
+          <div class="sm-stat">Net growth<b class="<%= s.net >= 0 ? 'green-txt' : 'red-txt' %>"><%= s.net >= 0 ? '+' : '' %><%= V.fmtNum(s.net) %></b></div>
+          <div class="sm-stat">Growth<b><%= V.fmtPct(s.growthPct, 2) %></b></div>
+        </div>
+        <p class="sm-foot-note" style="margin:0">Follower period <%= V.fmtDate(fw.from, 'short') %> – <%= V.fmtDate(fw.to, 'short') %> · DEMO DATA — INSTAGRAM NOT CONNECTED</p>
+        <div class="sm-progress-label"><span><%= monthName %> target</span><b><%= pr.published %> / <%= pr.target %> published · <%= pr.remaining %> remaining</b></div>
+        <div class="sm-progress"><i style="width:<%= pr.pct %>%;background:<%= p.color %>"></i></div>
+        <div class="sm-stat-grid">
+          <div class="sm-stat <%= pr.shootsAvailable ? 'hl' : '' %>">Shoots available<b><%= pr.shootsAvailable %></b></div>
+          <div class="sm-stat <%= pr.editingAvailable ? 'hl' : '' %>">Editing available<b><%= pr.editingAvailable %></b></div>
+          <div class="sm-stat">In production<b><%= pr.inProduction %></b></div>
+          <div class="sm-stat">Ready to publish<b><%= pr.readyToPublish %></b></div>
+          <div class="sm-stat">Scheduled<b><%= pr.scheduled %></b></div>
+          <div class="sm-stat">Published (month)<b><%= pr.published %></b></div>
+        </div>
+        <p class="sm-foot-note" style="margin:0"><%= pr.planned %> reels planned this month. “Available” = unclaimed, open to the page team.</p>
+        <div class="sm-two" style="border-top:1px solid var(--border-soft);padding-top:12px;">
+          <div>
+            <p class="sm-h4">Page team (can claim shoots &amp; confirm publishing)</p>
+            <div class="sm-people" style="flex-direction:column;gap:8px;">
+              <% team.forEach(function (k) { var r = C.getRosterEntry(k); %><%- people.keyChip(k, r.canEdit ? 'Page team · Editor' : 'Page team') %><% }) %>
+            </div>
+          </div>
+          <div>
+            <p class="sm-h4">Can claim editing</p>
+            <div class="sm-tags"><% editors.forEach(function (k) { %><%- V.badge(people.keyName(k), 'brand') %><% }) %></div>
+            <p class="sm-foot-note">From the four-person editing team only.</p>
+          </div>
+        </div>
+      </div>
+    <% }) %>
+  </div>
+</div>
+<%- include('_modals') %>
+<%- include('../partials/footer') %>

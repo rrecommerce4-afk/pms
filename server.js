@@ -8,6 +8,10 @@ const authRoutes = require('./routes/auth');
 const adminRoutes = require('./routes/admin');
 const employeeRoutes = require('./routes/employee');
 const viewerRoutes = require('./routes/viewer');
+const socialRoutes = require('./routes/social');
+const { getStudio } = require('./lib/studio/store');
+const { resolveActor } = require('./lib/studio/permissions');
+const { STUDIO_NAV } = require('./lib/studio/nav');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -18,6 +22,7 @@ app.set('views', path.join(__dirname, 'views'));
 // Appends `task=<id>` to a page URL (path + querystring) so a list page reopens
 // the task detail slide-over pointed at that task.
 app.locals.taskUrl = (base, id) => base + (base.includes('?') ? '&' : '?') + 'task=' + id;
+app.locals.studioNav = STUDIO_NAV;
 
 app.use(express.urlencoded({ extended: true }));
 app.use(express.static(path.join(__dirname, 'public')));
@@ -33,10 +38,15 @@ app.use(
 
 // The session keeps the name from login time, so a profile rename wouldn't show until the
 // user logged in again. Re-read it from the users list on each request instead.
+// Also decides whether the sidebar shows the Social Media Studio link for this user.
 app.use((req, res, next) => {
+  res.locals.studioAccess = false;
   if (req.session.userId) {
-    const user = load().users.find((u) => u.id === req.session.userId);
+    const db = load();
+    const user = db.users.find((u) => u.id === req.session.userId);
     if (user) req.session.name = user.name;
+    const actor = user ? resolveActor(getStudio(db), user) : null;
+    res.locals.studioAccess = !!(actor && actor.canView);
   }
   next();
 });
@@ -61,6 +71,7 @@ app.use('/', authRoutes);
 app.use('/admin', adminRoutes);
 app.use('/employee', employeeRoutes);
 app.use('/viewer', viewerRoutes);
+app.use('/social-media', socialRoutes);
 
 seedAdminIfNeeded();
 

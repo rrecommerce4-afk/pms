@@ -1,0 +1,28 @@
+<%
+  // Renders the controls for one stage of one reel. Expects: item, stage, extended (optional).
+  var acts = V.stageActions(sm.actor, sm.studio, item, stage, sm.people.nameOf, typeof extended !== 'undefined' && extended);
+  var modalAction = { 'complete-shoot': 'complete-shoot', 'complete-edit': 'complete-edit', publish: 'publish', schedule: 'schedule', reschedule: 'reschedule' };
+  var variantClass = { primary: '', outline: 'outline', ghost: 'ghost' };
+%>
+<% if (acts.length) { %>
+<div class="sm-actions">
+  <% acts.forEach(function (a) { %>
+    <% if (a.type === 'post') { %>
+      <form method="POST" action="/social-media/reels/<%= item.id %>/<%= a.action %>" class="sm-inline-form">
+        <input type="hidden" name="_csrf" value="<%= sm.csrf %>">
+        <input type="hidden" name="returnTo" value="<%= sm.currentUrl %>">
+        <% Object.keys(a.fields).forEach(function (k) { %><input type="hidden" name="<%= k %>" value="<%= a.fields[k] %>"><% }) %>
+        <button class="btn small <%= variantClass[a.variant] %>" type="submit"><%= a.label %></button>
+      </form>
+    <% } else if (a.type === 'modal') { %>
+      <button type="button" class="btn small <%= variantClass[a.variant] %>" data-sm-modal="<%= a.modal %>"
+        data-url="/social-media/reels/<%= item.id %>/<%= a.data.action || modalAction[a.modal] %>" data-reel="<%= item.title %>"
+        <% Object.keys(a.data).forEach(function (k) { if (k !== 'action') { %> data-<%= k %>="<%= a.data[k] %>"<% } }) %>><%= a.label %></button>
+    <% } else if (a.type === 'link') { %>
+      <a class="btn small outline" href="<%= a.href %>"><%= a.label %></a>
+    <% } else { %>
+      <span class="sm-hint icon-<%= a.icon %>"><%= a.text %></span>
+    <% } %>
+  <% }) %>
+</div>
+<% } %>

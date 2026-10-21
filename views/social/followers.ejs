@@ -1,0 +1,100 @@
+<%- include('../partials/header') %>
+<%
+  var shown = q.page === 'all' ? summaries : summaries.filter(function (s) { return s.pageId === q.page; });
+  var head = q.page === 'all' ? combined : shown[0];
+  var lines = q.page === 'all' ? PAGE_SERIES : PAGE_SERIES.filter(function (s) { return s.key === q.page; });
+  var qs = function (over) { var o = Object.assign({}, q, over); var p = new URLSearchParams(); Object.keys(o).forEach(function (k) { if (o[k] !== undefined && o[k] !== null && o[k] !== '') p.set(k, o[k]); }); if (o.period !== 'custom') { p.delete('from'); p.delete('to'); } return '?' + p.toString(); };
+  var delta = function (v) { return '<span class="' + (v >= 0 ? 'green-txt' : 'red-txt') + '">' + (v >= 0 ? '▲' : '▼') + ' ' + Math.abs(v).toFixed(1) + '%</span>'; };
+%>
+<div class="container container-wide sm">
+  <%- include('_bar') %>
+  <div class="page-head">
+    <div>
+      <div class="eyebrow-date">SOCIAL MEDIA STUDIO</div>
+      <h1>Followers Analytics</h1>
+      <p>Follower growth trends for each Instagram page. Numbers are generated locally for demonstration — real Instagram integration will be handled separately.</p>
+    </div>
+    <%- V.demoBadge() %>
+  </div>
+  <div class="sm-demo-strip"><b>DEMO DATA — INSTAGRAM NOT CONNECTED.</b> These follower counts are simulated and do not represent actual Instagram performance. No data is fetched from Instagram or Meta.</div>
+
+  <div class="list-card sm-section">
+    <form class="sm-filters" method="GET" action="/social-media/followers">
+      <span class="sm-seg"><% [['7', '7 days'], ['30', '30 days'], ['90', '90 days'], ['custom', 'Custom']].forEach(function (p) { %><a class="<%= q.period === p[0] ? 'active' : '' %>" href="<%= qs({ period: p[0] }) %>"><%= p[1] %></a><% }) %></span>
+      <% if (q.period === 'custom') { %>
+        <input type="hidden" name="period" value="custom">
+        <input type="date" name="from" min="<%= minDate %>" max="<%= maxDate %>" value="<%= q.from %>" aria-label="From">
+        <input type="date" name="to" min="<%= minDate %>" max="<%= maxDate %>" value="<%= q.to %>" aria-label="To">
+      <% } else { %><input type="hidden" name="period" value="<%= q.period %>"><% } %>
+      <select class="filter-select" name="page" data-autosubmit aria-label="Instagram page">
+        <option value="all">Combined — all four pages</option>
+        <% C.PAGES.forEach(function (p) { %><option value="<%= p.id %>" <%= q.page === p.id ? 'selected' : '' %>><%= p.name %></option><% }) %>
+      </select>
+      <select class="filter-select" name="bucket" data-autosubmit aria-label="Granularity"><option value="day" <%= q.bucket === 'day' ? 'selected' : '' %>>Daily</option><option value="week" <%= q.bucket === 'week' ? 'selected' : '' %>>Weekly</option></select>
+      <select class="filter-select" name="metric" data-autosubmit aria-label="Metric"><option value="total" <%= q.metric === 'total' ? 'selected' : '' %>>Total followers</option><option value="gain" <%= q.metric === 'gain' ? 'selected' : '' %>>Net gain</option></select>
+      <button class="btn small outline" type="submit">Apply</button>
+      <span class="grow"></span>
+      <span class="sm-muted">Demo scenario: <b><%= sm.settings.followerScenario %></b><% if (sm.actor.isManager) { %> · <a class="view-all" href="/social-media/settings#followers">change</a><% } %></span>
+    </form>
+    <p class="sm-muted sm-pad" style="margin-top:-6px;"><%= V.fmtDate(q.from) %> – <%= V.fmtDate(q.to) %> · <%= days %> days · compared with the previous <%= days %> days<%= days < 14 && q.bucket === 'week' ? ' · daily view used for short periods' : '' %></p>
+  </div>
+
+  <div class="sm-kpis cols-4">
+    <%- include('_kpi', { label: q.page === 'all' ? 'Total followers (4 pages)' : 'Current followers', value: V.fmtNum(head.current), hint: 'DEMO DATA', tone: 'brand' }) %>
+    <%- include('_kpi', { label: 'Previous period followers', value: V.fmtNum(head.previous), hint: 'at period start', tone: 'slate' }) %>
+    <div class="sum-card sm-kpi tone-green"><div class="sum-card-top"><span class="sum-label">Net followers gained</span></div><div class="sum-value"><%= head.net >= 0 ? '+' : '' %><%= V.fmtNum(head.net) %></div><div class="sum-sub"><%- delta(head.vsPrevPct) %> vs previous period</div></div>
+    <%- include('_kpi', { label: 'Growth', value: V.fmtPct(head.growthPct, 2), hint: 'avg ' + head.avgDaily.toFixed(1) + ' / day', tone: 'sky' }) %>
+  </div>
+
+  <div class="list-card sm-section">
+    <div class="list-card-head section-card-head"><div><h2><%= q.metric === 'total' ? 'Follower trend' : 'Net follower gain' %></h2><p class="sm-muted"><%= q.bucket === 'day' || days < 14 ? 'Daily' : 'Weekly' %> · <%= q.page === 'all' ? 'all pages' : C.getPage(q.page).name %></p></div><%- V.demoBadge() %></div>
+    <div class="sm-pad"><%- V.legend(lines) %><%- V.lineChart(series, lines, { height: 320, gain: q.metric === 'gain', label: 'Follower trend (demo data)' }) %></div>
+  </div>
+
+  <div class="sm-cards-4">
+    <% shown.forEach(function (s) { var p = C.getPage(s.pageId); %>
+      <div class="section-card sm-account" style="--pc:<%= p.color %>;--pcs:<%= p.soft %>;">
+        <div class="sm-account-head"><span class="sm-page-av"><%= V.initials(p.shortName) %></span><div><b><%= p.shortName %></b><small><%= p.handle %></small></div></div>
+        <div class="sm-account-stats"><div><b><%= V.fmtNum(s.current) %></b></div><div class="right"><b class="<%= s.net >= 0 ? 'green-txt' : 'red-txt' %>"><%= s.net >= 0 ? '+' : '' %><%= V.fmtNum(s.net) %></b><small><%= V.fmtPct(s.growthPct, 2) %></small></div></div>
+        <dl class="sm-kv" style="font-size:12px;">
+          <dt>Previous period followers</dt><dd><%= V.fmtNum(s.previous) %></dd>
+          <dt>Avg daily gain</dt><dd><%= s.avgDaily >= 0 ? '+' : '' %><%= s.avgDaily.toFixed(1) %></dd>
+          <dt>Previous period net</dt><dd><%= V.fmtNum(s.prevNet) %></dd>
+          <dt>vs previous period</dt><dd><%- delta(s.vsPrevPct) %></dd>
+          <dt>Best day</dt><dd><%= s.bestDay ? V.fmtDate(s.bestDay.date, 'short') + ' · +' + V.fmtNum(s.bestDay.gain) : '—' %></dd>
+          <dt>Best week</dt><dd><%= s.bestWeek ? V.fmtDate(s.bestWeek.week, 'short') + ' · +' + V.fmtNum(s.bestWeek.gain) : '—' %></dd>
+        </dl>
+      </div>
+    <% }) %>
+  </div>
+
+  <div class="sm-cards-2">
+    <div class="list-card">
+      <div class="list-card-head section-card-head"><div><h2>Combined followers</h2><p class="sm-muted">All four pages together</p></div><%- V.demoBadge('Demo data') %></div>
+      <div class="sm-pad"><%- V.lineChart(totalsSeries, [{ key: 'all', label: 'All four pages', color: '#6C4E96' }], { height: 240, area: true, label: 'Combined followers (demo data)' }) %></div>
+    </div>
+    <div class="list-card">
+      <div class="list-card-head section-card-head"><div><h2>Net gain: this vs previous period</h2><p class="sm-muted">Two consecutive <%= days %>-day periods</p></div><%- V.demoBadge('Demo data') %></div>
+      <div class="sm-pad">
+        <% var barSeries = [{ key: 'previous', label: 'Previous period', color: '#C9C0DA' }, { key: 'current', label: 'Selected period', color: '#6C4E96' }]; %>
+        <%- V.legend(barSeries) %><%- V.barChart(summaries.map(function (s) { return { label: C.getPage(s.pageId).shortName, current: s.net, previous: s.prevNet }; }), barSeries, { height: 240, label: 'Net gain comparison (demo data)' }) %>
+      </div>
+    </div>
+  </div>
+
+  <div class="list-card sm-section">
+    <div class="list-card-head section-card-head"><div><h2>Page comparison</h2><p class="sm-muted">Selected period vs previous period</p></div></div>
+    <div class="sm-scroll"><table class="sm-table min-900">
+      <thead><tr><th>Page</th><th class="num">Current</th><th class="num">Period start</th><th class="num">Net</th><th class="num">Growth</th><th class="num">Prev. net</th><th class="num">vs prev.</th><th>Best day</th><th>Best week</th></tr></thead>
+      <tbody>
+        <% summaries.forEach(function (s) { %>
+          <tr style="<%= q.page !== 'all' && q.page !== s.pageId ? 'opacity:.5' : '' %>"><td><%- V.pageBadge(s.pageId) %></td><td class="num"><%= V.fmtNum(s.current) %></td><td class="num"><%= V.fmtNum(s.previous) %></td><td class="num <%= s.net >= 0 ? 'green-txt' : 'red-txt' %>"><%= s.net >= 0 ? '+' : '' %><%= V.fmtNum(s.net) %></td><td class="num"><%= V.fmtPct(s.growthPct, 2) %></td><td class="num"><%= V.fmtNum(s.prevNet) %></td><td class="num"><%- delta(s.vsPrevPct) %></td><td class="nowrap"><%= s.bestDay ? V.fmtDate(s.bestDay.date, 'short') + ' (+' + V.fmtNum(s.bestDay.gain) + ')' : '—' %></td><td class="nowrap"><%= s.bestWeek ? 'Wk of ' + V.fmtDate(s.bestWeek.week, 'short') + ' (+' + V.fmtNum(s.bestWeek.gain) + ')' : '—' %></td></tr>
+        <% }) %>
+        <tr class="total"><td>All four pages</td><td class="num"><%= V.fmtNum(combined.current) %></td><td class="num"><%= V.fmtNum(combined.previous) %></td><td class="num"><%= combined.net >= 0 ? '+' : '' %><%= V.fmtNum(combined.net) %></td><td class="num"><%= V.fmtPct(combined.growthPct, 2) %></td><td class="num"><%= V.fmtNum(combined.prevNet) %></td><td class="num"><%- delta(combined.vsPrevPct) %></td><td></td><td></td></tr>
+      </tbody>
+    </table></div>
+    <p class="sm-foot-note sm-pad">DEMO DATA — INSTAGRAM NOT CONNECTED</p>
+  </div>
+</div>
+<%- include('_modals') %>
+<%- include('../partials/footer') %>

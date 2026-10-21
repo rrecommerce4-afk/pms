@@ -1,0 +1,80 @@
+<% if (!sm.actor.readOnly) { %>
+<div class="sm">
+  <% function modalHead(title) { %>
+    <div class="modal-head"><div><h3><%= title %></h3><div class="sm-modal-sub" data-fill="reel"></div></div><button class="modal-close" type="button" data-close aria-label="Close">&times;</button></div>
+  <% } %>
+  <% function hidden() { %><input type="hidden" name="_csrf" value="<%= sm.csrf %>"><input type="hidden" name="returnTo" value="<%= sm.currentUrl %>"><% } %>
+
+  <div class="modal-backdrop" id="sm-modal-complete-shoot" role="dialog" aria-modal="true">
+    <form class="modal-box" method="POST">
+      <% modalHead('Mark shoot completed'); hidden(); %>
+      <div class="modal-body">
+        <p class="sm-note">Recorded as <b><%= sm.actor.name %></b> at the time you submit · <b data-show-if="late" class="red-txt">after the shoot deadline</b><b data-show-unless="late" class="green-txt">before the shoot deadline</b></p>
+        <label class="sm-check"><input type="checkbox" name="rawSubmitted" value="on" checked> Raw footage is ready (submitted to the shared drive)</label>
+        <div class="field"><label>Notes (optional)</label><textarea name="notes" rows="3" maxlength="2000" placeholder="Shots captured, anything the editor should know…"></textarea></div>
+      </div>
+      <div class="sm-modal-foot"><button type="button" class="btn outline" data-close>Cancel</button><button class="btn" type="submit">Mark shoot completed</button></div>
+    </form>
+  </div>
+
+  <div class="modal-backdrop" id="sm-modal-complete-edit" role="dialog" aria-modal="true">
+    <form class="modal-box" method="POST">
+      <% modalHead('Mark editing completed'); hidden(); %>
+      <div class="modal-body">
+        <p class="sm-note">Recorded as <b><%= sm.actor.name %></b> when you submit. On-time status uses the editing deadline in effect now. There is no review step — the reel moves straight to Ready to Publish.</p>
+        <div class="field"><label>Editing notes (optional)</label><textarea name="notes" rows="3" maxlength="2000" data-fill-value="notes" placeholder="e.g. Re-cut intro after verbal feedback"></textarea></div>
+      </div>
+      <div class="sm-modal-foot"><button type="button" class="btn outline" data-close>Cancel</button><button class="btn" type="submit">Mark editing completed</button></div>
+    </form>
+  </div>
+
+  <div class="modal-backdrop" id="sm-modal-publish" role="dialog" aria-modal="true">
+    <form class="modal-box" method="POST">
+      <% modalHead('Mark as published'); hidden(); %>
+      <div class="modal-body">
+        <p class="sm-note warn">The PMS records your confirmation. It does not connect to Instagram and does not verify the post.</p>
+        <div class="field"><label>Instagram post URL *</label><input type="url" name="postUrl" required maxlength="500" placeholder="https://www.instagram.com/reel/…" pattern="https://(www\.)?instagram\.com/.+"></div>
+        <div class="field"><label>Actual publishing date &amp; time *</label><input type="datetime-local" name="publishedAt" required data-now><div class="helper-text" data-fill="planned" data-prefix="Planned: " data-empty="No planned time — timeliness will not be scored."></div></div>
+        <div class="field"><label>Caption / notes (optional)</label><textarea name="notes" rows="2" maxlength="2000"></textarea></div>
+        <p class="helper-text">You (<b><%= sm.actor.name %></b>) will be recorded as the publishing owner.</p>
+      </div>
+      <div class="sm-modal-foot"><button type="button" class="btn outline" data-close>Cancel</button><button class="btn" type="submit">Confirm upload</button></div>
+    </form>
+  </div>
+
+  <div class="modal-backdrop" id="sm-modal-schedule" role="dialog" aria-modal="true">
+    <form class="modal-box" method="POST">
+      <% modalHead('Schedule post'); hidden(); %>
+      <div class="modal-body">
+        <p class="sm-note">Scheduling is <b>not</b> publishing. The post stays unpublished until someone confirms the upload.</p>
+        <div class="field"><label>Planned publishing time *</label><input type="datetime-local" name="publishAt" required data-fill-value="publishat"></div>
+      </div>
+      <div class="sm-modal-foot"><button type="button" class="btn outline" data-close>Cancel</button><button class="btn" type="submit">Schedule</button></div>
+    </form>
+  </div>
+
+  <div class="modal-backdrop" id="sm-modal-reschedule" role="dialog" aria-modal="true">
+    <form class="modal-box" method="POST">
+      <% modalHead('Reschedule publishing'); hidden(); %>
+      <div class="modal-body">
+        <div class="field"><label>New planned publishing time *</label><input type="datetime-local" name="publishAt" required data-fill-value="publishat"></div>
+        <div class="field"><label>Reason (kept in history)</label><input type="text" name="reason" maxlength="500" placeholder="e.g. Festival post moved by a day"></div>
+      </div>
+      <div class="sm-modal-foot"><button type="button" class="btn outline" data-close>Cancel</button><button class="btn" type="submit">Reschedule</button></div>
+    </form>
+  </div>
+
+  <div class="modal-backdrop" id="sm-modal-reason" role="dialog" aria-modal="true">
+    <form class="modal-box" method="POST">
+      <div class="modal-head"><div><h3 data-fill="title">Reason</h3><div class="sm-modal-sub" data-fill="reel"></div></div><button class="modal-close" type="button" data-close aria-label="Close">&times;</button></div>
+      <% hidden(); %>
+      <input type="hidden" name="stage" data-fill-value="stage">
+      <div class="modal-body">
+        <div class="field"><label data-fill="label">Reason</label><textarea name="reason" rows="3" maxlength="500" required data-fill-placeholder="placeholder"></textarea></div>
+      </div>
+      <div class="sm-modal-foot"><button type="button" class="btn outline" data-close>Cancel</button><button class="btn" type="submit" data-fill="confirm">Save</button></div>
+    </form>
+  </div>
+</div>
+<% } %>
+<script src="/studio.js" defer></script>

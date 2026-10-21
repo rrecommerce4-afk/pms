@@ -1,0 +1,163 @@
+<%- include('../partials/header') %>
+<%
+  var w = sm.settings.weights, rk = sm.settings.ranking;
+  var medal = function (r) { return r === 1 ? 'gold' : r === 2 ? 'silver' : r === 3 ? 'bronze' : ''; };
+  var LINE = ['#6C4E96', '#3A5F8A', '#3F7A56', '#B5862A'];
+  var linked = slots.filter(function (s) { return s.linked; });
+  var trendSeries = linked.map(function (s, k) { return { key: 'u' + s.userId, label: s.name, color: LINE[k % LINE.length] }; });
+  var contrib = general.map(function (g) { return { label: g.name, Shoot: g.categories.Shoot.completed, Editing: g.categories.Editing.completed, Publishing: g.categories.Publishing.completed }; });
+  var contribSeries = [{ key: 'Shoot', label: 'Shoot', color: '#3A5F8A' }, { key: 'Editing', label: 'Editing', color: '#6C4E96' }, { key: 'Publishing', label: 'Publishing', color: '#3F7A56' }];
+  var podium = general.filter(function (s) { return s.status === 'Ranked' && s.rank && s.rank <= 3; }).slice(0, 3);
+  var scoreHtml = function (s) { return s.score === null ? '<span class="sm-score none">Insufficient data</span>' : '<b class="sm-score ' + (s.status === 'Provisional' ? 'prov' : '') + '">' + s.score + '</b>'; };
+  var rankCell = function (s) { return s.rank ? '<span class="sm-rank ' + medal(s.rank) + '" title="' + (s.tied ? 'Tied — equal scores share the same rank' : '') + '">' + (s.tied ? '=' : '') + s.rank + '</span>' : '<span class="muted">—</span>'; };
+%>
+<div class="container container-wide sm">
+  <%- include('_bar') %>
+  <div class="page-head">
+    <div>
+      <div class="eyebrow-date">SOCIAL MEDIA STUDIO</div>
+      <h1>Employee Ranking</h1>
+      <p>Based only on tasks each employee actually claimed and completed between <%= V.fmtDate(sm.range.from, 'short') %> and <%= V.fmtDate(sm.range.to) %>. Only Bansi, Bhavin, Vishnu and Krutik are ranked. Open any breakdown to see exactly how a score was calculated.</p>
+    </div>
+    <span class="sm-seg"><a class="<%= board === 'general' ? 'active' : '' %>" href="?board=general">General</a><a class="<%= board === 'editing' ? 'active' : '' %>" href="?board=editing">Editing</a></span>
+  </div>
+
+  <% var unlinkedRanked = slots.filter(function (s) { return !s.linked; }); if (unlinkedRanked.length) { %>
+    <div class="sm-flash info"><%= unlinkedRanked.map(function (s) { return s.rosterName; }).join(', ') %> <%= unlinkedRanked.length === 1 ? 'is' : 'are' %> not linked to a PMS account yet, so <%= unlinkedRanked.length === 1 ? 'is' : 'are' %> not shown below.<% if (sm.actor.isManager) { %> <a href="/social-media/settings#members">Link members</a><% } %></div>
+  <% } %>
+
+  <div class="list-card sm-section">
+    <div class="list-card-head section-card-head"><div><h2>How the ranking works</h2><p class="sm-muted">Transparent, rate-based, and limited to work each person actually owned.</p></div><% if (sm.actor.isManager) { %><a class="view-all" href="/social-media/settings#weights">Edit weights &amp; rules →</a><% } %></div>
+    <div class="sm-pad sm-two">
+      <div>
+        <p class="sm-h4">Score (configurable, out of 100)</p>
+        <ul class="sm-rules">
+          <li><%= S.COMPONENT_LABELS.onTime %>: <b><%= w.onTime %></b> — on-time completions ÷ all due tasks</li>
+          <li><%= S.COMPONENT_LABELS.shootDelivery %>: <b><%= w.shootDelivery %></b> — shoots completed with raw footage ÷ due shoots</li>
+          <li><%= S.COMPONENT_LABELS.editing %>: <b><%= w.editing %></b> — 50% completion rate + 50% on-time rate (editors only)</li>
+          <li><%= S.COMPONENT_LABELS.publishing %>: <b><%= w.publishing %></b> — confirmed posts published on schedule ÷ confirmed posts with a planned time</li>
+        </ul>
+        <p class="sm-muted">Minimum data: fewer than <b><%= rk.minDueTasks %></b> scored tasks → “Insufficient data”; fewer than <b><%= rk.provisionalBelow %></b> → “Provisional”. Equal scores share a rank (1, 1, 3); names are then listed alphabetically.</p>
+      </div>
+      <div>
+        <p class="sm-h4">Fairness rules</p>
+        <ul class="sm-rules"><% S.SCORING_PRINCIPLES.forEach(function (p) { %><li><%= p %></li><% }) %></ul>
+        <details><summary class="view-all" style="cursor:pointer">Deadline &amp; on-time rules</summary><ul class="sm-rules"><% W.DEADLINE_RULES.forEach(function (r) { %><li><%= r %></li><% }) %></ul></details>
+      </div>
+    </div>
+  </div>
+
+  <% if (board === 'general') { %>
+    <% if (podium.length) { %>
+      <div class="sm-cards-3 sm-section">
+        <% podium.forEach(function (s) { %>
+          <div class="section-card" style="<%= s.rank === 1 ? 'border-color:#E8D5A6;background:#FBF6EA' : '' %>">
+            <div class="sm-board-list"><li style="list-style:none"><span class="sm-rank <%= medal(s.rank) %>">#<%= s.rank %></span><span class="sm-av"><%= V.initials(s.name) %></span><span class="grow"><b><%= s.name %><%= s.tied ? ' (tied)' : '' %></b><small><%= s.totals.completed %> completed · <%= S.fmtRatio(s.totals.onTimeRate) %> on time</small></span><%- scoreHtml(s) %></li></div>
+          </div>
+        <% }) %>
+      </div>
+    <% } %>
+
+    <div class="list-card sm-section">
+      <div class="list-card-head section-card-head"><div><h2>General leaderboard</h2><p class="sm-muted">Shared ranks for equal scores. Provisional (P) and insufficient-data employees use the same minimum-data rule.</p></div></div>
+      <% if (!general.length) { %><div class="empty-state"><div class="empty-state-title">No ranked members linked yet</div></div><% } else { %>
+      <div class="sm-scroll"><table class="sm-table min-1100">
+        <thead><tr><th>Rank</th><th>Employee</th><th>Status</th><th class="num">Claimed</th><th class="num">Completed</th><th class="num">On time</th><th class="num">Late</th><th>Workload done</th><th class="num">On-time rate</th><th>Contribution (S / E / P)</th><th class="num">Avg time</th><th class="num">Score</th><th></th></tr></thead>
+        <tbody>
+          <% general.forEach(function (s) { var wl = s.totals.completionRate; %>
+            <tr>
+              <td><%- rankCell(s) %></td>
+              <td><span class="sm-person"><span class="sm-av"><%= V.initials(s.name) %></span><span><b><%= s.name %></b><small>Studio team · editor</small></span></span></td>
+              <td><%- V.statusBadge(s.status) %></td>
+              <td class="num"><%= s.totals.claimed %></td><td class="num"><%= s.totals.completed %></td>
+              <td class="num green-txt"><%= s.totals.onTime %></td><td class="num warn-txt"><%= s.totals.late %></td>
+              <td style="min-width:130px"><div class="sm-progress"><i style="width:<%= (wl || 0) * 100 %>%"></i></div><small class="muted"><%= s.totals.completed %>/<%= s.totals.due %></small></td>
+              <td class="num"><%= S.fmtRatio(s.totals.onTimeRate) %></td>
+              <td class="nowrap"><%= s.categories.Shoot.completed %> / <%= s.categories.Editing.completed %> / <%= s.categories.Publishing.completed %></td>
+              <td class="num"><%= V.fmtHours(s.totals.avgCompletionH) %></td>
+              <td class="num"><%- scoreHtml(s) %></td>
+              <td><a class="btn small outline" href="?board=general&breakdown=<%= s.userId %>">Breakdown</a></td>
+            </tr>
+          <% }) %>
+        </tbody>
+      </table></div>
+      <% } %>
+      <p class="sm-foot-note sm-pad">Workload done = completed ÷ (completed + claimed-and-overdue). Claimed tasks that are not yet due are shown in the breakdown but never affect the score. S / E / P = completed shooting, editing and publishing tasks.</p>
+    </div>
+
+    <div class="sm-cards-2">
+      <div class="list-card">
+        <div class="list-card-head section-card-head"><div><h2>Contribution volume by category</h2><p class="sm-muted">Completed tasks per employee. This is volume, not score — the score uses rates.</p></div></div>
+        <div class="sm-pad"><%- V.legend(contribSeries) %><%- V.barChart(contrib, contribSeries, { stacked: true, height: 240, label: 'Contribution volume' }) %></div>
+      </div>
+      <div class="list-card">
+        <div class="list-card-head section-card-head"><div><h2>Score trend</h2><p class="sm-muted">Rolling 4-week score at the end of each week. Gaps mean insufficient data for that window.</p></div></div>
+        <div class="sm-pad"><%- V.legend(trendSeries) %><%- V.lineChart(trend, trendSeries, { height: 240, fixedMin: 0, fixedMax: 100, label: 'Score trend' }) %></div>
+      </div>
+    </div>
+  <% } else { %>
+    <div class="list-card sm-section">
+      <div class="list-card-head section-card-head"><div><h2>Editing leaderboard — editing team only</h2><p class="sm-muted">Bansi, Bhavin, Vishnu and Krutik. Editing tasks only. Score = 50% completion rate + 50% on-time rate over due editing tasks.</p></div></div>
+      <% if (!editing.length) { %><div class="empty-state"><div class="empty-state-title">No editing data</div></div><% } else { %>
+      <div class="sm-scroll"><table class="sm-table min-1100">
+        <thead><tr><th>Rank</th><th>Editor</th><th>Status</th><th class="num">Claimed</th><th class="num">Completed</th><th class="num">On time</th><th class="num">Late</th><th class="num">Overdue (open)</th><th class="num">Completion</th><th class="num">On-time rate</th><th class="num">Avg time</th><th class="num">Editing score</th></tr></thead>
+        <tbody>
+          <% editing.forEach(function (s) { %>
+            <tr><td><%- rankCell(s) %></td><td><span class="sm-person"><span class="sm-av"><%= V.initials(s.name) %></span><b><%= s.name %></b></span></td><td><%- V.statusBadge(s.status) %></td>
+              <td class="num"><%= s.stats.claimed %></td><td class="num"><%= s.stats.completed %></td><td class="num green-txt"><%= s.stats.onTime %></td><td class="num warn-txt"><%= s.stats.late %></td><td class="num red-txt"><%= s.stats.openOverdue %></td>
+              <td class="num"><%= S.fmtRatio(s.stats.completionRate) %></td><td class="num"><%= S.fmtRatio(s.stats.onTimeRate) %></td><td class="num"><%= V.fmtHours(s.stats.avgCompletionH) %></td>
+              <td class="num"><%- scoreHtml(s) %><br><small class="muted"><%= s.formula %></small></td></tr>
+          <% }) %>
+        </tbody>
+      </table></div>
+      <% } %>
+      <p class="sm-foot-note sm-pad">Same minimum-data rule as the general leaderboard: fewer than <%= rk.minDueTasks %> due editing tasks → insufficient data; fewer than <%= rk.provisionalBelow %> → provisional.</p>
+    </div>
+  <% } %>
+</div>
+
+<% if (breakdown) { var b = breakdown; %>
+<div class="sm">
+  <div class="modal-backdrop open" role="dialog" aria-modal="true" aria-labelledby="bdTitle">
+    <div class="modal-box wide">
+      <div class="modal-head"><div><h3 id="bdTitle">Score breakdown — <%= b.name %></h3><div class="sm-modal-sub">Period <%= sm.range.from %> → <%= sm.range.to %>. Every number is derived from recorded task claims and completions.</div></div><a class="modal-close" href="?board=general" aria-label="Close">&times;</a></div>
+      <div class="modal-body">
+        <div class="section-card" style="display:flex;align-items:center;gap:14px;flex-wrap:wrap;margin-bottom:14px;">
+          <span class="sm-av" style="width:42px;height:42px;font-size:13px"><%= V.initials(b.name) %></span>
+          <div style="flex:1"><b><%= b.name %></b><div class="sm-muted">Studio team · editor</div></div>
+          <div style="text-align:right"><div style="font-size:28px"><%- scoreHtml(b) %></div><%- V.statusBadge(b.status) %><% if (b.rank) { %> <span class="sm-muted">Rank #<%= b.rank %><%= b.tied ? ' (tied)' : '' %></span><% } %></div>
+        </div>
+        <% if (b.status !== 'Ranked') { %>
+          <p class="sm-note warn"><%= b.status === 'Insufficient Data' ? 'Only ' + b.totals.due + ' scored task(s) in this period — at least ' + rk.minDueTasks + ' are needed before a score is shown.' + (b.rawScore !== null ? ' (Calculated value for reference: ' + b.rawScore + '.)' : '') : 'Provisional: ' + b.totals.due + ' scored task(s); a full ranking needs ' + rk.provisionalBelow + '. The same rule applies to everyone.' %></p>
+        <% } %>
+        <p class="sm-h4">Score by category</p>
+        <% b.components.forEach(function (c) { %>
+          <div class="sm-component <%= c.ratio === null ? 'excluded' : '' %>">
+            <div class="top"><span><%= c.label %></span><% if (c.ratio === null) { %><%- V.badge('Excluded', 'slate') %><% } else { %><span><b><%= c.points.toFixed(1) %></b> <small>/ <%= c.effectiveWeight.toFixed(1) %> pts</small></span><% } %></div>
+            <% if (c.ratio !== null) { %><div class="sm-progress" style="margin-top:8px"><i style="width:<%= c.ratio * 100 %>%"></i></div><% } %>
+            <p><%= c.ratio === null ? c.excludedReason : c.formula %></p>
+            <small>Configured weight <%= c.weight %><%= c.ratio !== null && c.effectiveWeight.toFixed(1) !== String(c.weight) ? ' → ' + c.effectiveWeight.toFixed(1) + ' after excluding non-applicable categories' : '' %></small>
+          </div>
+        <% }) %>
+        <p class="sm-h4" style="margin-top:16px">Tasks by category</p>
+        <div class="sm-scroll"><table class="sm-table min-640">
+          <thead><tr><th>Category</th><th class="num">Claimed</th><th class="num">Completed</th><th class="num">On time</th><th class="num">Late</th><th class="num">Overdue (open)</th><th class="num">Not yet due</th><th class="num">Avg time</th></tr></thead>
+          <tbody>
+            <% W.TASK_TYPES.forEach(function (cat) { var k = b.categories[cat]; %><tr><td><b><%= cat %></b></td><td class="num"><%= k.claimed %></td><td class="num"><%= k.completed %></td><td class="num green-txt"><%= k.onTime %></td><td class="num warn-txt"><%= k.late %></td><td class="num red-txt"><%= k.openOverdue %></td><td class="num"><%= k.openNotDue %></td><td class="num"><%= cat === 'Publishing' ? '—' : V.fmtHours(k.avgCompletionH) %></td></tr><% }) %>
+            <tr class="total"><td>Total</td><td class="num"><%= b.totals.claimed %></td><td class="num"><%= b.totals.completed %></td><td class="num"><%= b.totals.onTime %></td><td class="num"><%= b.totals.late %></td><td class="num"><%= b.totals.openOverdue %></td><td class="num"><%= b.totals.openNotDue %></td><td class="num"><%= V.fmtHours(b.totals.avgCompletionH) %></td></tr>
+          </tbody>
+        </table></div>
+        <p class="sm-muted">Completion rate <%= S.fmtRatio(b.totals.completionRate) %> (<%= b.totals.completed %> of <%= b.totals.due %> due) · On-time rate <%= S.fmtRatio(b.totals.onTimeRate) %> · Average time is shown only with at least 3 timed completions.</p>
+        <p class="sm-h4" style="margin-top:16px">Exclusions</p>
+        <ul class="sm-rules">
+          <% b.exclusions.forEach(function (x) { %><li><%= x %></li><% }) %>
+          <% b.components.filter(function (c) { return c.ratio === null; }).forEach(function (c) { %><li><%= c.label %>: <%= c.excludedReason %></li><% }) %>
+        </ul>
+      </div>
+      <div class="sm-modal-foot"><a class="btn outline" href="?board=general">Close</a></div>
+    </div>
+  </div>
+</div>
+<% } %>
+<%- include('_modals') %>
+<%- include('../partials/footer') %>

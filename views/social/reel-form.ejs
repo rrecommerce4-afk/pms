@@ -1,0 +1,53 @@
+<%- include('../partials/header') %>
+<%
+  var d = draft, editing = !!item;
+  var claimed = editing && !!(item.shootOwner || item.editor);
+  var st = sm.settings;
+%>
+<div class="container sm">
+  <%- include('_bar') %>
+  <div class="page-head">
+    <div>
+      <div class="eyebrow-date">SOCIAL MEDIA STUDIO</div>
+      <h1><%= editing ? 'Edit reel' : 'Create reel' %></h1>
+      <p><%= editing ? item.title : 'Decide what to make. Nobody is assigned here — the page team claims the shoot, the eligible editors claim editing, and whoever confirms the upload becomes the publishing owner.' %></p>
+    </div>
+  </div>
+  <% if (error) { %><div class="sm-flash error" role="alert"><%= error %></div><% } %>
+  <div class="list-card">
+    <form class="sm-form" method="POST" action="<%= editing ? '/social-media/reels/' + item.id + '/update' : '/social-media/reels' %>">
+      <input type="hidden" name="_csrf" value="<%= sm.csrf %>">
+      <input type="hidden" name="returnTo" value="<%= back %>">
+      <% if (editing) { %><input type="hidden" name="rev" value="<%= item.rev %>"><% } %>
+      <div class="form-grid-2">
+        <div class="field span-2"><label for="f-title">Reel title *</label><input id="f-title" name="title" required maxlength="150" value="<%= d.title %>" placeholder="e.g. Diwali stencil rangoli in 60 seconds"></div>
+        <div class="field"><label for="f-page">Instagram page *</label>
+          <select id="f-page" name="pageId" <%= claimed ? 'disabled' : '' %>><% C.PAGES.forEach(function (p) { %><option value="<%= p.id %>" <%= d.pageId === p.id ? 'selected' : '' %>><%= p.name %> (<%= p.handle %>)</option><% }) %></select>
+          <% if (claimed) { %><input type="hidden" name="pageId" value="<%= item.pageId %>"><div class="helper-text">Locked because work has been claimed.</div><% } %>
+        </div>
+        <div class="field"><label for="f-priority">Priority</label><select id="f-priority" name="priority"><% C.PRIORITIES.forEach(function (p) { %><option <%= d.priority === p ? 'selected' : '' %>><%= p %></option><% }) %></select></div>
+        <div class="field span-2"><label for="f-idea">Content idea / description</label><textarea id="f-idea" name="idea" rows="3" maxlength="3000" placeholder="Hook, key shots, message, CTA…"><%= d.idea %></textarea></div>
+        <div class="field span-2"><label for="f-prep">Preparation notes for the shoot</label><textarea id="f-prep" name="prepNotes" rows="2" maxlength="2000" placeholder="Props, products, location, outfit, references…"><%= d.prepNotes %></textarea></div>
+        <div class="field span-2"><label for="f-shoot">Planned shoot date / shoot deadline *</label><input id="f-shoot" type="datetime-local" name="shootAt" required value="<%= V.toInput(d.shootAt) %>"></div>
+        <div class="field">
+          <label class="sm-check"><input type="checkbox" name="hasEditDeadline" value="1" data-toggle-field="edit-wrap" <%= d.editDeadline ? 'checked' : '' %>> Editing deadline is known</label>
+          <div id="edit-wrap"><input type="datetime-local" name="editDeadline" value="<%= V.toInput(d.editDeadline) %>" aria-label="Editing deadline"></div>
+          <div class="helper-text">Optional. Otherwise: <%= st.deadlines.editDaysAfterShoot %> day(s) after the raw footage arrives.</div>
+        </div>
+        <div class="field">
+          <label class="sm-check"><input type="checkbox" name="hasPublishAt" value="1" data-toggle-field="pub-wrap" <%= d.publishAt ? 'checked' : '' %>> Planned publishing date is known</label>
+          <div id="pub-wrap"><input type="datetime-local" name="publishAt" value="<%= V.toInput(d.publishAt) %>" aria-label="Planned publishing date"></div>
+          <div class="helper-text">Optional — can be set later when scheduling.</div>
+        </div>
+        <div class="field span-2"><label for="f-caption">Caption (optional)</label><textarea id="f-caption" name="caption" rows="2" maxlength="2200" placeholder="Caption draft"><%= d.caption %></textarea></div>
+        <% if (editing) { %>
+          <div class="field span-2"><label for="f-reason">Reason for any date change<%= claimed ? ' (required when dates change — work has been claimed)' : '' %></label><input id="f-reason" name="reason" maxlength="500" value="<%= d.reason || '' %>" placeholder="e.g. Product stock delayed — management approved new date"><div class="helper-text">Original dates are kept in the history. On-time status uses the deadline in effect when a task is completed.</div></div>
+        <% } %>
+      </div>
+      <% if (!editing) { %><p class="sm-note">No owners are assigned here. The reel appears under “Available tasks” for the page team. Editing can only be claimed by Bansi, Bhavin, Vishnu or Krutik.</p><% } %>
+      <div class="sm-form-actions"><a class="btn outline" href="<%= back %>">Cancel</a><button class="btn" type="submit"><%= editing ? 'Save changes' : 'Create reel' %></button></div>
+    </form>
+  </div>
+</div>
+<%- include('_modals') %>
+<%- include('../partials/footer') %>

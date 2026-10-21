@@ -1,0 +1,58 @@
+<%
+  var a = sm.actor;
+  var studioRole = a.isManager ? 'Studio manager' : a.roster ? (a.canEditVideo ? 'Studio team · editor' : 'Studio team') : 'Viewer';
+%>
+<div class="sm-bar">
+  <nav class="sm-crumbs" aria-label="Breadcrumb">
+    <a href="/">PMS</a><span>›</span><a href="/social-media">Social Media Studio</a>
+    <% if (crumb !== 'Social Media Studio') { %><span>›</span><b><%= crumb %></b><% } %>
+  </nav>
+  <div class="sm-bar-right">
+    <form method="POST" action="/social-media/range" class="sm-range" data-sm-range>
+      <input type="hidden" name="_csrf" value="<%= sm.csrf %>">
+      <input type="hidden" name="returnTo" value="<%= sm.currentUrl %>">
+      <label class="sr-only" for="smPreset">Reporting period</label>
+      <select class="filter-select" name="preset" id="smPreset">
+        <% V.PRESETS.forEach(function (p) { %><option value="<%= p.value %>" <%= sm.range.preset === p.value ? 'selected' : '' %>><%= p.label %></option><% }) %>
+      </select>
+      <span class="sm-range-custom" <%= sm.range.preset === 'custom' ? '' : 'hidden' %>>
+        <input type="date" name="from" value="<%= sm.range.from %>" aria-label="From date">
+        <span>–</span>
+        <input type="date" name="to" value="<%= sm.range.to %>" aria-label="To date">
+        <button class="btn small outline" type="submit">Apply</button>
+      </span>
+      <span class="sm-range-label"><%= V.fmtDate(sm.range.from, 'short') %> – <%= V.fmtDate(sm.range.to) %></span>
+      <noscript><button class="btn small outline" type="submit">Apply</button></noscript>
+    </form>
+    <details class="sm-notif">
+      <summary aria-label="Notifications (<%= sm.unread %> unread)">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8a6 6 0 00-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.7 21a2 2 0 01-3.4 0"/></svg>
+        <% if (sm.unread) { %><span class="sm-notif-count"><%= sm.unread > 9 ? '9+' : sm.unread %></span><% } %>
+      </summary>
+      <div class="sm-notif-panel">
+        <div class="sm-notif-head">
+          <b>Notifications</b>
+          <form method="POST" action="/social-media/notifications/read">
+            <input type="hidden" name="_csrf" value="<%= sm.csrf %>"><input type="hidden" name="returnTo" value="<%= sm.currentUrl %>">
+            <button type="submit" class="sm-link-btn" <%= sm.unread ? '' : 'disabled' %>>Mark all read</button>
+          </form>
+        </div>
+        <% if (!sm.notifications.length) { %><p class="sm-muted sm-pad">You're all caught up.</p><% } %>
+        <% sm.notifications.forEach(function (n) { %>
+          <form method="POST" action="/social-media/notifications/read">
+            <input type="hidden" name="_csrf" value="<%= sm.csrf %>"><input type="hidden" name="id" value="<%= n.id %>"><input type="hidden" name="reel" value="<%= n.reelId %>">
+            <button type="submit" class="sm-notif-item <%= n.unread ? 'unread' : '' %> kind-<%= n.kind %>">
+              <b><%= n.title %></b><span><%= n.body %></span><small><%= V.fmtRelative(n.at, sm.now) %></small>
+            </button>
+          </form>
+        <% }) %>
+      </div>
+    </details>
+    <span class="sm-whoami" title="Studio access for your PMS account"><%= name %> · <%= studioRole %></span>
+  </div>
+</div>
+<% if (sm.flash) { %><div class="sm-flash <%= sm.flash.type %>" role="status"><%= sm.flash.text %></div><% } %>
+<div class="sm-banner">Follower counts and post metrics are <b>DEMO DATA — INSTAGRAM NOT CONNECTED</b>. Reels, tasks, ownership, history and rankings are live PMS data.</div>
+<% if (a.isManager && sm.unlinkedCount > 0) { %>
+  <div class="sm-flash info"><%= sm.unlinkedCount %> of 6 Studio members aren't linked to a PMS account yet, so they can't use the Studio. <a href="/social-media/settings#members">Link members in Settings</a>.</div>
+<% } %>
