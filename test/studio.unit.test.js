@@ -1,5 +1,8 @@
 // Social Media Studio — unit tests for permissions, workflow transitions, migration and scoring.
 // Run with: npm test
+// Times typed into forms are read in the PMS business time zone (server.js); the tests build
+// their form values in the same zone so they behave the same on any machine.
+process.env.TZ = 'Asia/Kolkata';
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const C = require('../lib/studio/config');

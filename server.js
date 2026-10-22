@@ -1,3 +1,8 @@
+// One business time zone for every date the PMS reads, shows or compares (form times like
+// "2026-10-25T18:00", "today", publishing slots, deadlines), whatever the host's own setting —
+// e.g. a cloud server running in UTC. Set PMS_TIMEZONE to change it. Must run before any Date use.
+process.env.TZ = process.env.PMS_TIMEZONE || 'Asia/Kolkata';
+
 const express = require('express');
 const session = require('express-session');
 const path = require('path');

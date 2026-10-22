@@ -1,4 +1,7 @@
 // Instagram follower sync — runs against a mocked fetch, never the real API.
+// Times typed into forms are read in the PMS business time zone (server.js); the tests build
+// their form values in the same zone so they behave the same on any machine.
+process.env.TZ = 'Asia/Kolkata';
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('fs');

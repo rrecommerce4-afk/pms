@@ -132,6 +132,7 @@ router.use((req, res, next) => {
     unread: notifications.filter((n) => n.unread).length,
     nav: Nav.STUDIO_NAV,
     src: F.sources(ctx.studio),
+    tz: process.env.TZ || Intl.DateTimeFormat().resolvedOptions().timeZone,
     unlinkedCount: C.ROSTER.length - linked
   };
   delete req.session.studioFlash;

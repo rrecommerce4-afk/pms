@@ -1,6 +1,9 @@
 // End-to-end HTTP tests: boots the real server.js against a throwaway COPY of db.json (via
 // PMS_DB_FILE) with extra test logins, then drives it like a browser. The real db.json is only
 // read, never written. Run with: npm test
+// Times typed into forms are read in the PMS business time zone (server.js); the tests build
+// their form values in the same zone so they behave the same on any machine.
+process.env.TZ = 'Asia/Kolkata';
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('fs');
@@ -24,7 +27,14 @@ const sourceText = fs.existsSync(SOURCE) ? fs.readFileSync(SOURCE, 'utf8') : '';
 const sourceHash = sha(sourceText);
 const seed = sourceText.trim() ? JSON.parse(sourceText) : { users: [], tasks: [], nextId: { users: 1, tasks: 1, todos: 1 } };
 // The tests start every page as "not connected to Instagram", whatever the real db.json has.
-if (seed.socialStudio) delete seed.socialStudio.instagram;
+if (seed.socialStudio) {
+  delete seed.socialStudio.instagram;
+  // ...and with no reels, schedules or schedule history of the real installation.
+  seed.socialStudio.reels = [];
+  seed.socialStudio.nextReelId = 1;
+  seed.socialStudio.scheduleHistory = [];
+  if (seed.socialStudio.settings) delete seed.socialStudio.settings.publishingSchedule;
+}
 const hash = bcrypt.hashSync(PW, 4);
 seed.nextId = seed.nextId || { users: 1, tasks: 1, todos: 1 };
 seed.users = seed.users || [];
@@ -77,7 +87,7 @@ const HOUR = 3600000;
 // ---------------------------------------------------------------- server lifecycle
 let server;
 test.before(async () => {
-  server = spawn(process.execPath, ['server.js'], { cwd: ROOT, env: { ...process.env, PORT: String(PORT), PMS_DB_FILE: DB, PMS_IG_SYNC: 'off', PMS_IG_TOKENS_FILE: path.join(TMP, 'ig-tokens.json') }, stdio: ['ignore', 'pipe', 'pipe'] });
+  server = spawn(process.execPath, ['server.js'], { cwd: ROOT, env: { ...process.env, PORT: String(PORT), PMS_DB_FILE: DB, TZ: 'UTC', PMS_IG_SYNC: 'off', PMS_IG_TOKENS_FILE: path.join(TMP, 'ig-tokens.json') }, stdio: ['ignore', 'pipe', 'pipe'] });
   server.stderrText = '';
   server.stderr.on('data', (d) => { server.stderrText += d; });
   await new Promise((resolve, reject) => {
@@ -515,6 +525,38 @@ test('24-hour editing deadline over HTTP: saved, shown, recalculated with histor
   // Dhara cannot reschedule even directly.
   const dhara = await as(U.dhara);
   assert.equal((await dhara.post(`/social-media/reels/${id}/reschedule`, { _csrf: dhara.token, publishAt: localInput(90 * HOUR), reason: 'x' })).status, 403);
+});
+
+test('a server whose host clock is UTC still reads form times in India time; publishing "now" is accepted', async () => {
+  // The test server is started with TZ=UTC (like most cloud hosts); server.js pins Asia/Kolkata.
+  const admin = await as(U.admin);
+  const bansi = await as(U.bansi);
+  const krutik = await as(U.krutik);
+  const made = await admin.post('/social-media/reels', { _csrf: admin.token, title: 'Timezone reel', pageId: 'product', priority: 'Medium', shootAt: '2026-11-20T11:00', hasPublishAt: '1', publishAt: '2026-11-25T18:00' });
+  const id = Number(made.location.split('/').pop());
+  assert.equal(reel(id).publishAt, '2026-11-25T12:30:00.000Z', '6:00 PM IST, not 6:00 PM UTC');
+  assert.equal(reel(id).editingDeadline, '2026-11-24T12:30:00.000Z');
+  assert.match((await admin.get(`/social-media/reels/${id}?tab=details`)).text, /25 Nov, 6:00 PM/, 'shown back in India time');
+  // Publish modal value = current India time → accepted (this was rejected as "in the future" on a UTC host).
+  await bansi.post(`/social-media/reels/${id}/claim-shoot`, { _csrf: bansi.token });
+  await bansi.post(`/social-media/reels/${id}/complete-shoot`, { _csrf: bansi.token, rawSubmitted: 'on' });
+  await krutik.post(`/social-media/reels/${id}/claim-edit`, { _csrf: krutik.token });
+  await krutik.post(`/social-media/reels/${id}/complete-edit`, { _csrf: krutik.token });
+  await bansi.post(`/social-media/reels/${id}/publish`, { _csrf: bansi.token, postUrl: 'https://www.instagram.com/reel/TzTest1/', publishedAt: localInput(0) });
+  assert.equal(reel(id).publishing.status, 'Published', 'current India time accepted');
+  assert.ok(Math.abs(Date.parse(reel(id).publishing.completion.at) - Date.now()) < 2 * 60000);
+  // A genuinely future time is refused with a message that shows both times.
+  const made2 = await admin.post('/social-media/reels', { _csrf: admin.token, title: 'Future reel', pageId: 'product', priority: 'Medium', shootAt: localInput(-5 * HOUR) });
+  const id2 = Number(made2.location.split('/').pop());
+  await bansi.post(`/social-media/reels/${id2}/claim-shoot`, { _csrf: bansi.token });
+  await bansi.post(`/social-media/reels/${id2}/complete-shoot`, { _csrf: bansi.token, rawSubmitted: 'on' });
+  await krutik.post(`/social-media/reels/${id2}/claim-edit`, { _csrf: krutik.token });
+  await krutik.post(`/social-media/reels/${id2}/complete-edit`, { _csrf: krutik.token });
+  await bansi.post(`/social-media/reels/${id2}/publish`, { _csrf: bansi.token, postUrl: 'https://www.instagram.com/reel/TzTest2/', publishedAt: localInput(3 * HOUR), returnTo: '/social-media' });
+  assert.match((await flashOf(bansi, '/social-media')).text, /is later than the current time .* mark it as published only after it is live/);
+  assert.notEqual(reel(id2).publishing.status, 'Published');
+  // The publish modal carries the business time zone for its "now" value.
+  assert.match((await bansi.get('/social-media/publishing')).text, /name="publishedAt" required data-now data-tz="Asia\/Kolkata"/);
 });
 
 test('every Studio screen renders for each role without server errors', async () => {

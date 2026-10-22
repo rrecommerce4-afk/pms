@@ -34,7 +34,7 @@
       <div class="modal-body">
         <p class="sm-note warn">The PMS records your confirmation. It does not connect to Instagram and does not verify the post.</p>
         <div class="field"><label>Instagram post URL *</label><input type="url" name="postUrl" required maxlength="500" placeholder="https://www.instagram.com/reel/…" pattern="https://(www\.)?instagram\.com/.+"></div>
-        <div class="field"><label>Actual publishing date &amp; time *</label><input type="datetime-local" name="publishedAt" required data-now><div class="helper-text" data-fill="planned" data-prefix="Planned: " data-empty="No planned time — timeliness will not be scored."></div></div>
+        <div class="field"><label>Actual publishing date &amp; time *</label><input type="datetime-local" name="publishedAt" required data-now data-tz="<%= sm.tz %>"><div class="helper-text" data-fill="planned" data-prefix="Planned: " data-empty="No planned time — timeliness will not be scored."></div></div>
         <div class="field"><label>Caption / notes (optional)</label><textarea name="notes" rows="2" maxlength="2000"></textarea></div>
         <p class="helper-text">You (<b><%= sm.actor.name %></b>) will be recorded as the publishing owner.</p>
       </div>

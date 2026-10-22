@@ -30,7 +30,7 @@
         <div class="field span-2"><label for="f-prep">Preparation notes for the shoot</label><textarea id="f-prep" name="prepNotes" rows="2" maxlength="2000" placeholder="Props, products, location, outfit, references…"><%= d.prepNotes %></textarea></div>
         <div class="field span-2"><label for="f-shoot">Planned shoot date / shoot deadline *</label><input id="f-shoot" type="datetime-local" name="shootAt" required value="<%= V.toInput(d.shootAt) %>"></div>
         <% var pg = C.getPage(d.pageId) || C.PAGES[0]; var dl = d.publishAt ? W.deadlineForPublish(d.publishAt) : null; var hasSchedule = Sched.hasAnySlot(st.publishingSchedule, pg.id); %>
-        <div class="field span-2 sm-publish-block" data-sm-publish data-edit-done="<%= editing && W.isEditingDone(item) ? '1' : '' %>" data-schedule="<%= JSON.stringify(st.publishingSchedule) %>">
+        <div class="field span-2 sm-publish-block" data-sm-publish data-tz="<%= sm.tz %>" data-edit-done="<%= editing && W.isEditingDone(item) ? '1' : '' %>" data-schedule="<%= JSON.stringify(st.publishingSchedule) %>">
           <label class="sm-check"><input type="checkbox" name="hasPublishAt" value="1" data-toggle-field="pub-wrap" <%= d.publishAt ? 'checked' : '' %>> Scheduled publishing date &amp; time is known</label>
           <div id="pub-wrap">
             <input type="datetime-local" name="publishAt" value="<%= V.toInput(d.publishAt) %>" aria-label="Scheduled publishing date and time" data-publish-input>

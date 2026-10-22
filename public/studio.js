@@ -2,8 +2,18 @@
 // validated on the server; this script only opens the input modals and tidies controls.
 (function () {
   function pad(n) { return String(n).padStart(2, '0'); }
-  function nowLocal() {
+  // Current date/time as "YYYY-MM-DDTHH:mm" in the PMS business time zone (the server reads
+  // form times in that zone), falling back to the browser's own zone.
+  function nowLocal(tz) {
     var d = new Date();
+    if (tz && window.Intl) {
+      try {
+        var p = {};
+        new Intl.DateTimeFormat('en-GB', { timeZone: tz, year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hourCycle: 'h23' })
+          .formatToParts(d).forEach(function (x) { p[x.type] = x.value; });
+        return p.year + '-' + p.month + '-' + p.day + 'T' + p.hour + ':' + p.minute;
+      } catch (e) { /* unknown zone: use the browser's */ }
+    }
     return d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate()) + 'T' + pad(d.getHours()) + ':' + pad(d.getMinutes());
   }
 
@@ -30,7 +40,7 @@
       });
       modal.querySelectorAll('[data-fill-value]').forEach(function (el) { el.value = d[el.getAttribute('data-fill-value')] || ''; });
       modal.querySelectorAll('[data-fill-placeholder]').forEach(function (el) { el.placeholder = d[el.getAttribute('data-fill-placeholder')] || ''; });
-      modal.querySelectorAll('[data-now]').forEach(function (el) { el.value = nowLocal(); el.max = nowLocal(); });
+      modal.querySelectorAll('[data-now]').forEach(function (el) { var n = nowLocal(el.getAttribute('data-tz')); el.value = n; el.max = n; });
       modal.querySelectorAll('[data-show-if]').forEach(function (el) { el.hidden = !d[el.getAttribute('data-show-if')]; });
       modal.querySelectorAll('[data-show-unless]').forEach(function (el) { el.hidden = !!d[el.getAttribute('data-show-unless')]; });
       modal.classList.add('open');
@@ -115,8 +125,9 @@
     }
     function render() {
       var week = schedule[pageId()];
-      var shoot = parseInputValue(shootInput && shootInput.value) || new Date();
-      var now = new Date();
+      // "now" as wall-clock time in the PMS time zone, like the slot and input values.
+      var now = parseInputValue(nowLocal(block.getAttribute('data-tz'))) || new Date();
+      var shoot = parseInputValue(shootInput && shootInput.value) || now;
       // Until editing is done, a suggested slot must leave 24 h for editing after the shoot.
       var base = shoot > now ? shoot : now;
       var after = editDone ? now : new Date(base.getTime() + 24 * 3600000);

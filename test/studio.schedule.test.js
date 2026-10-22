@@ -1,4 +1,7 @@
 // Weekly publishing schedule + mandatory 24-hour editing deadline (unit level).
+// Times typed into forms are read in the PMS business time zone (server.js); the tests build
+// their form values in the same zone so they behave the same on any machine.
+process.env.TZ = 'Asia/Kolkata';
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const Sched = require('../lib/studio/schedule');
@@ -205,6 +208,24 @@ test('editing timeliness in scoring uses the 24-hour deadline; only the four ran
   const general = S.computeGeneralScores(studio, users, [late, onTime], now, from, to);
   assert.deepEqual(general.map((g) => g.userId).sort(), [11, 12, 13, 14]);
   assert.deepEqual(Object.values(studio.settings.weights), [35, 25, 25, 15], 'weights unchanged');
+});
+
+test('a post cannot stay "Scheduled" without a publishing time', () => {
+  const { act, editingReel } = fixture();
+  const r = editingReel(72 * HOUR);
+  act('complete-edit', 14, r);
+  assert.ok(act('schedule', 11, r).ok);
+  assert.equal(r.publishing.status, 'Scheduled');
+  const base = { title: r.title, pageId: r.pageId, priority: r.priority, shootAt: r.shootAt, rev: r.rev };
+  assert.ok(act('update', 1, r, { ...base, publishAt: '', reason: 'Date not fixed yet' }).ok);
+  assert.equal(r.publishAt, null);
+  assert.equal(r.publishing.status, 'Ready to Publish');
+  assert.ok(r.activity.some((x) => /no longer scheduled/.test(x.text)));
+  // Older data stuck as Scheduled with no time is shown as Ready to Publish and can be scheduled again.
+  r.publishing.status = 'Scheduled';
+  assert.equal(W.getPublishStatus(r, new Date()), 'Ready to Publish');
+  const actor = P.resolveActor(fixture().studio, { id: 11, name: 'Bansi', role: 'employee', active: true });
+  assert.ok(V.stageActions(actor, fixture().studio, r, 'Publishing', () => '', false).some((x) => x.modal === 'schedule'));
 });
 
 test('view-only users cannot schedule or reschedule; invalid times are refused safely', () => {
