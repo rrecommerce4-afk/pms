@@ -80,7 +80,7 @@
               <% list.slice(0, 25).forEach(function (i) {
                 var meta = V.pageBadge(i.pageId) + ' ';
                 if (availTab === 'shoot') meta += '<span>Shoot ' + e(V.fmtDateTime(i.shootAt)) + '</span> ' + (sm.now > W.shootDeadline(i) ? V.badge('Unclaimed · past shoot date', 'orange') : people.ownerChip(null));
-                else if (availTab === 'editing') meta += '<span>Footage ready ' + e(V.fmtRelative(i.shoot.rawSubmittedAt || i.shoot.completion.at, sm.now)) + '</span> ' + people.ownerChip(null);
+                else if (availTab === 'editing') meta += '<span>Footage ready ' + e(V.fmtRelative(i.shoot.rawSubmittedAt || i.shoot.completion.at, sm.now)) + '</span> ' + people.ownerChip(null) + ' ' + V.editDeadlineHtml(i, sm.now);
                 else meta += '<span>' + e(i.publishAt ? 'Planned ' + V.fmtDateTime(i.publishAt) : 'No planned time') + '</span> ' + V.statusBadge(W.getPublishStatus(i, sm.now));
               %>
                 <%- include('_row', { item: i, meta: meta, stage: stageFor }) %>
@@ -100,7 +100,7 @@
             <% if (!mine.active.length) { %><p class="sm-muted">No active claims. Take a task from “Available tasks”.</p><% } %>
             <ul class="sm-rows">
               <% mine.active.forEach(function (m) {
-                var meta = '<span>' + m.stage + '</span> <span>' + e(m.stage === 'Shoot' ? (W.isShootDone(m.item) ? 'Raw footage pending' : 'Shoot ' + V.fmtDateTime(m.item.shootAt)) : 'Claimed ' + V.fmtRelative(m.item.editing.claimedAt, sm.now)) + '</span>';
+                var meta = '<span>' + m.stage + '</span> <span>' + e(m.stage === 'Shoot' ? (W.isShootDone(m.item) ? 'Raw footage pending' : 'Shoot ' + V.fmtDateTime(m.item.shootAt)) : 'Claimed ' + V.fmtRelative(m.item.editing.claimedAt, sm.now)) + '</span>' + (m.stage === 'Editing' ? ' ' + V.editDeadlineHtml(m.item, sm.now) : '');
               %><%- include('_row', { item: m.item, meta: meta, stage: m.stage }) %><% }) %>
             </ul>
             <p class="sm-day-label">Recently completed</p>

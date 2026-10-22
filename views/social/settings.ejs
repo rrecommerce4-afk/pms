@@ -2,7 +2,7 @@
 <%
   var a = sm.actor, st = sm.settings, people = sm.people, can = a.isManager;
   var wTotal = Object.keys(st.weights).reduce(function (s, k) { return s + st.weights[k]; }, 0);
-  var sections = [['instagram', 'Instagram connection'], ['members', 'Studio members'], ['targets', 'Monthly targets'], ['teams', 'Page teams'], ['editors', 'Editing team'], ['deadlines', 'Default deadlines'], ['priorities', 'Priorities'], ['weights', 'Scoring weights'], ['ranking', 'Ranking rules'], ['notifications', 'Notifications'], ['display', 'Display'], ['followers', 'Demo followers']];
+  var sections = [['instagram', 'Instagram connection'], ['schedule', 'Publishing Schedule'], ['members', 'Studio members'], ['targets', 'Monthly targets'], ['teams', 'Page teams'], ['editors', 'Editing team'], ['deadlines', 'Task deadlines'], ['priorities', 'Priorities'], ['weights', 'Scoring weights'], ['ranking', 'Ranking rules'], ['notifications', 'Notifications'], ['display', 'Display'], ['followers', 'Demo followers']];
   var hidden = function () { return '<input type="hidden" name="_csrf" value="' + V.esc(sm.csrf) + '">'; };
 %>
 <div class="container container-wide sm">
@@ -56,6 +56,51 @@
               <span class="sm-muted">Counts update and tokens renew automatically while the PMS server is running. Admins get a reminder popup if a token gets within <%= IGREMIND %> days of expiry or a daily update fails.</span>
             </div>
           <% } %>
+        </div>
+      </div>
+
+      <div class="list-card sm-section" id="schedule">
+        <div class="list-card-head section-card-head"><div><h2>Publishing Schedule</h2><p class="sm-muted">Recurring weekly publishing slots for each Instagram page. They repeat every week until changed and are used to <b>suggest</b> publishing times when reels are created or scheduled. Changing a schedule never moves reels that already have a publishing time — edit those reels individually. Times are in the PMS server's time zone.</p></div></div>
+        <div class="sm-pad">
+          <p class="sm-h4">Weekly overview</p>
+          <div class="sm-scroll" style="margin-bottom:16px"><table class="sm-table sm-sched-review min-640">
+            <thead><tr><th>Page</th><% Sched.DAYS.forEach(function (d) { %><th><%= Sched.DAY_LABEL[d].slice(0, 3) %></th><% }) %></tr></thead>
+            <tbody><% C.PAGES.forEach(function (p) { var wk = st.publishingSchedule[p.id]; %><tr><td><a class="reel-link" href="#schedule-<%= p.id %>"><%= p.shortName %></a></td><% Sched.DAYS.forEach(function (d) { var day = wk[d]; %><td><% if (day.enabled && day.slots.length) { %><%= day.slots.map(Sched.fmtSlot).join(', ') %><% } else { %><span class="muted"><%= day.enabled ? 'No time' : 'Off' %></span><% } %></td><% }) %></tr><% }) %></tbody>
+          </table></div>
+
+          <% C.PAGES.forEach(function (p) { var wk = st.publishingSchedule[p.id]; var nxt = Sched.nextSlot(st.publishingSchedule, p.id, sm.now); %>
+            <form class="sm-sched-page" id="schedule-<%= p.id %>" method="POST" action="/social-media/settings/schedule/<%= p.id %>" style="--pc:<%= p.color %>;--pcs:<%= p.soft %>">
+              <%- hidden() %>
+              <fieldset <%= can ? '' : 'disabled' %>>
+                <div class="sm-sched-head"><span class="sm-page-av"><%= V.initials(p.shortName) %></span><div><b><%= p.name %></b> <span class="sm-muted"><%= p.handle %></span><div class="sm-muted"><%= nxt ? 'Next slot: ' + V.fmtDate(nxt, 'weekday') + ', ' + V.fmtTime(nxt) : 'No active publishing days — no time can be suggested for this page.' %></div></div></div>
+                <div class="sm-scroll"><table class="sm-table sm-sched-table">
+                  <thead><tr><th>Day</th><th>Publish</th><th>Times (24-hour, saved as HH:mm)</th></tr></thead>
+                  <tbody>
+                    <% Sched.DAYS.forEach(function (d) { var day = wk[d]; %>
+                      <tr>
+                        <td><b><%= Sched.DAY_LABEL[d] %></b></td>
+                        <td><label class="sm-check" style="margin:0"><input type="checkbox" name="<%= d %>_enabled" value="on" <%= day.enabled ? 'checked' : '' %> aria-label="Publish on <%= Sched.DAY_LABEL[d] %>"> On</label></td>
+                        <td>
+                          <span data-slot-list><% day.slots.forEach(function (t) { %><span class="sm-slot"><input type="time" name="<%= d %>_slots" value="<%= t %>" required aria-label="<%= Sched.DAY_LABEL[d] %> publishing time"><span class="sm-slot-label"><%= Sched.fmtSlot(t) %></span><button type="button" class="sm-slot-x" data-remove-slot aria-label="Remove this slot">×</button></span><% }) %></span>
+                          <% if (can) { %><button type="button" class="btn small ghost" data-add-slot="<%= d %>">+ Add slot</button><% } %>
+                          <% if (!day.slots.length && !can) { %><span class="muted">—</span><% } %>
+                        </td>
+                      </tr>
+                    <% }) %>
+                  </tbody>
+                </table></div>
+                <div class="sm-form-actions"><button class="btn" type="submit">Save <%= p.shortName %> schedule</button></div>
+              </fieldset>
+            </form>
+          <% }) %>
+
+          <p class="sm-h4" style="margin-top:16px">Recent schedule changes</p>
+          <% if (!scheduleHistory.length) { %><p class="sm-muted">No changes yet.</p><% } %>
+          <ul class="sm-rows">
+            <% scheduleHistory.forEach(function (h) { var summary = function (wk) { return Sched.DAYS.filter(function (d) { return wk[d].enabled && wk[d].slots.length; }).map(function (d) { return Sched.DAY_LABEL[d].slice(0, 3) + ' ' + wk[d].slots.map(Sched.fmtSlot).join('/'); }).join(', ') || 'no active days'; }; %>
+              <li class="sm-row" style="display:block"><b><%= C.getPage(h.pageId).name %></b> · <%= V.fmtDateTime(h.at) %> by <%= h.byName %><div class="sm-muted">Before: <%= summary(h.before) %></div><div class="sm-muted">After: <%= summary(h.after) %></div></li>
+            <% }) %>
+          </ul>
         </div>
       </div>
 
@@ -133,14 +178,12 @@
       </div>
 
       <div class="list-card sm-section" id="deadlines">
-        <div class="list-card-head section-card-head"><div><h2>Default task deadlines</h2><p class="sm-muted">Reels can be created without an editing deadline or publishing date. These defaults fill the gaps.</p></div></div>
-        <form class="sm-pad" method="POST" action="/social-media/settings/deadlines"><%- hidden() %>
-          <div class="sm-two">
-            <div class="field"><label>Default editing deadline (days after raw footage arrives)</label><input type="number" min="0" max="30" name="editDaysAfterShoot" value="<%= st.deadlines.editDaysAfterShoot %>"></div>
-            <div class="field"><label>Suggested publishing date (days after the editing deadline)</label><input type="number" min="0" max="30" name="publishDaysAfterEdit" value="<%= st.deadlines.publishDaysAfterEdit %>"></div>
-          </div>
-          <div class="sm-form-actions"><button class="btn" type="submit">Save deadlines</button></div>
-        </form>
+        <div class="list-card-head section-card-head"><div><h2>Task deadlines</h2><p class="sm-muted">How deadlines are set. These rules are fixed on the server and apply to every reel.</p></div></div>
+        <div class="sm-pad"><ul class="sm-rules">
+          <li><b>Editing:</b> must be completed <b>24 hours before</b> the reel's scheduled publishing date and time. The deadline is calculated and saved automatically, and recalculated whenever that reel's publishing time is changed. A reel without a publishing time has no editing deadline.</li>
+          <li><b>Publishing times</b> are suggested from the page's <a class="view-all" href="#schedule">Publishing Schedule</a>; any date and time can still be chosen per reel.</li>
+          <li><b>Shoot:</b> due by the end of the planned shoot day.</li>
+        </ul></div>
       </div>
 
       <div class="list-card sm-section" id="priorities">

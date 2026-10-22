@@ -53,7 +53,7 @@
             <% rows.forEach(function (r) { var i = r.item, c = i.publishing.completion; %>
               <tr class="<%= r.status === 'Missed Deadline' ? 'overdue' : '' %>">
                 <td style="max-width:240px"><a class="reel-link" href="/social-media/reels/<%= i.id %>"><%= i.title %></a><div class="sub"><%- V.pageBadge(i.pageId) %></div><% if (i.caption) { %><div class="muted sm-clamp"><%= i.caption %></div><% } %></td>
-                <td class="nowrap"><%= i.publishAt ? V.fmtDateTime(i.publishAt) : 'not set' %></td>
+                <td class="nowrap"><%= i.publishAt ? V.fmtDateTime(i.publishAt) : 'not set' %><div class="muted" style="white-space:normal"><%- V.editDeadlineHtml(i, sm.now) %></div></td>
                 <td class="nowrap"><% if (c) { %><%= V.fmtDateTime(c.at) %> <% if (c.onTime !== undefined) { %><span class="<%= c.onTime ? 'green-txt' : 'red-txt' %>"><%= c.onTime ? 'on time' : 'late' %></span><% } %><% } else { %>—<% } %></td>
                 <td><%- V.statusBadge(r.status) %><% if (r.status === 'Delayed' && i.publishing.delayReason) { %><div class="muted"><%= i.publishing.delayReason %></div><% } %></td>
                 <td><%- people.ownerChip(i.publishingOwner, 'Not yet published') %></td>

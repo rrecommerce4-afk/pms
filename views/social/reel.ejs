@@ -3,7 +3,7 @@
   var a = sm.actor, st = sm.settings, people = sm.people, i = item;
   var page = C.getPage(i.pageId);
   var overdue = W.isItemOverdue(i, sm.now, st);
-  var stageField = { shootAt: 'Shoot date', editDeadline: 'Editing deadline', publishAt: 'Planned publishing' };
+  var stageField = { shootAt: 'Shoot date', editDeadline: 'Editing deadline (old manual)', editingDeadline: 'Editing deadline', publishAt: 'Planned publishing' };
   var completionLine = function (c) {
     if (!c) return '';
     var t = c.excused ? 'blocker recorded (excluded from timeliness)' : c.onTime === undefined ? 'no deadline' : c.onTime ? '<b class="green-txt">on time</b>' : '<b class="red-txt">late</b>';
@@ -16,15 +16,19 @@
   var owner = stage === 'Shoot' ? i.shootOwner : stage === 'Editing' ? i.editor : i.publishingOwner;
   var target = stage === 'Shoot' ? i.shoot : stage === 'Editing' ? i.editing : i.publishing;
   var status = stage === 'Shoot' ? (i.shoot.status === 'Unclaimed' ? 'Available' : i.shoot.status) : stage === 'Editing' ? (i.editing.status === 'Not Started' ? (W.footageReady(i) ? 'Available' : 'Waiting for footage') : i.editing.status) : W.getPublishStatus(i, sm.now);
-  var ed = W.editingDeadline(i, st);
-  var deadline = stage === 'Shoot' ? W.effectiveShootDeadline(i) : stage === 'Editing' ? (ed || i.editDeadline) : i.publishAt;
+  var deadline = stage === 'Shoot' ? W.effectiveShootDeadline(i) : stage === 'Editing' ? W.editingDeadline(i) : i.publishAt;
   var canAssign = a.isManager && stage !== 'Publishing' && !(stage === 'Shoot' ? W.isShootDone(i) : W.isEditingDone(i));
   var assignable = stage === 'Shoot' ? P.workingTeam(st, i.pageId) : P.editorsForPage(st, i.pageId);
 %>
   <div class="sm-stage" id="stage-<%= stage %>">
     <div class="sm-stage-head"><h3><%= stage %> <%- V.statusBadge(status) %><% if (stage !== 'Publishing' && W.activeBlocker(target.blocker)) { %><%- V.statusBadge('Blocked') %><% } %></h3><%- people.ownerChip(owner, stage === 'Publishing' ? 'Set when published' : 'Unclaimed') %></div>
     <dl>
-      <dt><%= stage === 'Publishing' ? 'Planned' : 'Deadline' %></dt><dd><%= deadline ? V.fmtDateTime(deadline) : (stage === 'Editing' ? 'not set (default rule applies after footage)' : 'not set') %></dd>
+      <% if (stage === 'Editing') { %>
+      <dt>Scheduled publishing</dt><dd><%= i.publishAt ? V.fmtDateTime(i.publishAt) : 'not set' %></dd>
+      <dt>Editing deadline</dt><dd><% if (i.publishAt) { %><%= V.fmtDateTime(deadline) %> <span class="sm-muted">(24 h before publishing)</span><br><%- V.editDeadlineHtml(i, sm.now) %><% } else { %><span class="warn-txt">None yet — set the reel's publishing date and time; editing is due 24 hours before it.</span><% } %></dd>
+      <% } else { %>
+      <dt><%= stage === 'Publishing' ? 'Planned' : 'Deadline' %></dt><dd><%= deadline ? V.fmtDateTime(deadline) : 'not set' %><% if (stage === 'Publishing' && !i.publishAt) { %> <span class="warn-txt">— set a publishing time (it also sets the editing deadline)</span><% } %></dd>
+      <% } %>
       <% if (target.claimedAt) { %><dt>Claimed</dt><dd><%= V.fmtDateTime(target.claimedAt) %></dd><% } %>
       <% if (stage === 'Shoot') { %><dt>Script</dt><dd><%= i.shoot.scriptReady ? 'Ready' : 'Pending' %></dd><% } %>
       <% if (stage === 'Shoot' && W.isShootDone(i)) { %><dt>Raw footage</dt><dd><%- i.shoot.rawSubmitted ? '<b class="green-txt">ready</b> · ' + V.esc(V.fmtDateTime(i.shoot.rawSubmittedAt)) : '<b class="warn-txt">pending</b> — editing cannot start yet' %></dd><% } %>
@@ -101,8 +105,9 @@
           <dl class="sm-kv">
             <dt>Instagram page</dt><dd><%= page.name %> <span class="sm-muted"><%= page.handle %></span></dd>
             <dt>Planned shoot</dt><dd><%= V.fmtDateTime(i.shootAt) %></dd>
-            <dt>Editing deadline</dt><dd><%= i.editDeadline ? V.fmtDateTime(i.editDeadline) : 'Not set (default rule)' %></dd>
-            <dt>Planned publishing</dt><dd><%= i.publishAt ? V.fmtDateTime(i.publishAt) : 'Not set' %></dd>
+            <dt>Scheduled publishing</dt><dd><%= i.publishAt ? V.fmtDateTime(i.publishAt) : 'Not set' %></dd>
+            <dt>Editing deadline</dt><dd><%= i.publishAt ? V.fmtDateTime(W.editingDeadline(i)) + ' (24 h before publishing)' : 'None — no publishing time yet' %></dd>
+            <% if (i.legacyEditDeadline) { %><dt>Old manual deadline</dt><dd class="sm-muted"><%= V.fmtDateTime(i.legacyEditDeadline) %> (kept for reference; no longer used)</dd><% } %>
             <dt>Script</dt><dd><%= i.shoot.scriptReady ? 'Ready' : 'Pending' %></dd>
             <dt>Shoot owner</dt><dd><%- people.ownerChip(i.shootOwner, 'Not yet claimed') %></dd>
             <dt>Page team</dt><dd><%= P.teamFor(st, i.pageId).map(function (k) { return people.keyName(k); }).join(', ') %></dd>

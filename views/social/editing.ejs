@@ -8,13 +8,14 @@
     return '?' + p.toString();
   };
   var columns = [['waiting', 'Waiting for footage', 'Shoot claimed / raw footage pending'], ['available', 'Available to claim', 'Footage ready — no editor yet'], ['editing', 'Editing', 'Claimed by an editor'], ['done', 'Editing completed', 'Moved to Ready to Publish (selected period)']];
+  // Deadline = 24 h before the reel's scheduled publishing time. "Editing Overdue" is a separate
+  // warning badge; the workflow status (statusOf) is never replaced by it.
   var deadlineText = function (i) {
-    if (W.isEditingDone(i)) { var c = i.editing.completion; return 'Completed ' + V.esc(V.fmtDateTime(c.at)) + ' · ' + V.timingBadge(c); }
-    var d = W.editingDeadline(i, st), over = W.isEditOverdue(i, sm.now, st);
-    if (!d) return '<span>Deadline: default rule after footage</span>';
-    return '<span class="' + (over ? 'red-txt' : '') + '">Due ' + V.esc(V.fmtDateTime(d)) + (over ? ' · overdue' : '') + '</span>';
+    var pub = i.publishAt ? 'Publishes ' + V.esc(V.fmtDateTime(i.publishAt)) + ' · ' : '';
+    if (W.isEditingDone(i)) return pub + 'Completed ' + V.esc(V.fmtDateTime(i.editing.completion.at)) + ' · ' + V.editDeadlineHtml(i, sm.now);
+    return pub + V.editDeadlineHtml(i, sm.now);
   };
-  var statusOf = function (i) { return W.isEditOverdue(i, sm.now, st) ? 'Overdue' : W.activeBlocker(i.editing.blocker) ? 'Blocked' : i.editing.status === 'Not Started' ? (W.footageReady(i) ? 'Available' : 'Waiting for footage') : i.editing.status; };
+  var statusOf = function (i) { return W.activeBlocker(i.editing.blocker) ? 'Blocked' : i.editing.status === 'Not Started' ? (W.footageReady(i) ? 'Available' : 'Waiting for footage') : i.editing.status; };
 %>
 <% function card(i) { %>
   <div class="sm-card-item <%= W.isEditOverdue(i, sm.now, st) ? 'overdue' : '' %>">
@@ -82,14 +83,14 @@
     <div class="list-card sm-section">
       <% if (!rows.length) { %><div class="empty-state"><div class="empty-state-title">No editing tasks</div><div class="empty-state-sub">Adjust the filters or the reporting period.</div></div><% } else { %>
       <div class="sm-scroll"><table class="sm-table min-900">
-        <thead><tr><th>Reel</th><th>Editor</th><th>Deadline</th><th>Status</th><th>Completed</th><th>Notes</th><th style="text-align:right">Action</th></tr></thead>
+        <thead><tr><th>Reel</th><th>Editor</th><th>Editing deadline</th><th>Status</th><th>Completed</th><th>Notes</th><th style="text-align:right">Action</th></tr></thead>
         <tbody>
           <% rows.forEach(function (i) { var d = W.editingDeadline(i, st), c = i.editing.completion; %>
             <tr class="<%= W.isEditOverdue(i, sm.now, st) ? 'overdue' : '' %>">
               <td><a class="reel-link" href="/social-media/reels/<%= i.id %>"><%= i.title %></a><div class="sub"><%- V.pageBadge(i.pageId) %></div></td>
               <td><%- people.ownerChip(i.editor) %></td>
-              <td class="nowrap"><%= c && c.deadline ? V.fmtDateTime(c.deadline) : d ? V.fmtDateTime(d) : 'Default rule' %></td>
-              <td><%- V.statusBadge(statusOf(i)) %></td>
+              <td><%- V.editDeadlineHtml(i, sm.now) %><% if (i.publishAt) { %><div class="muted">Publishes <%= V.fmtDateTime(i.publishAt) %></div><% } %></td>
+              <td><%- V.statusBadge(statusOf(i)) %><% if (W.isEditOverdue(i, sm.now)) { %> <%- V.badge('Editing Overdue', 'red') %><% } %></td>
               <td class="nowrap"><% if (c) { %><%= V.fmtDateTime(c.at) %><br><%- V.timingBadge(c) %><% } else { %>—<% } %></td>
               <td class="muted" style="max-width:220px"><span class="sm-clamp"><%= i.editing.notes || '—' %></span></td>
               <td><div style="display:flex;justify-content:flex-end"><%- include('_actions', { item: i, stage: 'Editing' }) %></div></td>

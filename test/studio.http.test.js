@@ -57,7 +57,10 @@ class Client {
     return { status: res.status, location: res.headers.get('location'), text: await res.text(), type: res.headers.get('content-type') };
   }
   async post(p, form) {
-    const res = await fetch(BASE + p, { method: 'POST', headers: { cookie: this.header(), 'content-type': 'application/x-www-form-urlencoded' }, body: new URLSearchParams(form).toString(), redirect: 'manual' });
+    // Arrays become repeated fields (mon_slots=13:00&mon_slots=18:30), as a browser sends them.
+    const body = new URLSearchParams();
+    Object.entries(form).forEach(([k, v]) => (Array.isArray(v) ? v : [v]).forEach((x) => body.append(k, x)));
+    const res = await fetch(BASE + p, { method: 'POST', headers: { cookie: this.header(), 'content-type': 'application/x-www-form-urlencoded' }, body: body.toString(), redirect: 'manual' });
     this.store(res);
     return { status: res.status, location: res.headers.get('location'), text: await res.text() };
   }
@@ -92,7 +95,7 @@ test.after(() => {
 test('migration preserved every existing record and linked the six Studio members without new users', async () => {
   await new Client().get('/login'); // first request after boot already loaded/migrated
   const db = readDb();
-  assert.equal(db.schemaVersion, 4);
+  assert.equal(db.schemaVersion, 5);
   for (const k of ['users', 'departments', 'todos', 'holidays']) assert.deepEqual(db[k] || [], preBoot[k] || [], `${k} preserved`);
   assert.deepEqual(db.tasks.map((t) => [t.id, t.title, t.assignedTo]), (preBoot.tasks || []).map((t) => [t.id, t.title, t.assignedTo]), 'tasks preserved');
   if ((preBoot.schemaVersion || 1) >= 4) {
@@ -179,7 +182,7 @@ test('end-to-end reel workflow over HTTP persists server-side', async () => {
   reelId = Number(created.location.split('/').pop());
   let r = reel(reelId);
   assert.equal(r.shootOwner, null);
-  assert.equal(r.editDeadline, null, 'unchecked optional deadline is not saved');
+  assert.equal(r.editingDeadline, new Date(Date.parse(r.publishAt) - 24 * HOUR).toISOString(), 'editing deadline saved as publish − 24h');
   assert.ok(r.publishAt);
 
   const page = await bansi.get(`/social-media/reels/${reelId}`);
@@ -410,6 +413,108 @@ test('admins get a token-expiry popup and banner on every page; others never do'
   fs.writeFileSync(path.join(TMP, 'ig-tokens.json'), JSON.stringify({ product: { token: 'IGAA' + 'k'.repeat(60), savedAt: new Date().toISOString(), refreshedAt: new Date().toISOString(), expiresAt: new Date(Date.now() + 55 * 86400000).toISOString() } }));
   const fine = (await admin.get('/admin/dashboard')).text;
   assert.doesNotMatch(fine, /Instagram access token reminder|ig-bell-count/);
+});
+
+test('weekly publishing schedules: per page, persisted, history kept, admin-only, existing reels untouched', async () => {
+  const admin = await as(U.admin);
+  // A reel scheduled BEFORE the recurring schedule changes.
+  const made = await admin.post('/social-media/reels', { _csrf: admin.token, title: 'Pre-scheduled reel', pageId: 'product', priority: 'Medium', shootAt: localInput(2 * HOUR), hasPublishAt: '1', publishAt: localInput(100 * HOUR) });
+  const preId = Number(made.location.split('/').pop());
+  const pre = JSON.parse(JSON.stringify(reel(preId)));
+
+  const productForm = { _csrf: admin.token, mon_enabled: 'on', mon_slots: ['13:00', '18:30'], tue_enabled: 'on', tue_slots: '14:00', wed_enabled: 'on', wed_slots: '12:00', fri_enabled: 'on', fri_slots: '17:00', sat_enabled: 'on', sat_slots: '11:00', thu_slots: '' };
+  assert.equal((await admin.post('/social-media/settings/schedule/product', productForm)).status, 303);
+  await admin.post('/social-media/settings/schedule/stencil', { _csrf: admin.token, sun_enabled: 'on', sun_slots: '10:15' });
+  let sch = studio().settings.publishingSchedule;
+  assert.deepEqual(sch.product.mon, { enabled: true, slots: ['13:00', '18:30'] });
+  assert.deepEqual(sch.product.thu, { enabled: false, slots: [] });
+  assert.deepEqual(sch.stencil.sun, { enabled: true, slots: ['10:15'] });
+  assert.deepEqual(sch.farma.mon, { enabled: false, slots: [] }, 'other pages untouched');
+
+  // Changing Product's Monday slot does not touch Stencil or any scheduled reel.
+  await admin.post('/social-media/settings/schedule/product', { ...productForm, mon_slots: ['15:00'] });
+  sch = studio().settings.publishingSchedule;
+  assert.deepEqual(sch.product.mon.slots, ['15:00']);
+  assert.deepEqual(sch.stencil.sun, { enabled: true, slots: ['10:15'] });
+  const after = reel(preId);
+  assert.equal(after.publishAt, pre.publishAt, 'already-scheduled reel keeps its time');
+  assert.equal(after.editingDeadline, pre.editingDeadline);
+  assert.equal(after.deadlineChanges.length, pre.deadlineChanges.length);
+  const hist = studio().scheduleHistory.filter((h) => h.pageId === 'product');
+  assert.equal(hist.length, 2);
+  assert.deepEqual([hist[1].before.mon.slots, hist[1].after.mon.slots, hist[1].byName], [['13:00', '18:30'], ['15:00'], 'Test Admin']);
+
+  // Invalid input is refused and nothing changes.
+  const snapshot = JSON.stringify(studio().settings.publishingSchedule);
+  await admin.post('/social-media/settings/schedule/product', { _csrf: admin.token, mon_enabled: 'on', mon_slots: '25:61' });
+  assert.match((await flashOf(admin, '/social-media/settings')).text, /not a valid time\. Use the time picker \(HH:mm\)\. Nothing was saved/);
+  assert.equal(JSON.stringify(studio().settings.publishingSchedule), snapshot);
+  assert.equal((await admin.post('/social-media/settings/schedule/instagram', { _csrf: admin.token })).status, 404);
+
+  // Persisted across logout/login, shown in friendly format.
+  await admin.post('/logout', {});
+  const again = await as(U.admin);
+  const settings = (await again.get('/social-media/settings')).text;
+  assert.match(settings, /3:00 PM/);
+  assert.match(settings, /10:15 AM/);
+  assert.match(settings, /id="schedule-butterpaper"/);
+
+  // Suggestions use the saved schedule; a page without one asks for configuration.
+  const form = (await again.get('/social-media/reels/new?page=stencil')).text;
+  assert.match(form, /Suggested from the Stencil weekly schedule \(first slot that leaves 24 h for editing after the shoot\): <b>Sun \d+ \w+, 10:15 AM<\/b>/);
+  const shootVal = form.match(/name="shootAt" required value="([^"]+)"/)[1];
+  const pubVal = form.match(/name="publishAt" value="([^"]+)"/)[1];
+  assert.ok(new Date(pubVal) - new Date(shootVal) >= 24 * HOUR, 'suggested slot leaves 24 h for editing after the shoot');
+  assert.match(form, /name="hasPublishAt" value="1" data-toggle-field="pub-wrap" checked/);
+  assert.match((await again.get('/social-media/reels/new?page=butterpaper')).text, /No publishing schedule is configured for Butterpaper/);
+
+  // Nobody but the admin can change schedules.
+  for (const who of ['bansi', 'krutik', 'dhara', 'ashmita', 'viewer']) {
+    const c = await as(U[who]);
+    assert.equal((await c.post('/social-media/settings/schedule/product', { _csrf: c.token, mon_enabled: 'on', mon_slots: '09:00' })).status, 403, who);
+    assert.doesNotMatch((await c.get('/social-media/settings')).text, /data-add-slot/, `${who} has no schedule editor`);
+  }
+  assert.equal(JSON.stringify(studio().settings.publishingSchedule), snapshot);
+});
+
+test('24-hour editing deadline over HTTP: saved, shown, recalculated with history, completion time not forgeable', async () => {
+  const admin = await as(U.admin);
+  const bansi = await as(U.bansi);
+  const krutik = await as(U.krutik);
+  const made = await admin.post('/social-media/reels', { _csrf: admin.token, title: 'Deadline reel', pageId: 'product', priority: 'High', shootAt: localInput(-3 * HOUR), hasPublishAt: '1', publishAt: localInput(72 * HOUR) });
+  const id = Number(made.location.split('/').pop());
+  let r = reel(id);
+  assert.equal(Date.parse(r.publishAt) - Date.parse(r.editingDeadline), 24 * HOUR);
+  await bansi.post(`/social-media/reels/${id}/claim-shoot`, { _csrf: bansi.token });
+  await bansi.post(`/social-media/reels/${id}/complete-shoot`, { _csrf: bansi.token, rawSubmitted: 'on' });
+  await krutik.post(`/social-media/reels/${id}/claim-edit`, { _csrf: krutik.token });
+
+  // Moved to 10 h from now → deadline already passed: warning, status stays "Editing".
+  const moved = await admin.post(`/social-media/reels/${id}/reschedule`, { _csrf: admin.token, publishAt: localInput(10 * HOUR), reason: 'Launch moved up' });
+  assert.equal(moved.status, 303);
+  assert.match((await flashOf(admin, `/social-media/reels/${id}`)).text, /Warning: the editing deadline .* has already passed/);
+  r = reel(id);
+  assert.equal(Date.parse(r.publishAt) - Date.parse(r.editingDeadline), 24 * HOUR);
+  assert.equal(r.editing.status, 'Editing');
+  assert.deepEqual(r.deadlineChanges.slice(-2).map((c) => [c.field, c.reason]), [['publishAt', 'Launch moved up'], ['editingDeadline', 'Launch moved up']]);
+  for (const p of [`/social-media/reels/${id}`, '/social-media/editing', '/social-media/editing?view=list', '/social-media/tasks?type=Editing']) {
+    const html = (await admin.get(p)).text;
+    assert.match(html, /Editing Overdue/, `overdue warning on ${p}`);
+  }
+  assert.match((await admin.get(`/social-media/calendar?view=day&date=${localInput(10 * HOUR).slice(0, 10)}`)).text, /Editing Overdue/);
+
+  // Forged completion fields are ignored: server time, server user, server on-time result.
+  await krutik.post(`/social-media/reels/${id}/complete-edit`, { _csrf: krutik.token, notes: 'done', at: '2020-01-01T00:00', completedAt: '2020-01-01T00:00', onTime: 'true', by: String(U.bansi.id) });
+  r = reel(id);
+  assert.equal(r.editing.completion.by, U.krutik.id);
+  assert.equal(r.editing.completion.onTime, false, 'late: completed after the 24-hour deadline');
+  assert.ok(Math.abs(Date.parse(r.editing.completion.at) - Date.now()) < 10000);
+  assert.equal(r.publishing.status, 'Ready to Publish');
+  // Bansi (view of Publishing Queue) sees the publishing time with the deadline result.
+  assert.match((await bansi.get('/social-media/publishing')).text, /Deadline reel/);
+  // Dhara cannot reschedule even directly.
+  const dhara = await as(U.dhara);
+  assert.equal((await dhara.post(`/social-media/reels/${id}/reschedule`, { _csrf: dhara.token, publishAt: localInput(90 * HOUR), reason: 'x' })).status, 403);
 });
 
 test('every Studio screen renders for each role without server errors', async () => {

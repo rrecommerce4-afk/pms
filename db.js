@@ -3,11 +3,11 @@ const path = require('path');
 const bcrypt = require('bcryptjs');
 const { addDays } = require('./utils');
 const { catchUpDailyTasks } = require('./lib/tasks');
-const { emptyStudio, migrateStudio } = require('./lib/studio/store');
+const { emptyStudio, migrateStudio, migrateEditingDeadlines } = require('./lib/studio/store');
 
 // PMS_DB_FILE lets the automated tests run against a throwaway copy; normal runs use db.json.
 const DB_FILE = process.env.PMS_DB_FILE ? path.resolve(process.env.PMS_DB_FILE) : path.join(__dirname, 'db.json');
-const SCHEMA_VERSION = 4;
+const SCHEMA_VERSION = 5;
 const BADGE_COLORS = ['var(--info)', 'var(--purple)', 'var(--success)', 'var(--warning)', 'var(--primary)', 'var(--danger)'];
 
 function emptyDb() {
@@ -59,6 +59,9 @@ function migrate(db) {
   // v4: Social Media Studio data under db.socialStudio (separate from general tasks). Only
   // added when missing; existing users, tasks and everything else are left untouched.
   if (db.schemaVersion < 4) migrateStudio(db);
+
+  // v5: editing deadline = 24h before each reel's scheduled publishing time, saved on the reel.
+  if (db.schemaVersion < 5) migrateEditingDeadlines(db);
 
   db.schemaVersion = SCHEMA_VERSION;
   return true;

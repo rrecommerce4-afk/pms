@@ -47,7 +47,9 @@
       <% modalHead('Schedule post'); hidden(); %>
       <div class="modal-body">
         <p class="sm-note">Scheduling is <b>not</b> publishing. The post stays unpublished until someone confirms the upload.</p>
-        <div class="field"><label>Planned publishing time *</label><input type="datetime-local" name="publishAt" required data-fill-value="publishat"></div>
+        <div class="field"><label>Planned publishing time *</label><input type="datetime-local" name="publishAt" required data-fill-value="publishat"><div class="helper-text" data-fill="slothint"></div></div>
+        <div class="field"><label>Reason (required if you change an existing time)</label><input type="text" name="reason" maxlength="500" placeholder="e.g. Moved to the Friday 5 PM slot"></div>
+        <p class="helper-text">Editing must be completed <b>24 hours before</b> this time. The editing deadline is recalculated automatically from it.</p>
       </div>
       <div class="sm-modal-foot"><button type="button" class="btn outline" data-close>Cancel</button><button class="btn" type="submit">Schedule</button></div>
     </form>
@@ -57,8 +59,9 @@
     <form class="modal-box" method="POST">
       <% modalHead('Reschedule publishing'); hidden(); %>
       <div class="modal-body">
-        <div class="field"><label>New planned publishing time *</label><input type="datetime-local" name="publishAt" required data-fill-value="publishat"></div>
-        <div class="field"><label>Reason (kept in history)</label><input type="text" name="reason" maxlength="500" placeholder="e.g. Festival post moved by a day"></div>
+        <div class="field"><label>New planned publishing time *</label><input type="datetime-local" name="publishAt" required data-fill-value="publishat"><div class="helper-text" data-fill="slothint"></div></div>
+        <p class="helper-text">The editing deadline moves with it (24 hours before). The previous time and deadline are kept in the history.</p>
+        <div class="field"><label>Reason (required when changing an existing time; kept in history)</label><input type="text" name="reason" maxlength="500" placeholder="e.g. Festival post moved by a day"></div>
       </div>
       <div class="sm-modal-foot"><button type="button" class="btn outline" data-close>Cancel</button><button class="btn" type="submit">Reschedule</button></div>
     </form>

@@ -29,6 +29,15 @@ Content Planning → Shoot Scheduled (claimed) → Shoot Completed → (raw foot
 - Every claim, release, reassignment, completion, deadline change, blocker, schedule and publish is written to the reel's activity log. Ownership changes are also written to `ownershipHistory`.
 - Deleting a reel is a soft delete. The record and its history stay in the database.
 
+## Publishing schedule and the 24-hour editing deadline
+
+- **Weekly publishing schedule.** In *Settings & Targets → Publishing Schedule*, each page has its own Monday–Sunday schedule. Each day can be turned on or off and can have several times, stored as 24-hour `HH:mm` in the server's time zone. Only admins can change it. Each save covers one page only and is recorded in `socialStudio.scheduleHistory` (before, after, who, when).
+- **Suggestions only.** The schedule only suggests publishing times. When a reel is created, its publishing time defaults to the first slot that still leaves 24 hours for editing after the shoot. The Schedule and Reschedule pop-ups also suggest the next slot. Changing the weekly schedule never changes reels that already have a publishing time.
+- **Editing deadline.** Each reel's editing deadline is always `editingDeadline = publishAt − 24 hours`. It is saved on the reel and recalculated whenever that reel's publishing time changes. The change history keeps the old and new publishing time and deadline, who changed them, when, and why; a reason is required when an existing time is changed. A reel without a publishing time has no deadline. If the new deadline has already passed, the PMS shows a warning and never moves the deadline forward.
+- **Completion.** "Mark editing completed" records the server time and the logged-in editor, and compares them with the deadline. Completed at or before the deadline counts as on time; after it, late. That result is stored with the completion and never rewritten. If the publishing time changes later, the reel shows whether the earlier completion also meets the new deadline. Reopening keeps the earlier completion in `editing.previousCompletions`.
+- **Overdue warning.** "Editing Overdue" is a warning badge only. The reel's workflow status, such as "Editing", stays as it is. Scoring uses the stored on-time or late result; the weights (35/25/25/15) and the four ranked employees are unchanged.
+- **Migration.** Schema v5 adds the saved deadline to existing reels. An old manually entered editing deadline is kept as `legacyEditDeadline` for reference only.
+
 ## Data
 
 - All Studio data lives in `db.socialStudio`: members, settings, reels, nextReelId and notification read-state. It is separate from the general `db.tasks`.

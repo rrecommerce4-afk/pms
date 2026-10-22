@@ -14,6 +14,7 @@ const A = require('../lib/studio/actions');
 const Store = require('../lib/studio/store');
 const Nav = require('../lib/studio/nav');
 const IG = require('../lib/studio/instagram');
+const Sched = require('../lib/studio/schedule');
 
 const router = express.Router();
 router.use(requireLogin);
@@ -116,6 +117,7 @@ router.use((req, res, next) => {
   res.locals.W = W;
   res.locals.P = P;
   res.locals.S = S;
+  res.locals.Sched = Sched;
   res.locals.sm = {
     actor: ctx.actor,
     studio: ctx.studio,
@@ -718,7 +720,8 @@ router.get('/settings', (req, res) => {
       });
     })(),
     igApiVersion: IG.API_VERSION,
-    IGREMIND: IG.REMIND_DAYS
+    IGREMIND: IG.REMIND_DAYS,
+    scheduleHistory: (studio.scheduleHistory || []).slice(-15).reverse()
   });
   delete req.session.studioLinkReport;
 });
@@ -727,6 +730,38 @@ function requireManager(req, res, next) {
   if (!req.sm.actor.isManager) return forbidden(res, 'Only an admin can change Studio settings.');
   next();
 }
+
+// Weekly publishing schedule for ONE page (Settings → Publishing Schedule). Only that page's
+// schedule changes. It only affects future slot suggestions: reels that already have a
+// publishing time keep it (and their editing deadline) until someone edits the reel itself.
+router.post('/settings/schedule/:pageId', requireManager, (req, res) => {
+  const page = C.getPage(req.params.pageId);
+  if (!page) return res.status(404).send('Unknown page');
+  const parsed = Sched.parseWeekForm(req.body);
+  if (parsed.error) {
+    flash(req, 'error', `${page.name}: ${parsed.error} Nothing was saved.`);
+    return res.redirect(303, `/social-media/settings#schedule-${page.id}`);
+  }
+  const ctx = loadCtx(req);
+  const { studio, db, actor } = ctx;
+  const before = studio.settings.publishingSchedule[page.id];
+  const after = parsed.week;
+  if (JSON.stringify(before) === JSON.stringify(after)) {
+    flash(req, 'info', `${page.name}: no changes.`);
+    return res.redirect(303, `/social-media/settings#schedule-${page.id}`);
+  }
+  const next = JSON.parse(JSON.stringify(studio.settings.publishingSchedule));
+  next[page.id] = after;
+  studio.settings = Store.sanitizeSettings({ ...studio.settings, publishingSchedule: next }, studio.settings);
+  studio.scheduleHistory = studio.scheduleHistory || [];
+  studio.scheduleHistory.push({ at: new Date().toISOString(), by: actor.userId, byName: actor.name, pageId: page.id, before, after: studio.settings.publishingSchedule[page.id] });
+  if (studio.scheduleHistory.length > 300) studio.scheduleHistory.splice(0, studio.scheduleHistory.length - 300);
+  logActivity(db, `<b>${escapeHtml(actor.name)}</b> updated the ${escapeHtml(page.name)} publishing schedule`);
+  save(db);
+  const empty = Sched.DAYS.filter((d) => after[d].enabled && !after[d].slots.length).map((d) => Sched.DAY_LABEL[d]);
+  flash(req, empty.length ? 'info' : 'success', `${page.name} publishing schedule saved. Future suggestions use it; reels that are already scheduled keep their times.${empty.length ? ` Note: ${empty.join(', ')} ${empty.length === 1 ? 'is' : 'are'} enabled but has no time, so ${empty.length === 1 ? 'it is' : 'they are'} skipped.` : ''}${Sched.hasAnySlot(studio.settings.publishingSchedule, page.id) ? '' : ' No publishing day is active, so no time can be suggested for this page.'}`);
+  res.redirect(303, `/social-media/settings#schedule-${page.id}`);
+});
 
 router.post('/settings/:section', requireManager, (req, res) => {
   const ctx = loadCtx(req);
@@ -744,7 +779,6 @@ router.post('/settings/:section', requireManager, (req, res) => {
     });
     if (C.PAGE_IDS.some((p) => !(Array.isArray(b[`team_${p}`]) ? b[`team_${p}`].length : b[`team_${p}`]))) msg = 'Saved. Each page needs at least one team member, so empty teams were left unchanged.';
   } else if (sec === 'restore-teams') { st.pageTeams = JSON.parse(JSON.stringify(C.DEFAULT_PAGE_TEAMS)); msg = 'Page teams restored to the default assignments.'; }
-  else if (sec === 'deadlines') { st.deadlines.editDaysAfterShoot = b.editDaysAfterShoot; st.deadlines.publishDaysAfterEdit = b.publishDaysAfterEdit; }
   else if (sec === 'priorities') st.priorities = st.priorities.map((p, i) => ({ priority: p.priority, description: b[`desc_${i}`], slaHours: b[`sla_${i}`] }));
   else if (sec === 'weights') {
     Object.keys(st.weights).forEach((k) => { st.weights[k] = b[`w_${k}`]; });
@@ -878,13 +912,22 @@ function saveMembers(req, res, ctx) {
 }
 
 // ---------------------------------------------------------------- reels
+// Default publishing time for a new reel: the page's first configured slot that still leaves
+// the full 24 hours for editing after the shoot (slot − 24h must be after both now and the
+// shoot). null when the page has no such slot (the form then asks the user to choose/configure).
+function suggestPublish(studio, pageId, shootAt, now) {
+  const after = new Date((shootAt > now ? shootAt : now).getTime() + W.EDIT_HOURS_BEFORE_PUBLISH * 3600000);
+  const slot = Sched.nextSlot(studio.settings.publishingSchedule, pageId, after);
+  return slot ? slot.toISOString() : null;
+}
+
 router.get('/reels/new', requireManager, (req, res) => {
   const { now } = req.sm;
   const date = parseDay(req.query.date, W.addDaysD(W.startOfDay(now), 1));
   date.setHours(11, 0, 0, 0);
   render(res, 'reel-form', 'Create reel', {
     item: null,
-    draft: { title: '', pageId: C.PAGE_IDS.includes(req.query.page) ? req.query.page : 'product', priority: 'Medium', idea: '', caption: '', prepNotes: '', shootAt: date.toISOString(), editDeadline: null, publishAt: null },
+    draft: { title: '', pageId: C.PAGE_IDS.includes(req.query.page) ? req.query.page : 'product', priority: 'Medium', idea: '', caption: '', prepNotes: '', shootAt: date.toISOString(), publishAt: suggestPublish(req.sm.studio, C.PAGE_IDS.includes(req.query.page) ? req.query.page : 'product', date, now) },
     error: null, back: safeReturn(req.query.returnTo, '/social-media')
   });
 });
@@ -892,7 +935,6 @@ router.get('/reels/new', requireManager, (req, res) => {
 router.post('/reels', requireManager, (req, res) => {
   const ctx = loadCtx(req);
   const input = { ...req.body };
-  if (!req.body.hasEditDeadline) input.editDeadline = '';
   if (!req.body.hasPublishAt) input.publishAt = '';
   const result = A.createReel({ ...ctx }, input);
   if (!result.ok) {
@@ -907,7 +949,7 @@ router.post('/reels', requireManager, (req, res) => {
 // Keeps what the user typed when the form is re-shown with an error.
 function formDraft(b) {
   const A2 = (v) => { const p = A.parseWhen(v); return p || null; };
-  return { title: b.title || '', pageId: b.pageId, priority: b.priority, idea: b.idea || '', caption: b.caption || '', prepNotes: b.prepNotes || '', shootAt: A2(b.shootAt), editDeadline: b.hasEditDeadline ? A2(b.editDeadline) : null, publishAt: b.hasPublishAt ? A2(b.publishAt) : null, reason: b.reason || '' };
+  return { title: b.title || '', pageId: C.PAGE_IDS.includes(b.pageId) ? b.pageId : 'product', priority: C.PRIORITIES.includes(b.priority) ? b.priority : 'Medium', idea: b.idea || '', caption: b.caption || '', prepNotes: b.prepNotes || '', shootAt: A2(b.shootAt), publishAt: b.hasPublishAt ? A2(b.publishAt) : null, reason: b.reason || '' };
 }
 
 router.get('/reels/:id', (req, res) => {
@@ -930,7 +972,6 @@ router.post('/reels/:id/:action', (req, res) => {
   const back = safeReturn(req.body.returnTo, fallback);
   const input = { ...req.body };
   if (req.params.action === 'update') {
-    if (!req.body.hasEditDeadline) input.editDeadline = '';
     if (!req.body.hasPublishAt) input.publishAt = '';
   }
   const result = A.runReelAction(req.params.action, { ...ctx, item }, input);

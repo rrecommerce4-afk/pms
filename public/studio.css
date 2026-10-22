@@ -392,3 +392,25 @@ form.modal-box { margin: 0; }
   .sm-member-row select { min-width: 0; width: 100%; }
   .sm-notif-panel { position: fixed; left: 12px; right: 12px; top: 64px; width: auto; }
 }
+
+/* Editing deadline (24 h before publishing) + weekly publishing schedule */
+.sm-dl { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 4px 6px; font-size: 11.5px; color: var(--text-muted); }
+.sm-dl.soon { color: #8a6519; font-weight: 600; }
+.sm-dl.overdue { color: var(--danger); font-weight: 600; }
+.sm-dl.missing { color: var(--text-faint); font-style: italic; }
+.sm-dl-note { color: var(--text-faint); font-weight: 400; }
+.sm-cal-dl { display: block; margin-top: 6px; }
+.sm-publish-block { border: 1px solid var(--border-soft); border-radius: var(--radius-sm); padding: 12px 14px; background: var(--bg); }
+.sm-publish-block input[type=datetime-local] { max-width: 260px; }
+.sm-slot-panel { margin-top: 8px; font-size: 12.5px; color: var(--text-muted); display: flex; flex-direction: column; gap: 6px; }
+.sm-slot-line { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.sm-deadline-preview { margin-top: 10px; font-size: 13px; }
+.sm-sched-page { border: 1px solid var(--border); border-top: 3px solid var(--pc); border-radius: var(--radius); padding: 12px 14px; margin: 0 0 14px; scroll-margin-top: 16px; }
+.sm-sched-head { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
+.sm-sched-table td { vertical-align: middle; }
+.sm-slot { display: inline-flex; align-items: center; gap: 4px; margin: 2px 8px 2px 0; padding: 2px 4px 2px 2px; border: 1px solid var(--border); border-radius: 6px; background: var(--surface); }
+.sm-slot input[type=time] { border: none; font: inherit; font-size: 13px; padding: 4px; background: transparent; }
+.sm-slot-label { font-size: 11px; color: var(--text-faint); }
+.sm-slot-x { border: none; background: none; color: var(--text-faint); font-size: 16px; line-height: 1; cursor: pointer; padding: 0 4px; }
+.sm-slot-x:hover { color: var(--danger); }
+.sm-sched-review td { white-space: nowrap; font-size: 12px; }

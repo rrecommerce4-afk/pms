@@ -47,8 +47,8 @@
               <td style="max-width:260px"><a class="reel-link <%= t.overdue && t.assignee ? 'red-txt' : '' %>" href="/social-media/reels/<%= t.contentId %>"><%= t.title %></a><div class="sub"><%- V.pageBadge(t.pageId) %></div></td>
               <td><%- V.typeBadge(t.type) %></td>
               <td><%- people.ownerChip(t.assignee, t.type === 'Publishing' && !t.done ? 'Not yet published' : 'Unclaimed') %></td>
-              <td class="nowrap <%= t.overdue ? 'red-txt' : '' %>"><%= t.deadline ? V.fmtDateTime(t.deadline) : 'not set' %></td>
-              <td><%- V.statusBadge(t.overdue && !t.assignee ? 'Overdue' : t.status) %><% if (t.overdue && !t.assignee) { %><div class="muted warn-txt" style="font-size:10.5px">unclaimed — not attributed</div><% } %></td>
+              <td class="nowrap <%= t.overdue ? 'red-txt' : '' %>"><% if (t.type === 'Editing' && r.item) { %><%- V.editDeadlineHtml(r.item, sm.now) %><% } else { %><%= t.deadline ? V.fmtDateTime(t.deadline) : 'not set' %><% } %></td>
+              <td><%- V.statusBadge(t.status) %><% if (t.overdue && t.type === 'Editing') { %> <%- V.badge('Editing Overdue', 'red') %><% } else if (t.overdue && t.status !== 'Overdue' && t.status !== 'Missed Deadline') { %> <%- V.badge('Overdue', 'red') %><% } %><% if (t.overdue && !t.assignee) { %><div class="muted warn-txt" style="font-size:10.5px">unclaimed — not attributed</div><% } %></td>
               <td><%- V.priorityBadge(t.priority) %></td>
               <td class="nowrap muted"><%= t.claimedAt ? V.fmtDateTime(t.claimedAt) : '—' %></td>
               <td class="nowrap muted"><% if (t.done && t.completedAt) { %><%= V.fmtDate(t.completedAt, 'short') %> <%- timing(t) %><% } else { %>—<% } %></td>

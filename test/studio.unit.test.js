@@ -72,8 +72,11 @@ test('only the admin can create reels; owners are never set at creation', () => 
   assert.equal(A.createReel(ctx(1), { title: '', pageId: 'product', shootAt: local(HOUR) }).status, 400);
   assert.equal(A.createReel(ctx(1), { title: 'x', pageId: 'nope', shootAt: local(HOUR) }).status, 400);
   assert.equal(A.createReel(ctx(1), { title: 'x', pageId: 'product', shootAt: 'not a date' }).status, 400);
-  assert.equal(A.createReel(ctx(1), { title: 'x', pageId: 'product', shootAt: local(5 * HOUR), editDeadline: local(HOUR) }).status, 400);
+  assert.equal(A.createReel(ctx(1), { title: 'x', pageId: 'product', shootAt: local(5 * HOUR), publishAt: local(HOUR) }).status, 400, 'publishing before the shoot');
+  assert.equal(A.createReel(ctx(1), { title: 'x', pageId: 'product', shootAt: local(HOUR), publishAt: '2026-13-45T99:00' }).status, 400, 'invalid publishing date');
   const r = create({ caption: 'cap', idea: 'idea', prepNotes: 'bring props', editDeadline: local(30 * HOUR), publishAt: local(60 * HOUR) });
+  assert.equal(r.editDeadline, undefined, 'a submitted manual editing deadline is ignored');
+  assert.equal(r.editingDeadline, new Date(Date.parse(r.publishAt) - 24 * HOUR).toISOString());
   assert.equal(r.shootOwner, null);
   assert.equal(r.editor, null);
   assert.equal(r.publishingOwner, null);
@@ -248,7 +251,7 @@ test('settings are sanitised server-side', () => {
 function doneReel(id, pageId, { shootBy, editBy, pubBy, onTime = true, raw = true, at = iso(-2 * HOUR), publishAt }) {
   const c = (by) => (by ? { by, byName: '', at, deadline: iso(onTime ? HOUR : -10 * HOUR), onTime } : null);
   return {
-    id, title: `R${id}`, pageId, priority: 'Medium', shootAt: iso(-48 * HOUR), editDeadline: null, publishAt: publishAt || null,
+    id, title: `R${id}`, pageId, priority: 'Medium', shootAt: iso(-48 * HOUR), publishAt: publishAt || null,
     shootOwner: shootBy || null, editor: editBy || null, publishingOwner: pubBy || null,
     shoot: { status: shootBy ? 'Completed' : 'Unclaimed', claimedAt: iso(-50 * HOUR), rawSubmitted: !!shootBy && raw, rawSubmittedAt: at, completion: c(shootBy), blocker: null, notes: '' },
     editing: { status: editBy ? 'Editing Completed' : 'Not Started', claimedAt: iso(-20 * HOUR), completion: c(editBy), blocker: null, notes: '' },

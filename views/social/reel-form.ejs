@@ -29,19 +29,23 @@
         <div class="field span-2"><label for="f-idea">Content idea / description</label><textarea id="f-idea" name="idea" rows="3" maxlength="3000" placeholder="Hook, key shots, message, CTA…"><%= d.idea %></textarea></div>
         <div class="field span-2"><label for="f-prep">Preparation notes for the shoot</label><textarea id="f-prep" name="prepNotes" rows="2" maxlength="2000" placeholder="Props, products, location, outfit, references…"><%= d.prepNotes %></textarea></div>
         <div class="field span-2"><label for="f-shoot">Planned shoot date / shoot deadline *</label><input id="f-shoot" type="datetime-local" name="shootAt" required value="<%= V.toInput(d.shootAt) %>"></div>
-        <div class="field">
-          <label class="sm-check"><input type="checkbox" name="hasEditDeadline" value="1" data-toggle-field="edit-wrap" <%= d.editDeadline ? 'checked' : '' %>> Editing deadline is known</label>
-          <div id="edit-wrap"><input type="datetime-local" name="editDeadline" value="<%= V.toInput(d.editDeadline) %>" aria-label="Editing deadline"></div>
-          <div class="helper-text">Optional. Otherwise: <%= st.deadlines.editDaysAfterShoot %> day(s) after the raw footage arrives.</div>
-        </div>
-        <div class="field">
-          <label class="sm-check"><input type="checkbox" name="hasPublishAt" value="1" data-toggle-field="pub-wrap" <%= d.publishAt ? 'checked' : '' %>> Planned publishing date is known</label>
-          <div id="pub-wrap"><input type="datetime-local" name="publishAt" value="<%= V.toInput(d.publishAt) %>" aria-label="Planned publishing date"></div>
-          <div class="helper-text">Optional — can be set later when scheduling.</div>
+        <% var pg = C.getPage(d.pageId) || C.PAGES[0]; var dl = d.publishAt ? W.deadlineForPublish(d.publishAt) : null; var hasSchedule = Sched.hasAnySlot(st.publishingSchedule, pg.id); %>
+        <div class="field span-2 sm-publish-block" data-sm-publish data-edit-done="<%= editing && W.isEditingDone(item) ? '1' : '' %>" data-schedule="<%= JSON.stringify(st.publishingSchedule) %>">
+          <label class="sm-check"><input type="checkbox" name="hasPublishAt" value="1" data-toggle-field="pub-wrap" <%= d.publishAt ? 'checked' : '' %>> Scheduled publishing date &amp; time is known</label>
+          <div id="pub-wrap">
+            <input type="datetime-local" name="publishAt" value="<%= V.toInput(d.publishAt) %>" aria-label="Scheduled publishing date and time" data-publish-input>
+            <div class="sm-slot-panel" data-slot-panel>
+              <% if (!editing && d.publishAt) { %>Suggested from the <%= pg.shortName %> weekly schedule (first slot that leaves 24 h for editing after the shoot): <b><%= V.fmtDate(d.publishAt, 'weekday') %>, <%= V.fmtTime(d.publishAt) %></b>. You can choose another date and time.<% } else if (!hasSchedule) { %>No publishing schedule is configured for <%= pg.shortName %> yet — choose a time, or configure it in <a class="view-all" href="/social-media/settings#schedule">Settings → Publishing Schedule</a>.<% } %>
+            </div>
+          </div>
+          <div class="sm-deadline-preview" data-deadline-preview>
+            <% if (dl) { %>Editing deadline: <b><%= V.fmtDateTime(dl) %></b> (24 hours before publishing)<% if (new Date(dl) <= sm.now && !(editing && W.isEditingDone(item))) { %> — <b class="red-txt">already passed: editing would be overdue immediately</b><% } %><% } else { %>No publishing time → no editing deadline yet. Editing must be completed 24 hours before the publishing time once it is set.<% } %>
+          </div>
+          <% if (editing && item.editing.completion) { %><div class="helper-text">Editing was already completed on <%= V.fmtDateTime(item.editing.completion.at) %> (<%= item.editing.completion.onTime === false ? 'late' : item.editing.completion.onTime ? 'on time' : 'no deadline' %>). Changing the publishing time keeps that original result; the history shows whether it meets the new deadline.</div><% } %>
         </div>
         <div class="field span-2"><label for="f-caption">Caption (optional)</label><textarea id="f-caption" name="caption" rows="2" maxlength="2200" placeholder="Caption draft"><%= d.caption %></textarea></div>
         <% if (editing) { %>
-          <div class="field span-2"><label for="f-reason">Reason for any date change<%= claimed ? ' (required when dates change — work has been claimed)' : '' %></label><input id="f-reason" name="reason" maxlength="500" value="<%= d.reason || '' %>" placeholder="e.g. Product stock delayed — management approved new date"><div class="helper-text">Original dates are kept in the history. On-time status uses the deadline in effect when a task is completed.</div></div>
+          <div class="field span-2"><label for="f-reason">Reason for any date change<%= claimed || item.publishAt ? ' (required when the publishing time changes' + (claimed ? ' or any date changes — work has been claimed' : '') + ')' : '' %></label><input id="f-reason" name="reason" maxlength="500" value="<%= d.reason || '' %>" placeholder="e.g. Product stock delayed — management approved new date"><div class="helper-text">The previous publishing time and editing deadline are kept in the history. On-time status uses the deadline in effect when a task is completed.</div></div>
         <% } %>
       </div>
       <% if (!editing) { %><p class="sm-note">No owners are assigned here. The reel appears under “Available tasks” for the page team. Editing can only be claimed by Bansi, Bhavin, Vishnu or Krutik.</p><% } %>
