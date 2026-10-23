@@ -68,6 +68,32 @@ test('actor resolution comes from the PMS user, not client input', () => {
   assert.equal(P.resolveActor(fixture().studio, { id: 11, name: 'Bansi', role: 'employee', active: false }), null);
 });
 
+test('"Can create reels": allowed members create for their own pages only; view-only never', () => {
+  const { studio, ctx } = fixture();
+  const bansi = studio.members.find((m) => m.key === 'bansi');
+  const input = (pageId) => ({ title: 'Member reel', pageId, priority: 'Medium', shootAt: local(2 * HOUR) });
+  assert.equal(A.createReel(ctx(11), input('product')).status, 403, 'off by default');
+  bansi.canCreate = true;
+  assert.equal(ctx(11).actor.canCreate, true);
+  assert.deepEqual(P.creatablePages(ctx(11).actor, studio.settings), ['product', 'farma']);
+  const ok = A.createReel(ctx(11), input('farma'));
+  assert.ok(ok.ok, ok.error);
+  assert.equal(ok.reel.createdBy, 11);
+  assert.equal(ok.reel.shootOwner, null, 'still created without owners');
+  assert.equal(A.createReel(ctx(11), input('stencil')).status, 403, 'not her page');
+  assert.equal(A.createReel(ctx(12), input('stencil')).status, 403, 'Bhavin was not allowed');
+  // Even if the stored flag were set, view-only members can never create.
+  studio.members.find((m) => m.key === 'dhara').canCreate = true;
+  assert.equal(ctx(15).actor.canCreate, false);
+  assert.equal(A.createReel(ctx(15), input('stencil')).status, 403);
+  Store.getStudio({ socialStudio: studio });
+  assert.equal(studio.members.find((m) => m.key === 'dhara').canCreate, false, 'normalised off');
+  assert.equal(studio.members.find((m) => m.key === 'bansi').canCreate, true);
+  // Creating doesn't grant editing or deleting.
+  assert.equal(A.runReelAction('update', ctx(11, ok.reel), { ...input('farma'), rev: ok.reel.rev }).status, 403);
+  assert.equal(A.runReelAction('delete', ctx(11, ok.reel)).status, 403);
+});
+
 test('only the admin can create reels; owners are never set at creation', () => {
   const { ctx, create } = fixture();
   assert.equal(A.createReel(ctx(11), { title: 'x', pageId: 'product', shootAt: local(HOUR) }).status, 403);

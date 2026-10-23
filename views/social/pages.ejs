@@ -8,7 +8,7 @@
       <h1>Instagram Pages</h1>
       <p>Four Rajarani accounts with their page teams, monthly targets and shared task status. Page team members can claim shoots and confirm publishing; editing is claimed by the eligible editors.</p>
     </div>
-    <div class="sm-head-actions"><%- V.followerBadge(sm.src) %><% if (a.isManager) { %><a class="btn" href="/social-media/reels/new">+ Create reel</a><% } %></div>
+    <div class="sm-head-actions"><%- V.followerBadge(sm.src) %><% if (a.canCreate) { %><a class="btn" href="/social-media/reels/new">+ Create reel</a><% } %></div>
   </div>
 
   <div class="sm-cards-2">

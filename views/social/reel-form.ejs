@@ -22,7 +22,7 @@
       <div class="form-grid-2">
         <div class="field span-2"><label for="f-title">Reel title *</label><input id="f-title" name="title" required maxlength="150" value="<%= d.title %>" placeholder="e.g. Diwali stencil rangoli in 60 seconds"></div>
         <div class="field"><label for="f-page">Instagram page *</label>
-          <select id="f-page" name="pageId" <%= claimed ? 'disabled' : '' %>><% C.PAGES.forEach(function (p) { %><option value="<%= p.id %>" <%= d.pageId === p.id ? 'selected' : '' %>><%= p.name %> (<%= p.handle %>)</option><% }) %></select>
+          <select id="f-page" name="pageId" <%= claimed ? 'disabled' : '' %>><% (editing ? C.PAGES : C.PAGES.filter(function (p) { return P.canCreateFor(sm.actor, st, p.id); })).forEach(function (p) { %><option value="<%= p.id %>" <%= d.pageId === p.id ? 'selected' : '' %>><%= p.name %> (<%= p.handle %>)</option><% }) %></select>
           <% if (claimed) { %><input type="hidden" name="pageId" value="<%= item.pageId %>"><div class="helper-text">Locked because work has been claimed.</div><% } %>
         </div>
         <div class="field"><label for="f-priority">Priority</label><select id="f-priority" name="priority"><% C.PRIORITIES.forEach(function (p) { %><option <%= d.priority === p ? 'selected' : '' %>><%= p %></option><% }) %></select></div>

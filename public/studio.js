@@ -55,7 +55,7 @@
 
   // Forms that need a confirmation (e.g. delete).
   document.addEventListener('submit', function (e) {
-    var msg = e.target.getAttribute('data-confirm');
+    var msg = (e.submitter && e.submitter.getAttribute('data-confirm')) || e.target.getAttribute('data-confirm');
     if (msg && !window.confirm(msg)) e.preventDefault();
   });
 
@@ -180,6 +180,23 @@
     }
     var rm = e.target.closest('[data-remove-slot]');
     if (rm) rm.closest('.sm-slot').remove();
+  });
+
+  // ---------------------------------------------------------------- Manage reels (bulk select)
+  document.querySelectorAll('[data-bulk-form]').forEach(function (form) {
+    var all = form.querySelector('[data-select-all]');
+    var boxes = form.querySelectorAll('[data-row-check]');
+    var label = form.querySelector('[data-selected-count]');
+    function sync() {
+      var n = 0;
+      boxes.forEach(function (b) { if (b.checked) n++; });
+      if (label) label.textContent = n + ' selected';
+      if (all) { all.checked = n > 0 && n === boxes.length; all.indeterminate = n > 0 && n < boxes.length; }
+      form.querySelectorAll('button[type=submit]').forEach(function (btn) { btn.disabled = n === 0; });
+    }
+    if (all) all.addEventListener('change', function () { boxes.forEach(function (b) { b.checked = all.checked; }); sync(); });
+    boxes.forEach(function (b) { b.addEventListener('change', sync); });
+    sync();
   });
 
   // Close the notifications panel when clicking elsewhere.

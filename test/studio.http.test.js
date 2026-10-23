@@ -559,6 +559,94 @@ test('a server whose host clock is UTC still reads form times in India time; pub
   assert.match((await bansi.get('/social-media/publishing')).text, /name="publishedAt" required data-now data-tz="Asia\/Kolkata"/);
 });
 
+test('admin can let chosen team members create reels for their own pages', async () => {
+  const admin = await as(U.admin);
+  const bansi = await as(U.bansi);
+  const krutik = await as(U.krutik);
+  const dhara = await as(U.dhara);
+  const reelBody = (c, pageId) => ({ _csrf: c.token, title: `Member reel ${pageId}`, pageId, priority: 'Medium', shootAt: localInput(5 * HOUR) });
+  assert.equal((await bansi.get('/social-media/reels/new')).status, 403, 'not allowed yet');
+  assert.equal((await bansi.post('/social-media/reels', reelBody(bansi, 'product'))).status, 403);
+  assert.doesNotMatch((await bansi.get('/social-media')).text, /\+ Create reel/);
+
+  // Admin turns it on for Bansi (and tries Dhara, who is view-only).
+  assert.equal((await bansi.post('/social-media/settings/members', { _csrf: bansi.token, members_form: '1', create_bansi: 'on' })).status, 403, 'members cannot grant it');
+  await admin.post('/social-media/settings/members', { _csrf: admin.token, members_form: '1', create_bansi: 'on', create_dhara: 'on' });
+  const m = Object.fromEntries(studio().members.map((x) => [x.key, x.canCreate]));
+  assert.deepEqual([m.bansi, m.dhara, m.krutik], [true, false, false]);
+  assert.match((await admin.get('/social-media/settings')).text, /name="create_bansi" value="on" checked/);
+
+  const form = await bansi.get('/social-media/reels/new?page=stencil');
+  assert.equal(form.status, 200);
+  const options = [...form.text.matchAll(/<option value="(product|farma|stencil|butterpaper)"/g)].map((x) => x[1]);
+  assert.deepEqual(options, ['product', 'farma'], 'only her own pages');
+  assert.match((await bansi.get('/social-media')).text, /\+ Create reel/);
+  const created = await bansi.post('/social-media/reels', reelBody(bansi, 'product'));
+  assert.equal(created.status, 303);
+  const id = Number(created.location.split('/').pop());
+  assert.equal(reel(id).createdBy, U.bansi.id);
+  assert.equal(reel(id).shootOwner, null);
+  const blocked = await bansi.post('/social-media/reels', reelBody(bansi, 'stencil'));
+  assert.equal(blocked.status, 403);
+  assert.match(blocked.text, /only for your own pages \(Product, Farma Pattern\)/);
+  assert.equal((await bansi.get(`/social-media/reels/${id}/edit`)).status, 403, 'editing stays admin-only');
+  assert.equal((await krutik.get('/social-media/reels/new')).status, 403, 'Krutik was not allowed');
+  assert.equal((await dhara.post('/social-media/reels', reelBody(dhara, 'stencil'))).status, 403);
+
+  // Turning it off removes it again.
+  await admin.post('/social-media/settings/members', { _csrf: admin.token, members_form: '1' });
+  assert.equal(studio().members.find((x) => x.key === 'bansi').canCreate, false);
+  assert.equal((await bansi.get('/social-media/reels/new')).status, 403);
+});
+
+test('admin can bulk delete and restore reels; nobody else can', async () => {
+  const admin = await as(U.admin);
+  const made = [];
+  for (const t of ['Bulk A', 'Bulk B', 'Bulk C']) {
+    const r = await admin.post('/social-media/reels', { _csrf: admin.token, title: t, pageId: 'farma', priority: 'Low', shootAt: localInput(4 * HOUR) });
+    made.push(Number(r.location.split('/').pop()));
+  }
+  const page = await admin.get('/social-media/manage-reels?q=Bulk');
+  assert.equal(page.status, 200);
+  for (const id of made) assert.match(page.text, new RegExp(`name="ids" value="${id}"`));
+  assert.match((await admin.get('/social-media/tasks')).text, /href="\/social-media\/manage-reels"/);
+
+  // Other roles: no page, no bulk action (even with "Can create reels").
+  await admin.post('/social-media/settings/members', { _csrf: admin.token, members_form: '1', create_bansi: 'on' });
+  for (const who of ['bansi', 'krutik', 'dhara', 'viewer']) {
+    const c = await as(U[who]);
+    assert.equal((await c.get('/social-media/manage-reels')).status, 403, who);
+    assert.equal((await c.post('/social-media/manage-reels/delete', { _csrf: c.token, ids: made.map(String) })).status, 403, who);
+    assert.doesNotMatch((await c.get('/social-media/tasks')).text, /manage-reels/);
+  }
+  await admin.post('/social-media/settings/members', { _csrf: admin.token, members_form: '1' });
+  assert.ok(made.every((id) => !reel(id).deletedAt), 'nothing deleted by unauthorised requests');
+
+  // Delete two at once (plus a bogus id); they disappear from the Studio but stay in the database.
+  const del = await admin.post('/social-media/manage-reels/delete', { _csrf: admin.token, ids: [String(made[0]), String(made[1]), '999999', 'abc'], returnTo: '/social-media/manage-reels?q=Bulk' });
+  assert.equal(del.status, 303);
+  assert.equal(del.location, '/social-media/manage-reels?q=Bulk');
+  assert.match((await flashOf(admin, '/social-media/manage-reels')).text, /2 reel\(s\) deleted\. 1 skipped/);
+  assert.ok(reel(made[0]).deletedAt && reel(made[1]).deletedAt && !reel(made[2]).deletedAt);
+  assert.ok(reel(made[0]).activity.some((a) => a.kind === 'delete'));
+  const tasks = (await admin.get('/social-media/tasks?q=Bulk')).text;
+  assert.doesNotMatch(tasks, /Bulk A|Bulk B/);
+  assert.match(tasks, /Bulk C/);
+  assert.equal((await admin.get(`/social-media/reels/${made[0]}`)).status, 404);
+  assert.match((await admin.get('/social-media/manage-reels?show=deleted&q=Bulk')).text, /Bulk A[\s\S]*Deleted/);
+
+  // Restore one.
+  await admin.post('/social-media/manage-reels/restore', { _csrf: admin.token, ids: String(made[0]) });
+  assert.equal(reel(made[0]).deletedAt, null);
+  assert.ok(reel(made[0]).activity.some((a) => a.text === 'Reel restored'));
+  assert.equal((await admin.get(`/social-media/reels/${made[0]}`)).status, 200);
+  // Empty selection and unknown mode are handled.
+  await admin.post('/social-media/manage-reels/delete', { _csrf: admin.token });
+  assert.match((await flashOf(admin, '/social-media/manage-reels')).text, /Tick at least one reel/);
+  assert.equal((await admin.post('/social-media/manage-reels/purge', { _csrf: admin.token, ids: String(made[2]) })).status, 404);
+  assert.equal((await admin.post('/social-media/manage-reels/delete', { ids: String(made[2]) })).status, 403, 'CSRF still required');
+});
+
 test('every Studio screen renders for each role without server errors', async () => {
   const pages = ['/social-media', '/social-media/pages', '/social-media/pages/product?tab=history', '/social-media/pages/stencil?tab=editing', '/social-media/followers?period=90&bucket=week', '/social-media/calendar?view=month&shoots=1', '/social-media/calendar?view=week', '/social-media/calendar?view=day', '/social-media/shoots?tab=completed', '/social-media/shoots?view=calendar', '/social-media/editing', '/social-media/editing?view=list', '/social-media/publishing', '/social-media/publishing?view=calendar', '/social-media/tasks?state=done', '/social-media/tasks?sort=priority&dir=desc', '/social-media/ranking', `/social-media/ranking?breakdown=${U.bansi.id}`, '/social-media/reports?page=product', '/social-media/settings', `/social-media/reels/${reelId}`, `/social-media/reels/${reelId}?tab=details`];
   for (const who of ['admin', 'krutik', 'ashmita', 'viewer']) {

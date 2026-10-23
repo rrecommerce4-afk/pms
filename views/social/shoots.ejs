@@ -43,7 +43,7 @@
       <h1>Shoot Planner</h1>
       <p>Reels start unassigned. Any page team member can take a shoot, then mark it completed with the raw footage — editing opens automatically after that.</p>
     </div>
-    <% if (a.isManager) { %><a class="btn" href="/social-media/reels/new">+ Create reel</a><% } %>
+    <% if (a.canCreate) { %><a class="btn" href="/social-media/reels/new">+ Create reel</a><% } %>
   </div>
 
   <% if (a.memberKey) { %>

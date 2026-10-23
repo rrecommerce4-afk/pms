@@ -23,6 +23,7 @@
       <h1>Task Management</h1>
       <p>Every shoot, editing and publishing task across the four pages. Unclaimed work belongs to nobody until an employee takes it — it is never counted against anyone. These Studio tasks are separate from the general PMS task list.</p>
     </div>
+    <% if (sm.actor.isManager) { %><a class="btn outline" href="/social-media/manage-reels">Manage reels (bulk delete / restore)</a><% } %>
   </div>
   <div class="list-card sm-section">
     <div class="sm-pad" style="padding-top:16px;padding-bottom:0"><div class="tabs sm-tabs"><% states.forEach(function (s) { %><a class="tab-btn <%= f.state === s[0] ? 'active' : '' %>" href="<%= qs({ state: s[0], pg: 1 }) %>"><%= s[1] %> <span class="tag-count"><%= counts[s[0]] %></span></a><% }) %></div></div>

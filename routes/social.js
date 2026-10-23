@@ -707,7 +707,7 @@ router.get('/settings', (req, res) => {
     members: C.ROSTER.map((r) => {
       const m = studio.members.find((x) => x.key === r.key);
       const u = m.userId ? users.find((x) => x.id === m.userId) : null;
-      return { ...r, userId: m.userId, user: u ? { id: u.id, name: u.name, email: u.email, role: u.role, active: u.active } : null, linkedAt: m.linkedAt };
+      return { ...r, userId: m.userId, user: u ? { id: u.id, name: u.name, email: u.email, role: u.role, active: u.active } : null, linkedAt: m.linkedAt, canCreate: m.canCreate === true };
     }),
     candidates: users.filter((u) => u.active && (u.role === 'employee' || u.role === 'admin')).map((u) => ({ id: u.id, name: u.name, email: u.email, role: u.role, takenBy: takenBy.get(u.id) || null })),
     linkReport: req.session.studioLinkReport || null,
@@ -903,12 +903,20 @@ function saveMembers(req, res, ctx) {
       m.linkedAt = m.userId ? new Date().toISOString() : null;
       m.linkedBy = m.userId ? actor.userId : null;
     }
+    // "Can create reels" checkboxes (only when the members form sent them). Off for unlinked
+    // and view-only slots, whatever was posted.
+    if (req.body.members_form === '1') {
+      const r = C.getRosterEntry(m.key);
+      const want = !!(m.userId && r.canWork && req.body[`create_${m.key}`] === 'on');
+      if (want !== (m.canCreate === true)) changes.push(`${r.name}: create reels ${want ? 'allowed' : 'not allowed'}`);
+      m.canCreate = want;
+    }
   });
   if (changes.length) {
     logActivity(db, `<b>${escapeHtml(actor.name)}</b> updated Social Media Studio member links (${escapeHtml(changes.join(', '))})`);
     save(db);
   }
-  flash(req, 'success', changes.length ? `Studio member links saved: ${changes.join(', ')}.` : 'No changes.');
+  flash(req, 'success', changes.length ? `Studio members saved: ${changes.join(', ')}.` : 'No changes.');
   res.redirect(303, '/social-media/settings#members');
 }
 
@@ -922,18 +930,27 @@ function suggestPublish(studio, pageId, shootAt, now) {
   return slot ? slot.toISOString() : null;
 }
 
-router.get('/reels/new', requireManager, (req, res) => {
-  const { now } = req.sm;
+// Admins, plus team members an admin allowed to create reels (Settings → Studio members).
+function requireCreator(req, res, next) {
+  if (!req.sm.actor.canCreate) return forbidden(res, 'Creating reels is available to admins and to team members an admin has allowed in Settings → Studio members.');
+  next();
+}
+
+router.get('/reels/new', requireCreator, (req, res) => {
+  const { now, actor, studio } = req.sm;
   const date = parseDay(req.query.date, W.addDaysD(W.startOfDay(now), 1));
   date.setHours(11, 0, 0, 0);
+  const allowed = P.creatablePages(actor, studio.settings);
+  if (!allowed.length) return forbidden(res, 'You are not on any page team yet, so there is no page you can create reels for.');
+  const pageId = allowed.includes(req.query.page) ? req.query.page : allowed[0];
   render(res, 'reel-form', 'Create reel', {
     item: null,
-    draft: { title: '', pageId: C.PAGE_IDS.includes(req.query.page) ? req.query.page : 'product', priority: 'Medium', idea: '', caption: '', prepNotes: '', shootAt: date.toISOString(), publishAt: suggestPublish(req.sm.studio, C.PAGE_IDS.includes(req.query.page) ? req.query.page : 'product', date, now) },
+    draft: { title: '', pageId, priority: 'Medium', idea: '', caption: '', prepNotes: '', shootAt: date.toISOString(), publishAt: suggestPublish(studio, pageId, date, now) },
     error: null, back: safeReturn(req.query.returnTo, '/social-media')
   });
 });
 
-router.post('/reels', requireManager, (req, res) => {
+router.post('/reels', requireCreator, (req, res) => {
   const ctx = loadCtx(req);
   const input = { ...req.body };
   if (!req.body.hasPublishAt) input.publishAt = '';
@@ -952,6 +969,60 @@ function formDraft(b) {
   const A2 = (v) => { const p = A.parseWhen(v); return p || null; };
   return { title: b.title || '', pageId: C.PAGE_IDS.includes(b.pageId) ? b.pageId : 'product', priority: C.PRIORITIES.includes(b.priority) ? b.priority : 'Medium', idea: b.idea || '', caption: b.caption || '', prepNotes: b.prepNotes || '', shootAt: A2(b.shootAt), publishAt: b.hasPublishAt ? A2(b.publishAt) : null, reason: b.reason || '' };
 }
+
+// ---------------------------------------------------------------- Manage reels (admin bulk delete / restore)
+function manageFilters(q) {
+  const day = (v) => (typeof v === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(v) ? v : '');
+  return {
+    show: ['active', 'deleted', 'all'].includes(q.show) ? q.show : 'active',
+    page: C.PAGE_IDS.includes(q.page) ? q.page : 'all',
+    stage: W.STAGES.includes(q.stage) ? q.stage : 'all',
+    q: String(q.q || '').trim().slice(0, 80),
+    from: day(q.from),
+    to: day(q.to)
+  };
+}
+
+router.get('/manage-reels', requireManager, (req, res) => {
+  const { studio, users } = req.sm;
+  const f = manageFilters(req.query);
+  const term = f.q.toLowerCase();
+  const rows = studio.reels
+    .filter((r) => (f.show === 'all' || (f.show === 'deleted' ? !!r.deletedAt : !r.deletedAt))
+      && (f.page === 'all' || r.pageId === f.page)
+      && (f.stage === 'all' || W.getStage(r) === f.stage)
+      && (!term || String(r.title || '').toLowerCase().includes(term))
+      && (!f.from || W.localDay(r.createdAt) >= f.from)
+      && (!f.to || W.localDay(r.createdAt) <= f.to))
+    .sort((a, b) => String(b.createdAt).localeCompare(String(a.createdAt)));
+  render(res, 'manage-reels', 'Manage reels', {
+    f, rows,
+    counts: { active: studio.reels.filter((r) => !r.deletedAt).length, deleted: studio.reels.filter((r) => r.deletedAt).length },
+    users
+  });
+});
+
+router.post('/manage-reels/:mode', requireManager, (req, res) => {
+  const mode = req.params.mode === 'restore' ? 'restore' : req.params.mode === 'delete' ? 'delete' : null;
+  if (!mode) return res.status(404).send('Unknown action');
+  const raw = req.body.ids;
+  const ids = (Array.isArray(raw) ? raw : raw ? [raw] : []).slice(0, 5000);
+  const back = safeReturn(req.body.returnTo, '/social-media/manage-reels');
+  if (!ids.length) {
+    flash(req, 'error', 'Tick at least one reel first.');
+    return res.redirect(303, back);
+  }
+  const ctx = loadCtx(req);
+  const result = A.bulkReels(ctx, ids, mode);
+  if (!result.ok) return forbidden(res, result.error);
+  if (result.done) {
+    logActivity(ctx.db, `<b>${escapeHtml(ctx.actor.name)}</b> ${mode === 'restore' ? 'restored' : 'deleted'} ${result.done} Social Media Studio reel(s)`);
+    save(ctx.db);
+  }
+  const verb = mode === 'restore' ? 'restored' : 'deleted';
+  flash(req, result.done ? 'success' : 'info', `${result.done} reel(s) ${verb}.${result.skipped ? ` ${result.skipped} skipped (already ${verb} or not found).` : ''}${mode === 'delete' && result.done ? ' They are hidden everywhere and no longer count in rankings; you can restore them from the "Deleted" tab.' : ''}`);
+  res.redirect(303, back);
+});
 
 router.get('/reels/:id', (req, res) => {
   const { studio } = req.sm;

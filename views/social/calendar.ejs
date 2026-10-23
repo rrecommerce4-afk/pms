@@ -13,7 +13,7 @@
     return '<a class="sm-ev' + (ev.kind === 'shoot' || ev.tbd ? ' dashed' : '') + (ev.overdue ? ' overdue' : '') + '" style="--pc:' + p.color + ';--pcs:' + p.soft + '" href="/social-media/reels/' + ev.item.id + '" title="' + V.esc((ev.kind === 'shoot' ? 'Shoot: ' : '') + ev.item.title + ' · ' + p.shortName + (ev.tbd ? ' · publishing date TBD — no editing deadline yet' : (ev.item.publishAt && !W.isEditingDone(ev.item) ? ' · edit by ' + V.fmtDateTime(W.editingDeadline(ev.item)) + (W.isEditOverdue(ev.item, sm.now) ? ' (Editing Overdue)' : '') : ''))) + '">'
       + (ev.tbd ? '<span class="tbd">TBD</span>' : '') + (ev.kind === 'shoot' ? '📷 ' : '') + (compact ? '' : '<span>' + V.esc(V.fmtTime(ev.at)) + '</span> ') + '<span class="t">' + V.esc(ev.item.title) + '</span></a>';
   };
-  var addLink = function (d) { return a.isManager ? '<a class="sm-cal-add" href="/social-media/reels/new?date=' + W.localDay(d) + '&returnTo=' + encodeURIComponent('/social-media/calendar' + qs({})) + '" title="Create reel on this day">+</a>' : ''; };
+  var addLink = function (d) { return a.canCreate ? '<a class="sm-cal-add" href="/social-media/reels/new?date=' + W.localDay(d) + '&returnTo=' + encodeURIComponent('/social-media/calendar' + qs({})) + '" title="Create reel on this day">+</a>' : ''; };
 %>
 <div class="container container-wide sm">
   <%- include('_bar') %>
@@ -23,7 +23,7 @@
       <h1>Content Calendar</h1>
       <p>Plan reels across all four Instagram pages. Events sit on their planned publishing date (or the shoot date, marked TBD, when publishing is not planned yet).</p>
     </div>
-    <% if (a.isManager) { %><a class="btn" href="/social-media/reels/new?date=<%= W.localDay(cursor) %>">+ Create reel</a><% } %>
+    <% if (a.canCreate) { %><a class="btn" href="/social-media/reels/new?date=<%= W.localDay(cursor) %>">+ Create reel</a><% } %>
   </div>
 
   <div class="list-card sm-section">
@@ -69,7 +69,7 @@
                 <small><%= ev.kind === 'shoot' ? '📷 Shoot · ' + V.fmtTime(ev.at) : ev.tbd ? 'Shoot day · publish TBD' : V.fmtTime(ev.at) %></small><b><%= ev.item.title %></b><em><%= W.getStage(ev.item) %></em><% if (ev.kind === 'publish' && !ev.tbd) { %><em><%- V.editDeadlineHtml(ev.item, sm.now) %></em><% } %>
               </a>
             <% }) %>
-            <% if (a.isManager) { %><a class="sm-week-add" href="/social-media/reels/new?date=<%= key %>">+ Add</a><% } %>
+            <% if (a.canCreate) { %><a class="sm-week-add" href="/social-media/reels/new?date=<%= key %>">+ Add</a><% } %>
           </div>
         </div>
       <% }) %>
@@ -77,7 +77,7 @@
   <% } else { var evs = eventsOn(cursor); %>
     <div class="list-card sm-section">
       <% if (!evs.length) { %>
-        <div class="empty-state"><div class="empty-state-title">Nothing scheduled</div><div class="empty-state-sub">No reels match the current filters on <%= V.fmtDate(cursor) %>.<% if (a.isManager) { %> <a href="/social-media/reels/new?date=<%= W.localDay(cursor) %>">Create a reel</a><% } %></div></div>
+        <div class="empty-state"><div class="empty-state-title">Nothing scheduled</div><div class="empty-state-sub">No reels match the current filters on <%= V.fmtDate(cursor) %>.<% if (a.canCreate) { %> <a href="/social-media/reels/new?date=<%= W.localDay(cursor) %>">Create a reel</a><% } %></div></div>
       <% } else { %>
         <ul class="sm-day-list">
           <% evs.forEach(function (ev) { var i = ev.item; %>

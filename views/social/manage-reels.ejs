@@ -1,0 +1,77 @@
+<%- include('../partials/header') %>
+<%
+  var people = sm.people;
+  var qs = function (over) {
+    var o = Object.assign({ show: f.show, page: f.page, stage: f.stage, q: f.q, from: f.from, to: f.to }, over);
+    var p = new URLSearchParams();
+    Object.keys(o).forEach(function (k) { if (o[k] && o[k] !== 'all' && !(k === 'show' && o[k] === 'active')) p.set(k, o[k]); });
+    var s = p.toString();
+    return '/social-media/manage-reels' + (s ? '?' + s : '');
+  };
+  var here = qs({});
+  var canDelete = rows.some(function (r) { return !r.deletedAt; });
+  var canRestore = rows.some(function (r) { return r.deletedAt; });
+%>
+<div class="container container-wide sm">
+  <%- include('_bar') %>
+  <div class="page-head">
+    <div>
+      <div class="eyebrow-date">SOCIAL MEDIA STUDIO · ADMIN</div>
+      <h1>Manage reels</h1>
+      <p>Delete or restore many reels at once. Deleted reels are hidden from every Studio screen and no longer count in rankings or reports, but their record and history are kept, so you can restore them from the <b>Deleted</b> tab. Only admins can see this page.</p>
+    </div>
+    <a class="btn outline" href="/social-media/tasks">Back to Task Management</a>
+  </div>
+
+  <div class="list-card sm-section">
+    <div class="sm-pad" style="padding-top:16px;padding-bottom:0"><div class="tabs sm-tabs">
+      <a class="tab-btn <%= f.show === 'active' ? 'active' : '' %>" href="<%= qs({ show: 'active' }) %>">Active <span class="tag-count"><%= counts.active %></span></a>
+      <a class="tab-btn <%= f.show === 'deleted' ? 'active' : '' %>" href="<%= qs({ show: 'deleted' }) %>">Deleted <span class="tag-count"><%= counts.deleted %></span></a>
+      <a class="tab-btn <%= f.show === 'all' ? 'active' : '' %>" href="<%= qs({ show: 'all' }) %>">All</a>
+    </div></div>
+    <form class="sm-filters" method="GET" action="/social-media/manage-reels">
+      <input type="hidden" name="show" value="<%= f.show %>">
+      <input type="search" name="q" value="<%= f.q %>" placeholder="Search title…" aria-label="Search title">
+      <select class="filter-select" name="page" data-autosubmit aria-label="Page"><option value="all">All pages</option><% C.PAGES.forEach(function (p) { %><option value="<%= p.id %>" <%= f.page === p.id ? 'selected' : '' %>><%= p.shortName %></option><% }) %></select>
+      <select class="filter-select" name="stage" data-autosubmit aria-label="Status"><option value="all">All statuses</option><% W.STAGES.forEach(function (s) { %><option <%= f.stage === s ? 'selected' : '' %>><%= s %></option><% }) %></select>
+      <label class="sm-muted">Created from <input type="date" name="from" value="<%= f.from %>"></label>
+      <label class="sm-muted">to <input type="date" name="to" value="<%= f.to %>"></label>
+      <button class="btn small outline" type="submit">Filter</button>
+      <% if (f.q || f.page !== 'all' || f.stage !== 'all' || f.from || f.to) { %><a class="view-all" href="<%= qs({ q: '', page: '', stage: '', from: '', to: '' }) %>">Clear filters</a><% } %>
+    </form>
+
+    <% if (!rows.length) { %>
+      <div class="empty-state"><div class="empty-state-title">No reels match</div><div class="empty-state-sub">Try another tab or clear the filters.</div></div>
+    <% } else { %>
+      <form method="POST" action="/social-media/manage-reels/delete" data-bulk-form>
+        <input type="hidden" name="_csrf" value="<%= sm.csrf %>">
+        <input type="hidden" name="returnTo" value="<%= here %>">
+        <div class="sm-filters sm-bulk-bar">
+          <label class="sm-check"><input type="checkbox" data-select-all> Select all <%= rows.length %> shown</label>
+          <span class="sm-muted" data-selected-count>0 selected</span>
+          <span class="grow"></span>
+          <% if (canDelete) { %><button class="btn small danger" type="submit" formaction="/social-media/manage-reels/delete" data-confirm="Delete the selected reels? They will be hidden everywhere and stop counting in rankings. You can restore them later from the Deleted tab.">Delete selected</button><% } %>
+          <% if (canRestore) { %><button class="btn small outline" type="submit" formaction="/social-media/manage-reels/restore">Restore selected</button><% } %>
+        </div>
+        <div class="sm-scroll"><table class="sm-table min-900">
+          <thead><tr><th style="width:36px"></th><th>Reel</th><th>Status</th><th>Shoot</th><th>Publishing</th><th>Created</th><th>State</th></tr></thead>
+          <tbody>
+            <% rows.forEach(function (r) { %>
+              <tr class="<%= r.deletedAt ? 'warnrow' : '' %>">
+                <td><input type="checkbox" name="ids" value="<%= r.id %>" data-row-check aria-label="Select <%= r.title %>"></td>
+                <td style="max-width:300px"><% if (r.deletedAt) { %><b><%= r.title %></b><% } else { %><a class="reel-link" href="/social-media/reels/<%= r.id %>"><%= r.title %></a><% } %><div class="sub"><%- V.pageBadge(r.pageId) %><span class="muted">#<%= r.id %></span></div></td>
+                <td><%- V.statusBadge(W.getStage(r)) %></td>
+                <td class="nowrap"><%= V.fmtDateTime(r.shootAt) %></td>
+                <td class="nowrap"><%= r.publishAt ? V.fmtDateTime(r.publishAt) : '—' %></td>
+                <td class="nowrap muted"><%= V.fmtDateTime(r.createdAt) %><br>by <%= people.nameOf(r.createdBy) %></td>
+                <td><% if (r.deletedAt) { %><%- V.badge('Deleted', 'red') %><div class="muted"><%= V.fmtDateTime(r.deletedAt) %> by <%= people.nameOf(r.deletedBy) %></div><% } else { %><%- V.badge('Active', 'green') %><% } %></td>
+              </tr>
+            <% }) %>
+          </tbody>
+        </table></div>
+      </form>
+    <% } %>
+  </div>
+</div>
+<%- include('_modals') %>
+<%- include('../partials/footer') %>

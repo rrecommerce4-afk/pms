@@ -10,6 +10,7 @@ Identity always comes from the logged-in PMS session. Each Studio "slot" (Bansi,
 |---|---|
 | Admin | Studio manager: create/edit/delete reels, reassign with a reason, blockers, reopen, delay/reschedule, settings, member links |
 | Linked Bansi / Bhavin / Vishnu / Krutik | Claim, release and complete shoots; mark raw footage ready; schedule; confirm publishing on their own pages; claim editing only where they are an eligible editor; ranked |
+| …with "Can create reels" on | An admin can turn this on per member in Settings → Studio members. That member can then create reels for their own page-team pages. Editing and deleting reels stays admin-only |
 | Linked Dhara / Ashmita | View only (all screens, including preparation details). Every Studio POST returns 403. Never ranked or scored |
 | PMS viewer | View only |
 | Any other user | No access (403); no sidebar link |
@@ -28,6 +29,7 @@ Content Planning → Shoot Scheduled (claimed) → Shoot Completed → (raw foot
 - Reopening an edit requires a reason. The earlier completion is kept in `editing.previousCompletions`.
 - Every claim, release, reassignment, completion, deadline change, blocker, schedule and publish is written to the reel's activity log. Ownership changes are also written to `ownershipHistory`.
 - Deleting a reel is a soft delete. The record and its history stay in the database.
+- **Manage reels** (`/social-media/manage-reels`, admin only, linked from Task Management and Settings) deletes or restores many reels at once. You can filter by page, status, title and created date, and use "Select all shown". Every reel goes through the same delete rules and history logging as a single delete.
 
 ## Publishing schedule and the 24-hour editing deadline
 

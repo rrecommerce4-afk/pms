@@ -13,6 +13,7 @@
       <h1>Settings &amp; Targets</h1>
       <p><%= can ? 'Saved on the server and applied across every Studio screen. Only admins can change these settings.' : 'Read-only view of the Studio configuration. Only an admin can change these settings.' %></p>
     </div>
+    <% if (can) { %><a class="btn outline" href="/social-media/manage-reels">Manage reels (bulk delete / restore)</a><% } %>
   </div>
 
   <div class="sm-settings-layout">
@@ -111,13 +112,13 @@
             <div class="sm-note"><b>Auto-link report</b><ul class="sm-rules"><% linkReport.forEach(function (x) { %><li><b><%= x.name %></b>: <%= x.status === 'unresolved' ? 'not linked — ' + x.reason : x.status === 'auto-linked' ? 'linked to user #' + x.userId : 'already linked (#' + x.userId + ')' %></li><% }) %></ul></div>
           <% } %>
           <form method="POST" action="/social-media/settings/members">
-            <%- hidden() %>
+            <%- hidden() %><input type="hidden" name="members_form" value="1">
             <fieldset <%= can ? '' : 'disabled' %>>
               <% members.forEach(function (m) { %>
                 <div class="sm-member-row">
                   <div class="who">
                     <b><%= m.name %></b>
-                    <div class="sm-tags" style="margin-top:4px"><%- m.canEdit ? V.badge('Can edit videos', 'brand') : '' %><%- m.ranked ? V.badge('Ranked', 'green') : '' %><%- m.canWork ? V.badge('Claims & completes work', 'sky') : V.badge('View preparation info only', 'slate') %></div>
+                    <div class="sm-tags" style="margin-top:4px"><%- m.canEdit ? V.badge('Can edit videos', 'brand') : '' %><%- m.ranked ? V.badge('Ranked', 'green') : '' %><%- m.canWork ? V.badge('Claims & completes work', 'sky') : V.badge('View preparation info only', 'slate') %><%- m.canCreate ? V.badge('Can create reels', 'green') : '' %></div>
                     <small class="sm-muted">Pages: <%= C.PAGE_IDS.filter(function (p) { return P.teamFor(st, p).includes(m.key); }).map(function (p) { return C.getPage(p).shortName; }).join(', ') || 'none' %></small>
                   </div>
                   <% if (can) { %>
@@ -125,13 +126,18 @@
                       <option value="">— Not linked —</option>
                       <% candidates.forEach(function (u) { %><option value="<%= u.id %>" <%= m.userId === u.id ? 'selected' : '' %> <%= u.takenBy && u.takenBy !== m.key ? 'disabled' : '' %>>#<%= u.id %> <%= u.name %> (<%= u.email %>, <%= u.role %>)<%= u.takenBy && u.takenBy !== m.key ? ' — linked to ' + C.getRosterEntry(u.takenBy).name : '' %></option><% }) %>
                     </select>
+                    <% if (m.canWork) { %>
+                      <label class="sm-check" style="margin:0" title="Lets this person create reels for their own pages. Editing and deleting reels stays admin-only."><input type="checkbox" name="create_<%= m.key %>" value="on" <%= m.canCreate ? 'checked' : '' %> <%= m.userId ? '' : 'disabled' %>> Can create reels<%= m.userId ? '' : ' (link an account first)' %></label>
+                    <% } else { %>
+                      <span class="sm-muted">Cannot create reels (view-only)</span>
+                    <% } %>
                   <% } else { %>
                     <span><%- m.user ? people.ownerChip(m.userId) : V.badge('Not linked', 'slate') %></span>
                   <% } %>
                   <% if (m.userId && !m.user) { %><span class="warn-txt">Linked user #<%= m.userId %> no longer exists</span><% } else if (m.user && !m.user.active) { %><span class="warn-txt">Linked account is inactive</span><% } %>
                 </div>
               <% }) %>
-              <div class="sm-form-actions" style="margin-top:12px"><button class="btn" type="submit">Save member links</button></div>
+              <div class="sm-form-actions" style="margin-top:12px"><button class="btn" type="submit">Save members</button></div>
             </fieldset>
           </form>
           <% if (can) { %>

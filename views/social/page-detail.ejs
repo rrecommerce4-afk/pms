@@ -12,7 +12,7 @@
     <div class="sm-account-head"><span class="sm-page-av lg"><%= V.initials(page.shortName) %></span><div><h1 style="margin:0"><%= page.name %></h1><p><%= page.handle %></p></div></div>
     <div class="sm-head-actions">
       <div class="sm-people"><% team.forEach(function (k) { var r = C.getRosterEntry(k); %><%- people.keyChip(k, r.canEdit ? 'Page team · Editor' : 'Page team') %><% }) %></div>
-      <% if (a.isManager) { %><a class="btn" href="/social-media/reels/new?page=<%= page.id %>&returnTo=<%= encodeURIComponent('/social-media/pages/' + page.id) %>">+ Create reel</a><% } %>
+      <% if (P.canCreateFor(a, sm.settings, page.id)) { %><a class="btn" href="/social-media/reels/new?page=<%= page.id %>&returnTo=<%= encodeURIComponent('/social-media/pages/' + page.id) %>">+ Create reel</a><% } %>
     </div>
   </div>
 
@@ -83,7 +83,7 @@
     <div class="list-card sm-section">
       <div class="list-card-head section-card-head"><div><h2><%= V.fmtDate(sm.now, 'month') %> content</h2><p class="sm-muted">Planned publishing dates (shoot date when publishing is not set yet)</p></div><a class="view-all" href="/social-media/calendar?page=<%= page.id %>">Open full calendar →</a></div>
       <div class="sm-pad">
-        <% if (!monthItems.length) { %><div class="empty-state"><div class="empty-state-title">No content planned this month</div><% if (a.isManager) { %><div class="empty-state-sub"><a href="/social-media/reels/new?page=<%= page.id %>">Create a reel</a></div><% } %></div><% } %>
+        <% if (!monthItems.length) { %><div class="empty-state"><div class="empty-state-title">No content planned this month</div><% if (P.canCreateFor(a, sm.settings, page.id)) { %><div class="empty-state-sub"><a href="/social-media/reels/new?page=<%= page.id %>">Create a reel</a></div><% } %></div><% } %>
         <% var lastDay = ''; monthItems.forEach(function (i) { var d = W.localDay(W.plannedDate(i)); if (d !== lastDay) { lastDay = d; %><p class="sm-day-label"><%= V.fmtDate(d, 'weekday') %></p><% } %>
           <ul class="sm-rows"><%- include('_row', { item: i, meta: e(V.fmtTime(W.plannedDate(i)) + (i.publishAt ? '' : ' · shoot (publishing not set)')), right: V.statusBadge(W.getStage(i)) }) %></ul>
         <% }) %>
