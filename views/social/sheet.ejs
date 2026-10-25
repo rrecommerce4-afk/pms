@@ -1,0 +1,97 @@
+<%- include('../partials/header') %>
+<%
+  var can = sheet.can;
+  var fmt = function (d) { return d ? V.fmtDate(d, 'weekday') : ''; };
+  var tone = { Yes: 'green', No: 'red', Done: 'green', Published: 'green', 'In Progress': 'blue', Scheduled: 'sky', Pending: 'amber' };
+  function select(form, name, value) {
+    var html = '<select class="sm-cell" name="' + name + '"' + (form ? ' form="' + form + '"' : '') + ' aria-label="' + name + '"><option value="">—</option>';
+    OPTS[name].forEach(function (o) { html += '<option' + (o === value ? ' selected' : '') + '>' + V.esc(o) + '</option>'; });
+    return html + '</select>';
+  }
+  function postLink(r) {
+    if (!r.link) return '';
+    return '<a href="' + V.esc(r.link) + '" target="_blank" rel="noopener noreferrer">Open post</a>' + (r.lockedAt ? ' <span class="sm-lock" title="Locked when it was marked Published">🔒 Locked</span>' : '');
+  }
+  var cols = ['Publish Date', 'Name', 'Shoot Date', 'Material Ready For Shoot', 'Shoot Status', 'Editing Status', 'Publish Status', 'Post Link', 'Add Note'];
+%>
+<div class="container container-wide sm">
+  <div class="page-head">
+    <div>
+      <div class="eyebrow-date">SOCIAL MEDIA</div>
+      <h1>Content Sheet</h1>
+      <p>Planned posts with the status of each step. When a post is Published, add its link; the link then locks. <%= can ? 'Edit any cell and click Save on that row.' : 'Only an admin can edit this sheet.' %></p>
+    </div>
+  </div>
+  <% if (sheet.flash) { %><div class="sm-flash <%= sheet.flash.type %>" role="status"><%= sheet.flash.text %></div><% } %>
+
+  <div class="list-card sm-section">
+    <div class="sm-scroll"><table class="sm-table sm-sheet min-1100">
+      <thead><tr><% cols.forEach(function (c) { %><th><%= c %></th><% }) %><% if (can) { %><th></th><% } %></tr></thead>
+      <tbody>
+        <% if (!rows.length) { %><tr><td colspan="<%= can ? 10 : 9 %>" class="muted">No rows yet.<%= can ? ' Add the first one below.' : '' %></td></tr><% } %>
+        <% rows.forEach(function (r) { var f = 'row-form-' + r.id; %>
+          <tr id="row-<%= r.id %>">
+            <% if (can) { %>
+              <td><input class="sm-cell" type="date" name="publishDate" form="<%= f %>" value="<%= r.publishDate || '' %>" aria-label="Publish date"></td>
+              <td><input class="sm-cell" name="name" form="<%= f %>" value="<%= r.name %>" maxlength="150" aria-label="Name"></td>
+              <td><input class="sm-cell" type="date" name="shootDate" form="<%= f %>" value="<%= r.shootDate || '' %>" aria-label="Shoot date"></td>
+              <td><%- select(f, 'materialReady', r.materialReady) %></td>
+              <td><%- select(f, 'shootStatus', r.shootStatus) %></td>
+              <td><%- select(f, 'editingStatus', r.editingStatus) %></td>
+              <% if (r.lockedAt) { %>
+                <td><%- V.badge(r.publishStatus, tone[r.publishStatus] || 'slate') %></td>
+                <td class="nowrap"><%- postLink(r) %></td>
+              <% } else { %>
+                <td><%- select(f, 'publishStatus', r.publishStatus) %></td>
+                <td><input class="sm-cell sm-link-cell" type="url" name="link" form="<%= f %>" value="<%= r.link || '' %>" maxlength="500" placeholder="https://instagram.com/…" aria-label="Post link"></td>
+              <% } %>
+              <td><input class="sm-cell" name="note" form="<%= f %>" value="<%= r.note %>" maxlength="1000" aria-label="Note"></td>
+              <td class="nowrap">
+                <form id="<%= f %>" method="POST" action="/content-sheet/<%= r.id %>" style="display:inline"><input type="hidden" name="_csrf" value="<%= sheet.csrf %>"><button class="btn small" type="submit">Save</button></form>
+                <form method="POST" action="/content-sheet/<%= r.id %>" style="display:inline" data-confirm="Delete this row?"><input type="hidden" name="_csrf" value="<%= sheet.csrf %>"><input type="hidden" name="remove" value="1"><button class="btn small ghost" type="submit" aria-label="Delete row">×</button></form>
+              </td>
+            <% } else { %>
+              <td class="nowrap"><%= fmt(r.publishDate) %></td><td><b><%= r.name %></b></td><td class="nowrap"><%= fmt(r.shootDate) %></td>
+              <% ['materialReady', 'shootStatus', 'editingStatus', 'publishStatus'].forEach(function (k) { %><td><%- r[k] ? V.badge(r[k], tone[r[k]] || 'slate') : '' %></td><% }) %>
+              <td class="nowrap"><%- postLink(r) %></td>
+              <td><%= r.note %></td>
+            <% } %>
+          </tr>
+        <% }) %>
+        <% if (can) { %>
+          <tr class="sm-sheet-new">
+            <td><input class="sm-cell" type="date" name="publishDate" form="sheet-add" aria-label="New row publish date"></td>
+            <td><input class="sm-cell" name="name" form="sheet-add" maxlength="150" placeholder="Name" aria-label="New row name"></td>
+            <td><input class="sm-cell" type="date" name="shootDate" form="sheet-add" aria-label="New row shoot date"></td>
+            <td><%- select('sheet-add', 'materialReady', '') %></td>
+            <td><%- select('sheet-add', 'shootStatus', '') %></td>
+            <td><%- select('sheet-add', 'editingStatus', '') %></td>
+            <td><%- select('sheet-add', 'publishStatus', '') %></td>
+            <td><input class="sm-cell sm-link-cell" type="url" name="link" form="sheet-add" maxlength="500" placeholder="Post link" aria-label="New row post link"></td>
+            <td><input class="sm-cell" name="note" form="sheet-add" maxlength="1000" placeholder="Note" aria-label="New row note"></td>
+            <td><form id="sheet-add" method="POST" action="/content-sheet"><input type="hidden" name="_csrf" value="<%= sheet.csrf %>"><button class="btn small" type="submit">+ Add row</button></form></td>
+          </tr>
+        <% } %>
+      </tbody>
+    </table></div>
+  </div>
+
+  <% if (can) { %>
+    <details class="list-card sm-section" style="padding:16px 20px" id="share" <%= viewers.length ? '' : 'open' %>>
+      <summary><b>Who can see this sheet</b> · <%= viewers.length %> shared</summary>
+      <p class="sm-muted">Ticked people get a Content Sheet link in their menu and can view it (not edit). This does not give them Social Media Studio access. Admins, viewers and linked Studio members can always see it.</p>
+      <form method="POST" action="/content-sheet/access">
+        <input type="hidden" name="_csrf" value="<%= sheet.csrf %>">
+        <div class="sm-share-list">
+          <% shareable.forEach(function (u) { %>
+            <label><input type="checkbox" name="viewers" value="<%= u.id %>" <%= viewers.includes(u.id) ? 'checked' : '' %>> <%= u.name %> <span class="sm-muted">(<%= u.role === 'viewer' ? 'Viewer' : 'Team member' %>)</span></label>
+          <% }) %>
+          <% if (!shareable.length) { %><p class="sm-muted">No other active PMS users yet.</p><% } %>
+        </div>
+        <button class="btn small" type="submit">Save sharing</button>
+      </form>
+    </details>
+  <% } %>
+</div>
+<script src="/studio.js" defer></script>
+<%- include('../partials/footer') %>

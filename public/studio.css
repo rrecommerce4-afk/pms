@@ -414,3 +414,17 @@ form.modal-box { margin: 0; }
 .sm-slot-x { border: none; background: none; color: var(--text-faint); font-size: 16px; line-height: 1; cursor: pointer; padding: 0 4px; }
 .sm-slot-x:hover { color: var(--danger); }
 .sm-sched-review td { white-space: nowrap; font-size: 12px; }
+
+/* Content Sheet */
+.sm-sheet td { padding: 6px 6px; vertical-align: middle; }
+.sm-cell { width: 100%; min-width: 90px; border: 1px solid var(--border-soft); border-radius: 5px; padding: 6px 7px; font: inherit; font-size: 13px; background: var(--surface); }
+.sm-cell:focus { border-color: var(--primary); outline: none; }
+.sm-sheet-new td { background: var(--bg); }
+.sm-sheet input[name="name"] { min-width: 190px; }
+.sm-sheet input[name="note"] { min-width: 220px; }
+.sm-sheet .sm-link-cell { min-width: 200px; }
+.sm-lock { font-size: 12px; color: var(--text-muted); }
+.sm-sheet td a { color: var(--primary); font-weight: 600; }
+.sm-share-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 6px 16px; margin: 10px 0 12px; }
+.sm-share-list label { display: flex; gap: 8px; align-items: center; font-size: 14px; }
+#share summary { cursor: pointer; }

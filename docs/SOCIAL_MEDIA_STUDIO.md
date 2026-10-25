@@ -15,6 +15,8 @@ Identity always comes from the logged-in PMS session. Each Studio "slot" (Bansi,
 | PMS viewer | View only |
 | Any other user | No access (403); no sidebar link |
 
+**Studio access switch.** *Settings & Targets → Studio access* controls who sees the Studio. It is off by default, so only admins see it and everyone else gets no sidebar link and a 403. Turn it on to open the Studio to the roles in the table above (`settings.teamAccess`). The Content Sheet is not affected by this switch.
+
 The permission flags are fixed in `lib/studio/config.js`. Every POST is checked on the server in `routes/social.js` (read-only guard + CSRF) and again in `lib/studio/actions.js` (per-action rules).
 
 Default page teams: Product = Bansi, Krutik · Farma Pattern = Bansi, Vishnu · Stencil = Dhara, Bhavin · Butterpaper = Ashmita, Bhavin. Editors for a page = the page team ∩ {Bansi, Bhavin, Vishnu, Krutik}.
@@ -40,6 +42,15 @@ Content Planning → Shoot Scheduled (claimed) → Shoot Completed → (raw foot
 - **Overdue warning.** "Editing Overdue" is a warning badge only. The reel's workflow status, such as "Editing", stays as it is. Scoring uses the stored on-time or late result; the weights (35/25/25/15) and the four ranked employees are unchanged.
 - **Time zone.** `server.js` pins the whole PMS to one business time zone (`Asia/Kolkata`, or `PMS_TIMEZONE`). Typed times, "today", slots and deadlines therefore mean the same thing on any host, including a cloud server whose clock is UTC. The publish pop-up's "now" uses the same zone.
 - **Migration.** Schema v5 adds the saved deadline to existing reels. An old manually entered editing deadline is kept as `legacyEditDeadline` for reference only.
+
+## Content Sheet (`/content-sheet`)
+
+A plain planning sheet with its own **Content Sheet** link in the main sidebar menu, outside the Studio. The columns are Publish Date, Name, Shoot Date, Material Ready For Shoot, Shoot Status, Editing Status, Publish Status, Post Link and Add Note.
+
+- **Who sees it:** everyone who could view the Studio (admins, linked Studio members, PMS viewers), even while the Studio access switch is off, plus any PMS user an admin ticks under **Who can see this sheet** on the sheet page (`contentSheet.viewers`). Sharing gives view-only sheet access, never Studio access. Everyone else gets a 403 and no link.
+- **Who changes it:** only admins can add, edit (Save on each row) or delete rows. Everyone else sees it read-only.
+- **Post link and lock:** a row can only be marked **Published** together with its post link (an http/https URL). Saving it that way locks the link and the Published status (`lockedAt`, `lockedBy`); later saves keep both. To correct a locked link, delete the row and add it again.
+- **Storage:** the rows live in `socialStudio.contentSheet` and are independent of reels, so they do not affect tasks, deadlines or scoring.
 
 ## Data
 

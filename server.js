@@ -16,7 +16,7 @@ const employeeRoutes = require('./routes/employee');
 const viewerRoutes = require('./routes/viewer');
 const socialRoutes = require('./routes/social');
 const { getStudio } = require('./lib/studio/store');
-const { resolveActor } = require('./lib/studio/permissions');
+const { resolveActor, canSeeSheet } = require('./lib/studio/permissions');
 const { STUDIO_NAV } = require('./lib/studio/nav');
 const instagram = require('./lib/studio/instagram');
 
@@ -49,6 +49,7 @@ app.use(
 // admins the Instagram access-token reminders (popup once a day + banner until fixed).
 app.use((req, res, next) => {
   res.locals.studioAccess = false;
+  res.locals.sheetAccess = false;
   res.locals.igAlerts = [];
   if (req.session.userId) {
     const db = load();
@@ -56,7 +57,8 @@ app.use((req, res, next) => {
     if (user) req.session.name = user.name;
     const studio = getStudio(db);
     const actor = user ? resolveActor(studio, user) : null;
-    res.locals.studioAccess = !!(actor && actor.canView);
+    res.locals.studioAccess = !!(actor && actor.canView && (actor.isManager || studio.settings.teamAccess));
+    res.locals.sheetAccess = canSeeSheet(studio, user, actor);
     if (user && user.role === 'admin' && user.active) {
       res.locals.igAlerts = instagram.tokenAlerts(studio);
       if (res.locals.igAlerts.length) {
@@ -90,6 +92,7 @@ app.use('/admin', adminRoutes);
 app.use('/employee', employeeRoutes);
 app.use('/viewer', viewerRoutes);
 app.use('/social-media', socialRoutes);
+app.use('/content-sheet', socialRoutes.sheet);
 
 seedAdminIfNeeded();
 

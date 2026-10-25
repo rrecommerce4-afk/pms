@@ -8,7 +8,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Inter+Tight:wght@600;700;800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="/style.css" />
-  <% if (typeof path !== 'undefined' && path && (path === '/social-media' || path.startsWith('/social-media/'))) { %><link rel="stylesheet" href="/studio.css" /><% } %>
+  <% if (typeof path !== 'undefined' && path && (path === '/social-media' || path.startsWith('/social-media/') || path.startsWith('/content-sheet'))) { %><link rel="stylesheet" href="/studio.css" /><% } %>
 </head>
 <body>
 <% if (typeof role !== 'undefined' && role) { %>
@@ -110,6 +110,12 @@
             My Department
           </a>
         <% } %>
+      <% } %>
+      <% if (typeof sheetAccess !== 'undefined' && sheetAccess) { %>
+        <a class="nav-link <%= path && path.startsWith('/content-sheet') ? 'active' : '' %>" href="/content-sheet">
+          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M3 15h18M9 3v18"/></svg>
+          Content Sheet
+        </a>
       <% } %>
       <% if (typeof studioAccess !== 'undefined' && studioAccess) { var inStudio = path && (path === '/social-media' || path.startsWith('/social-media/')); %>
         <div class="nav-section-label" style="margin-top:14px;">SOCIAL MEDIA</div>

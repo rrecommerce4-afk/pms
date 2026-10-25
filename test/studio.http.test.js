@@ -28,6 +28,8 @@ const sourceHash = sha(sourceText);
 const seed = sourceText.trim() ? JSON.parse(sourceText) : { users: [], tasks: [], nextId: { users: 1, tasks: 1, todos: 1 } };
 // The tests start every page as "not connected to Instagram", whatever the real db.json has.
 if (seed.socialStudio) {
+  // Most tests exercise team access, so the Studio is open to the team here (tested separately).
+  if (seed.socialStudio.settings) seed.socialStudio.settings.teamAccess = true;
   delete seed.socialStudio.instagram;
   // ...and with no reels, schedules or schedule history of the real installation.
   seed.socialStudio.reels = [];
@@ -647,8 +649,91 @@ test('admin can bulk delete and restore reels; nobody else can', async () => {
   assert.equal((await admin.post('/social-media/manage-reels/delete', { ids: String(made[2]) })).status, 403, 'CSRF still required');
 });
 
+test('Studio access switch hides the Studio from everyone but admins; the Content Sheet stays visible', async () => {
+  const admin = await as(U.admin);
+  await admin.post('/social-media/settings/access', { _csrf: admin.token }); // unchecked → admins only
+  assert.equal(studio().settings.teamAccess, false);
+  for (const who of ['bansi', 'dhara', 'viewer']) {
+    const c = new Client();
+    await c.login(U[who]);
+    const home = (await c.get(who === 'viewer' ? '/viewer/dashboard' : '/employee/dashboard')).text;
+    assert.doesNotMatch(home, /href="\/social-media"/, who + ': no Studio link');
+    assert.match(home, /href="\/content-sheet"/, who + ': Content Sheet link');
+    assert.equal((await c.get('/social-media')).status, 403, who);
+    assert.equal((await c.get('/content-sheet')).status, 200, who);
+  }
+  const other = new Client();
+  await other.login(U.other);
+  assert.doesNotMatch((await other.get('/employee/dashboard')).text, /href="\/content-sheet"/);
+  assert.equal((await other.get('/content-sheet')).status, 403);
+  assert.equal((await admin.get('/social-media')).status, 200);
+  const adminHome = (await admin.get('/admin/dashboard')).text;
+  assert.match(adminHome, /href="\/social-media"/);
+  assert.match(adminHome, /href="\/content-sheet"/);
+  await admin.post('/social-media/settings/access', { _csrf: admin.token, teamAccess: 'on' });
+  assert.equal(studio().settings.teamAccess, true);
+  assert.equal((await (await as(U.bansi)).get('/social-media')).status, 200);
+});
+
+test('Content Sheet: admin adds, edits and deletes rows; published link locks; others only view', async () => {
+  const admin = await as(U.admin);
+  const bansi = await as(U.bansi); // token taken while the Studio is open, so the 403s below are the admin-only guard
+  await admin.post('/social-media/settings/access', { _csrf: admin.token });
+  await admin.post('/content-sheet', { _csrf: admin.token, publishDate: '2026-10-25', name: 'Discount Reel', shootDate: '2026-10-23', materialReady: 'Yes', shootStatus: 'Done', editingStatus: 'In Progress', publishStatus: 'Pending', note: 'Use new offer' });
+  await admin.post('/content-sheet', { _csrf: admin.token, publishDate: '2026-10-27' });
+  let rows = studio().contentSheet.rows;
+  assert.equal(rows.length, 2);
+  assert.deepEqual([rows[0].name, rows[0].materialReady, rows[0].editingStatus], ['Discount Reel', 'Yes', 'In Progress']);
+  // Validation: bad date / empty row / unknown status / bad link / Published without a link.
+  await admin.post('/content-sheet', { _csrf: admin.token, publishDate: '25 Oct' });
+  await admin.post('/content-sheet', { _csrf: admin.token, name: '', publishDate: '' });
+  await admin.post('/content-sheet', { _csrf: admin.token, name: 'x', link: 'javascript:alert(1)' });
+  await admin.post('/content-sheet/' + rows[1].id, { _csrf: admin.token, publishDate: '2026-10-27', name: 'Festival post', shootStatus: 'Hacked' });
+  await admin.post('/content-sheet/' + rows[0].id, { _csrf: admin.token, name: 'Discount Reel', publishDate: '2026-10-25', publishStatus: 'Published' });
+  assert.match((await admin.get('/content-sheet')).text, /Add the published post link/);
+  rows = studio().contentSheet.rows;
+  assert.equal(rows.length, 2);
+  assert.deepEqual([rows[1].name, rows[1].shootStatus], ['Festival post', '']);
+  assert.equal(rows[0].publishStatus, 'Pending');
+  // Published + link → locked; later saves keep the link and status.
+  const link = 'https://www.instagram.com/reel/ABC123/';
+  await admin.post('/content-sheet/' + rows[0].id, { _csrf: admin.token, name: 'Discount Reel', publishDate: '2026-10-25', publishStatus: 'Published', link });
+  assert.ok(studio().contentSheet.rows[0].lockedAt);
+  await admin.post('/content-sheet/' + rows[0].id, { _csrf: admin.token, name: 'Discount Reel v2', publishDate: '2026-10-25', publishStatus: 'Pending', link: 'https://example.com/other' });
+  const locked = studio().contentSheet.rows[0];
+  assert.deepEqual([locked.name, locked.publishStatus, locked.link], ['Discount Reel v2', 'Published', link]);
+  // Others see it (Studio hidden) but cannot change it.
+  const view = await bansi.get('/content-sheet');
+  assert.equal(view.status, 200);
+  assert.match(view.text, /Discount Reel v2/);
+  assert.match(view.text, /href="https:\/\/www\.instagram\.com\/reel\/ABC123\/"/);
+  assert.doesNotMatch(view.text, /\+ Add row/);
+  assert.equal((await bansi.post('/content-sheet', { _csrf: bansi.token, name: 'x' })).status, 403);
+  assert.equal((await bansi.post('/content-sheet/' + rows[0].id, { _csrf: bansi.token, remove: '1' })).status, 403);
+  // Delete.
+  await admin.post('/content-sheet/' + rows[1].id, { _csrf: admin.token, remove: '1' });
+  assert.deepEqual(studio().contentSheet.rows.map((r) => r.name), ['Discount Reel v2']);
+  assert.match((await admin.get('/content-sheet')).text, /value="Discount Reel v2"/);
+  // Sharing: an unlinked employee sees the sheet (read-only) once ticked, but still not the Studio.
+  const other = new Client();
+  await other.login(U.other);
+  assert.equal((await other.get('/content-sheet')).status, 403);
+  await admin.post('/content-sheet/access', { _csrf: admin.token, viewers: [String(U.other.id), String(U.admin.id), '99999'] });
+  assert.deepEqual(studio().contentSheet.viewers, [U.other.id]);
+  assert.match((await other.get('/employee/dashboard')).text, /href="\/content-sheet"/);
+  const shared = await other.get('/content-sheet');
+  assert.equal(shared.status, 200);
+  assert.doesNotMatch(shared.text, /\+ Add row|Who can see this sheet/);
+  assert.equal((await other.get('/social-media')).status, 403);
+  assert.equal((await bansi.post('/content-sheet/access', { _csrf: bansi.token, viewers: String(U.bansi.id) })).status, 403);
+  await admin.post('/content-sheet/access', { _csrf: admin.token });
+  assert.deepEqual(studio().contentSheet.viewers, []);
+  assert.equal((await other.get('/content-sheet')).status, 403);
+  await admin.post('/social-media/settings/access', { _csrf: admin.token, teamAccess: 'on' });
+});
+
 test('every Studio screen renders for each role without server errors', async () => {
-  const pages = ['/social-media', '/social-media/pages', '/social-media/pages/product?tab=history', '/social-media/pages/stencil?tab=editing', '/social-media/followers?period=90&bucket=week', '/social-media/calendar?view=month&shoots=1', '/social-media/calendar?view=week', '/social-media/calendar?view=day', '/social-media/shoots?tab=completed', '/social-media/shoots?view=calendar', '/social-media/editing', '/social-media/editing?view=list', '/social-media/publishing', '/social-media/publishing?view=calendar', '/social-media/tasks?state=done', '/social-media/tasks?sort=priority&dir=desc', '/social-media/ranking', `/social-media/ranking?breakdown=${U.bansi.id}`, '/social-media/reports?page=product', '/social-media/settings', `/social-media/reels/${reelId}`, `/social-media/reels/${reelId}?tab=details`];
+  const pages = ['/social-media', '/content-sheet', '/social-media/pages', '/social-media/pages/product?tab=history', '/social-media/pages/stencil?tab=editing', '/social-media/followers?period=90&bucket=week', '/social-media/calendar?view=month&shoots=1', '/social-media/calendar?view=week', '/social-media/calendar?view=day', '/social-media/shoots?tab=completed', '/social-media/shoots?view=calendar', '/social-media/editing', '/social-media/editing?view=list', '/social-media/publishing', '/social-media/publishing?view=calendar', '/social-media/tasks?state=done', '/social-media/tasks?sort=priority&dir=desc', '/social-media/ranking', `/social-media/ranking?breakdown=${U.bansi.id}`, '/social-media/reports?page=product', '/social-media/settings', `/social-media/reels/${reelId}`, `/social-media/reels/${reelId}?tab=details`];
   for (const who of ['admin', 'krutik', 'ashmita', 'viewer']) {
     const c = await as(U[who]);
     for (const p of pages) {

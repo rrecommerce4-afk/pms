@@ -54,6 +54,13 @@ function forbidden(res, message) {
   return res.status(403).render('social/forbidden', { message: message || "You don't have access to this part of the Social Media Studio." });
 }
 
+function csrfOk(req) {
+  if (!req.session.studioCsrf) req.session.studioCsrf = crypto.randomBytes(24).toString('hex');
+  const sent = req.body && typeof req.body._csrf === 'string' ? req.body._csrf : '';
+  const expected = req.session.studioCsrf;
+  return sent.length === expected.length && crypto.timingSafeEqual(Buffer.from(sent), Buffer.from(expected));
+}
+
 function currentRange(req, now) {
   const r = req.session.studioRange || { preset: 'this-month' };
   return V.rangeFromPreset(r.preset, now, r);
@@ -94,14 +101,12 @@ router.use((req, res, next) => {
   if (!ctx.user || !ctx.user.active) return req.session.destroy(() => res.redirect('/login'));
   sidebarLocals(res, ctx.db, ctx.user);
   if (!ctx.actor || !ctx.actor.canView) return forbidden(res, 'The Social Media Studio is available to admins, viewers and the Studio team members linked by an admin.');
+  // Admin switch (Settings → Studio access): while off, only admins can open the Studio.
+  if (!ctx.actor.isManager && !ctx.studio.settings.teamAccess) return forbidden(res, 'The Social Media Studio is not open to the team yet.');
 
   if (!req.session.studioCsrf) req.session.studioCsrf = crypto.randomBytes(24).toString('hex');
   if (req.method === 'POST') {
-    const sent = req.body && typeof req.body._csrf === 'string' ? req.body._csrf : '';
-    const expected = req.session.studioCsrf;
-    if (sent.length !== expected.length || !crypto.timingSafeEqual(Buffer.from(sent), Buffer.from(expected))) {
-      return forbidden(res, 'This form has expired or did not come from the PMS. Reload the page and try again.');
-    }
+    if (!csrfOk(req)) return forbidden(res, 'This form has expired or did not come from the PMS. Reload the page and try again.');
     // Central guard: view-only users (Dhara, Ashmita, PMS viewers) can't change Studio data.
     // Only their own period selection and notification read-state are personal preferences.
     const personal = req.path === '/range' || req.path === '/notifications/read';
@@ -788,6 +793,7 @@ router.post('/settings/:section', requireManager, (req, res) => {
   else if (sec === 'notifications') Object.keys(st.notifications).forEach((k) => { st.notifications[k] = b[`n_${k}`] === 'on'; });
   else if (sec === 'display') { st.display.weekStartsOn = Number(b.weekStartsOn); st.display.defaultCalendarView = b.defaultCalendarView; }
   else if (sec === 'followers') st.followerScenario = b.followerScenario;
+  else if (sec === 'access') st.teamAccess = b.teamAccess === 'on';
   else if (sec === 'members') return saveMembers(req, res, ctx);
   else if (sec === 'autolink') {
     req.session.studioLinkReport = Store.autoLinkMembers(db, studio, actor.userId);
@@ -1062,4 +1068,110 @@ router.post('/reels/:id/:action', (req, res) => {
   res.redirect(303, req.params.action === 'delete' ? '/social-media' : back);
 });
 
+// ---------------------------------------------------------------- Content Sheet (/content-sheet)
+// A plain spreadsheet-style list kept in db.socialStudio.contentSheet, separate from reels.
+// It has its own URL so the Studio team can use it while the Studio itself is admin-only.
+// Everyone with Studio view rights sees it; only admins change it.
+const SHEET_OPTIONS = {
+  materialReady: ['Yes', 'No'],
+  shootStatus: ['Pending', 'Done'],
+  editingStatus: ['Pending', 'In Progress', 'Done'],
+  publishStatus: ['Pending', 'Scheduled', 'Published']
+};
+
+function parseSheetRow(b) {
+  const day = (v) => (typeof v === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(v) && !Number.isNaN(Date.parse(v)) ? v : null);
+  for (const k of ['publishDate', 'shootDate']) if (b[k] && !day(b[k])) return { error: 'Use the date picker for dates.' };
+  const row = {
+    publishDate: day(b.publishDate),
+    name: String(b.name || '').trim().slice(0, 150),
+    shootDate: day(b.shootDate),
+    link: String(b.link || '').trim(),
+    note: String(b.note || '').trim().slice(0, 1000)
+  };
+  for (const [k, opts] of Object.entries(SHEET_OPTIONS)) row[k] = opts.includes(b[k]) ? b[k] : '';
+  if (!row.publishDate && !row.name) return { error: 'Give the row at least a publish date or a name.' };
+  if (row.link && (row.link.length > 500 || !/^https?:\/\/[^\s<>"]+$/i.test(row.link))) return { error: 'Paste the full post link, starting with https://' };
+  if (row.publishStatus === 'Published' && !row.link) return { error: 'Add the published post link before marking the row Published.' };
+  return { row };
+}
+
+// Once a row is saved as Published with its link, the link and the Published status are locked.
+function lockIfPublished(row, ctx) {
+  if (!row.lockedAt && row.publishStatus === 'Published' && row.link) Object.assign(row, { lockedAt: new Date().toISOString(), lockedBy: ctx.actor.userId });
+}
+
+const sheet = express.Router();
+sheet.use(requireLogin);
+sheet.use((req, res, next) => {
+  const ctx = loadCtx(req);
+  if (!ctx.user || !ctx.user.active) return req.session.destroy(() => res.redirect('/login'));
+  sidebarLocals(res, ctx.db, ctx.user);
+  if (!P.canSeeSheet(ctx.studio, ctx.user, ctx.actor)) return forbidden(res, 'The Content Sheet has not been shared with you. Ask an admin.');
+  if (req.method === 'POST') {
+    if (!csrfOk(req)) return forbidden(res, 'This form has expired or did not come from the PMS. Reload the page and try again.');
+    if (!ctx.actor || !ctx.actor.isManager) return forbidden(res, 'Only an admin can change the Content Sheet.');
+  }
+  if (!req.session.studioCsrf) req.session.studioCsrf = crypto.randomBytes(24).toString('hex');
+  req.sm = ctx;
+  res.locals.V = V;
+  res.locals.sheet = { can: !!(ctx.actor && ctx.actor.isManager), csrf: req.session.studioCsrf, flash: req.session.studioFlash || null };
+  delete req.session.studioFlash;
+  next();
+});
+
+sheet.get('/', (req, res) => {
+  const rows = req.sm.studio.contentSheet.rows.slice()
+    .sort((a, b) => (a.publishDate || '9999').localeCompare(b.publishDate || '9999') || a.id - b.id);
+  // Admins pick who else can see the sheet (no Studio access needed).
+  const shareable = req.sm.actor && req.sm.actor.isManager
+    ? req.sm.users.filter((u) => u.active && u.role !== 'admin').sort((a, b) => a.name.localeCompare(b.name))
+    : [];
+  res.render('social/sheet', { rows, OPTS: SHEET_OPTIONS, shareable, viewers: req.sm.studio.contentSheet.viewers });
+});
+
+sheet.post('/access', (req, res) => {
+  const ctx = req.sm;
+  const picked = [].concat(req.body.viewers || []).map(Number);
+  ctx.studio.contentSheet.viewers = ctx.users.filter((u) => u.role !== 'admin' && picked.includes(u.id)).map((u) => u.id);
+  save(ctx.db);
+  flash(req, 'success', 'Sheet sharing saved.');
+  res.redirect(303, '/content-sheet');
+});
+
+sheet.post('/', (req, res) => {
+  const parsed = parseSheetRow(req.body);
+  if (parsed.error) { flash(req, 'error', parsed.error); return res.redirect(303, '/content-sheet'); }
+  const ctx = req.sm;
+  const s = ctx.studio.contentSheet;
+  s.nextId = Math.max(s.nextId || 1, ...s.rows.map((r) => r.id + 1));
+  const row = { id: s.nextId++, ...parsed.row, updatedAt: new Date().toISOString(), updatedBy: ctx.actor.userId };
+  lockIfPublished(row, ctx);
+  s.rows.push(row);
+  save(ctx.db);
+  flash(req, 'success', 'Row added.');
+  res.redirect(303, '/content-sheet');
+});
+
+sheet.post('/:id', (req, res) => {
+  const ctx = req.sm;
+  const row = ctx.studio.contentSheet.rows.find((r) => String(r.id) === req.params.id);
+  if (!row) return res.status(404).render('social/not-found', { crumb: 'Content Sheet', what: 'Row', back: '/content-sheet' });
+  if (req.body.remove === '1') {
+    ctx.studio.contentSheet.rows = ctx.studio.contentSheet.rows.filter((r) => r !== row);
+    save(ctx.db);
+    flash(req, 'success', 'Row deleted.');
+    return res.redirect(303, '/content-sheet');
+  }
+  const body = row.lockedAt ? { ...req.body, publishStatus: row.publishStatus, link: row.link } : req.body;
+  const parsed = parseSheetRow(body);
+  if (parsed.error) { flash(req, 'error', parsed.error); return res.redirect(303, '/content-sheet'); }
+  Object.assign(row, parsed.row, { updatedAt: new Date().toISOString(), updatedBy: ctx.actor.userId });
+  lockIfPublished(row, ctx);
+  save(ctx.db);
+  flash(req, 'success', 'Row saved.');
+  res.redirect(303, '/content-sheet#row-' + row.id);
+});
+
 module.exports = router;
+module.exports.sheet = sheet;

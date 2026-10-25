@@ -2,7 +2,7 @@
 <%
   var a = sm.actor, st = sm.settings, people = sm.people, can = a.isManager;
   var wTotal = Object.keys(st.weights).reduce(function (s, k) { return s + st.weights[k]; }, 0);
-  var sections = [['instagram', 'Instagram connection'], ['schedule', 'Publishing Schedule'], ['members', 'Studio members'], ['targets', 'Monthly targets'], ['teams', 'Page teams'], ['editors', 'Editing team'], ['deadlines', 'Task deadlines'], ['priorities', 'Priorities'], ['weights', 'Scoring weights'], ['ranking', 'Ranking rules'], ['notifications', 'Notifications'], ['display', 'Display'], ['followers', 'Demo followers']];
+  var sections = [['access', 'Studio access'], ['instagram', 'Instagram connection'], ['schedule', 'Publishing Schedule'], ['members', 'Studio members'], ['targets', 'Monthly targets'], ['teams', 'Page teams'], ['editors', 'Editing team'], ['deadlines', 'Task deadlines'], ['priorities', 'Priorities'], ['weights', 'Scoring weights'], ['ranking', 'Ranking rules'], ['notifications', 'Notifications'], ['display', 'Display'], ['followers', 'Demo followers']];
   var hidden = function () { return '<input type="hidden" name="_csrf" value="' + V.esc(sm.csrf) + '">'; };
 %>
 <div class="container container-wide sm">
@@ -19,6 +19,14 @@
   <div class="sm-settings-layout">
     <nav class="sm-settings-nav" aria-label="Settings sections"><% sections.forEach(function (s) { %><a href="#<%= s[0] %>"><%= s[1] %></a><% }) %></nav>
     <div>
+      <div class="list-card sm-section" id="access">
+        <div class="list-card-head section-card-head"><div><h2>Studio access</h2><p class="sm-muted">While this is off, only admins can see and open the Social Media Studio — it is hidden from the sidebar for team members and viewers.</p></div><%- st.teamAccess ? V.badge('Open to the team', 'green') : V.badge('Admins only', 'amber') %></div>
+        <form class="sm-pad" method="POST" action="/social-media/settings/access"><%- hidden() %>
+          <fieldset <%= can ? '' : 'disabled' %>><label class="sm-check"><input type="checkbox" name="teamAccess" value="on" <%= st.teamAccess ? 'checked' : '' %>> Show the Social Media Studio to team members and viewers</label>
+          <div class="sm-form-actions"><button class="btn" type="submit">Save access</button></div></fieldset>
+        </form>
+      </div>
+
       <div class="list-card sm-section" id="instagram">
         <div class="list-card-head section-card-head"><div><h2>Instagram connection</h2><p class="sm-muted">Real follower counts through the official Instagram API (Instagram login, <%= igApiVersion %>). Each page needs its own access token from the Meta app → <b>Generate token</b>. Tokens are stored in a private server file — not in the database — and are never shown again after saving. Follower counts update automatically about once a day.</p></div><%- V.followerBadge(sm.src) %></div>
         <div class="sm-pad">
