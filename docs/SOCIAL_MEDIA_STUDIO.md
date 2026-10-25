@@ -47,8 +47,8 @@ Content Planning → Shoot Scheduled (claimed) → Shoot Completed → (raw foot
 
 A plain planning sheet with its own **Content Sheet** link in the main sidebar menu, outside the Studio. The columns are Publish Date, Name, Shoot Date, Material Ready For Shoot, Shoot Status, Editing Status, Publish Status, Post Link and Add Note.
 
-- **Who sees it:** everyone who could view the Studio (admins, linked Studio members, PMS viewers), even while the Studio access switch is off, plus any PMS user an admin ticks under **Who can see this sheet** on the sheet page (`contentSheet.viewers`). Sharing gives view-only sheet access, never Studio access. Everyone else gets a 403 and no link.
-- **Who changes it:** only admins can add, edit (Save on each row) or delete rows. Everyone else sees it read-only.
+- **Who sees it:** everyone who could view the Studio (admins, linked Studio members, PMS viewers), even while the Studio access switch is off, plus any PMS user an admin ticks under **Who can see this sheet** on the sheet page (`contentSheet.viewers`). Sharing never gives Studio access. Everyone else gets a 403 and no link.
+- **Who changes it:** admins can do everything. Users ticked under *Who can see this sheet* (except PMS viewers) can also add rows and edit them (Save on each row). Only admins can delete rows or change the sharing list. Everyone else sees it read-only.
 - **Post link and lock:** a row can only be marked **Published** together with its post link (an http/https URL). Saving it that way locks the link and the Published status (`lockedAt`, `lockedBy`); later saves keep both. To correct a locked link, delete the row and add it again.
 - **Storage:** the rows live in `socialStudio.contentSheet` and are independent of reels, so they do not affect tasks, deadlines or scoring.
 

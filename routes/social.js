@@ -1098,7 +1098,7 @@ function parseSheetRow(b) {
 
 // Once a row is saved as Published with its link, the link and the Published status are locked.
 function lockIfPublished(row, ctx) {
-  if (!row.lockedAt && row.publishStatus === 'Published' && row.link) Object.assign(row, { lockedAt: new Date().toISOString(), lockedBy: ctx.actor.userId });
+  if (!row.lockedAt && row.publishStatus === 'Published' && row.link) Object.assign(row, { lockedAt: new Date().toISOString(), lockedBy: ctx.user.id });
 }
 
 const sheet = express.Router();
@@ -1108,14 +1108,19 @@ sheet.use((req, res, next) => {
   if (!ctx.user || !ctx.user.active) return req.session.destroy(() => res.redirect('/login'));
   sidebarLocals(res, ctx.db, ctx.user);
   if (!P.canSeeSheet(ctx.studio, ctx.user, ctx.actor)) return forbidden(res, 'The Content Sheet has not been shared with you. Ask an admin.');
+  // Admins do everything; users the sheet is shared with (except PMS viewers) add and edit rows.
+  // Deleting rows and changing who can see the sheet stay admin-only.
+  const admin = !!(ctx.actor && ctx.actor.isManager);
+  const canEdit = admin || (ctx.user.role !== 'viewer' && ctx.studio.contentSheet.viewers.includes(ctx.user.id));
   if (req.method === 'POST') {
     if (!csrfOk(req)) return forbidden(res, 'This form has expired or did not come from the PMS. Reload the page and try again.');
-    if (!ctx.actor || !ctx.actor.isManager) return forbidden(res, 'Only an admin can change the Content Sheet.');
+    const adminOnly = req.path === '/access' || req.body.remove === '1';
+    if (adminOnly ? !admin : !canEdit) return forbidden(res, adminOnly ? 'Only an admin can do this on the Content Sheet.' : 'Your Content Sheet access is view-only.');
   }
   if (!req.session.studioCsrf) req.session.studioCsrf = crypto.randomBytes(24).toString('hex');
   req.sm = ctx;
   res.locals.V = V;
-  res.locals.sheet = { can: !!(ctx.actor && ctx.actor.isManager), csrf: req.session.studioCsrf, flash: req.session.studioFlash || null };
+  res.locals.sheet = { can: canEdit, admin, csrf: req.session.studioCsrf, flash: req.session.studioFlash || null };
   delete req.session.studioFlash;
   next();
 });
@@ -1145,7 +1150,7 @@ sheet.post('/', (req, res) => {
   const ctx = req.sm;
   const s = ctx.studio.contentSheet;
   s.nextId = Math.max(s.nextId || 1, ...s.rows.map((r) => r.id + 1));
-  const row = { id: s.nextId++, ...parsed.row, updatedAt: new Date().toISOString(), updatedBy: ctx.actor.userId };
+  const row = { id: s.nextId++, ...parsed.row, updatedAt: new Date().toISOString(), updatedBy: ctx.user.id };
   lockIfPublished(row, ctx);
   s.rows.push(row);
   save(ctx.db);
@@ -1166,7 +1171,7 @@ sheet.post('/:id', (req, res) => {
   const body = row.lockedAt ? { ...req.body, publishStatus: row.publishStatus, link: row.link } : req.body;
   const parsed = parseSheetRow(body);
   if (parsed.error) { flash(req, 'error', parsed.error); return res.redirect(303, '/content-sheet'); }
-  Object.assign(row, parsed.row, { updatedAt: new Date().toISOString(), updatedBy: ctx.actor.userId });
+  Object.assign(row, parsed.row, { updatedAt: new Date().toISOString(), updatedBy: ctx.user.id });
   lockIfPublished(row, ctx);
   save(ctx.db);
   flash(req, 'success', 'Row saved.');

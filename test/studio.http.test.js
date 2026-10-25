@@ -714,18 +714,32 @@ test('Content Sheet: admin adds, edits and deletes rows; published link locks; o
   await admin.post('/content-sheet/' + rows[1].id, { _csrf: admin.token, remove: '1' });
   assert.deepEqual(studio().contentSheet.rows.map((r) => r.name), ['Discount Reel v2']);
   assert.match((await admin.get('/content-sheet')).text, /value="Discount Reel v2"/);
-  // Sharing: an unlinked employee sees the sheet (read-only) once ticked, but still not the Studio.
+  // Sharing: a ticked employee can view, add and edit rows (not delete / not re-share), but still not open the Studio.
   const other = new Client();
   await other.login(U.other);
   assert.equal((await other.get('/content-sheet')).status, 403);
-  await admin.post('/content-sheet/access', { _csrf: admin.token, viewers: [String(U.other.id), String(U.admin.id), '99999'] });
-  assert.deepEqual(studio().contentSheet.viewers, [U.other.id]);
+  await admin.post('/content-sheet/access', { _csrf: admin.token, viewers: [String(U.other.id), String(U.viewer.id), String(U.admin.id), '99999'] });
+  assert.deepEqual(studio().contentSheet.viewers, [U.other.id, U.viewer.id].sort((x, y) => x - y));
   assert.match((await other.get('/employee/dashboard')).text, /href="\/content-sheet"/);
   const shared = await other.get('/content-sheet');
   assert.equal(shared.status, 200);
-  assert.doesNotMatch(shared.text, /\+ Add row|Who can see this sheet/);
+  assert.match(shared.text, /\+ Add row/);
+  assert.doesNotMatch(shared.text, /Who can see this sheet|aria-label="Delete row"/);
+  const otherToken = shared.text.match(/name="_csrf" value="([a-f0-9]+)"/)[1];
+  await other.post('/content-sheet', { _csrf: otherToken, publishDate: '2026-11-02', name: 'Team row', shootStatus: 'Pending' });
+  const teamRow = studio().contentSheet.rows.find((r) => r.name === 'Team row');
+  assert.equal(teamRow.updatedBy, U.other.id);
+  await other.post('/content-sheet/' + teamRow.id, { _csrf: otherToken, publishDate: '2026-11-02', name: 'Team row', shootStatus: 'Done' });
+  assert.equal(studio().contentSheet.rows.find((r) => r.id === teamRow.id).shootStatus, 'Done');
+  assert.equal((await other.post('/content-sheet/' + teamRow.id, { _csrf: otherToken, remove: '1' })).status, 403);
+  assert.equal((await other.post('/content-sheet/access', { _csrf: otherToken, viewers: String(U.bansi.id) })).status, 403);
   assert.equal((await other.get('/social-media')).status, 403);
+  // A ticked PMS viewer stays view-only.
+  const viewer = new Client();
+  await viewer.login(U.viewer);
+  assert.doesNotMatch((await viewer.get('/content-sheet')).text, /\+ Add row/);
   assert.equal((await bansi.post('/content-sheet/access', { _csrf: bansi.token, viewers: String(U.bansi.id) })).status, 403);
+  await admin.post('/content-sheet/' + teamRow.id, { _csrf: admin.token, remove: '1' });
   await admin.post('/content-sheet/access', { _csrf: admin.token });
   assert.deepEqual(studio().contentSheet.viewers, []);
   assert.equal((await other.get('/content-sheet')).status, 403);
