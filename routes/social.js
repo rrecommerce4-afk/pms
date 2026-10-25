@@ -1079,6 +1079,9 @@ const SHEET_OPTIONS = {
   publishStatus: ['Pending', 'Scheduled', 'Published']
 };
 
+const SHEET_FIELDS = ['publishDate', 'name', 'shootDate', 'materialReady', 'shootStatus', 'editingStatus', 'publishStatus', 'link', 'note'];
+const SHEET_PAGES = C.PAGES.map((p) => p.id);
+
 function parseSheetRow(b) {
   const day = (v) => (typeof v === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(v) && !Number.isNaN(Date.parse(v)) ? v : null);
   for (const k of ['publishDate', 'shootDate']) if (b[k] && !day(b[k])) return { error: 'Use the date picker for dates.' };
@@ -1090,7 +1093,7 @@ function parseSheetRow(b) {
     note: String(b.note || '').trim().slice(0, 1000)
   };
   for (const [k, opts] of Object.entries(SHEET_OPTIONS)) row[k] = opts.includes(b[k]) ? b[k] : '';
-  if (!row.publishDate && !row.name) return { error: 'Give the row at least a publish date or a name.' };
+  if (!row.publishDate) return { error: 'Pick a publish date for the row.' };
   if (row.link && (row.link.length > 500 || !/^https?:\/\/[^\s<>"]+$/i.test(row.link))) return { error: 'Paste the full post link, starting with https://' };
   if (row.publishStatus === 'Published' && !row.link) return { error: 'Add the published post link before marking the row Published.' };
   return { row };
@@ -1100,6 +1103,21 @@ function parseSheetRow(b) {
 function lockIfPublished(row, ctx) {
   if (!row.lockedAt && row.publishStatus === 'Published' && row.link) Object.assign(row, { lockedAt: new Date().toISOString(), lockedBy: ctx.user.id });
 }
+
+// Records who last wrote each cell, so the sheet can show their initials next to it.
+function trackEdits(row, before, ctx) {
+  row.edits = row.edits || {};
+  const at = new Date().toISOString();
+  for (const k of SHEET_FIELDS) {
+    if (String(row[k] || '') === String(before[k] || '')) continue;
+    if (row[k]) row.edits[k] = { by: ctx.user.id, at };
+    else delete row.edits[k];
+  }
+}
+
+const monthOf = (v) => (typeof v === 'string' && /^\d{4}-(0[1-9]|1[0-2])$/.test(v) ? v : null);
+const sheetUrl = (pageId, month, hash) => '/content-sheet?page=' + (SHEET_PAGES.includes(pageId) ? pageId : SHEET_PAGES[0]) + (monthOf(month) ? '&month=' + month : '') + (hash ? '#' + hash : '');
+const backTo = (b) => sheetUrl(b.pageId, typeof b.publishDate === 'string' ? b.publishDate.slice(0, 7) : null);
 
 const sheet = express.Router();
 sheet.use(requireLogin);
@@ -1126,13 +1144,29 @@ sheet.use((req, res, next) => {
 });
 
 sheet.get('/', (req, res) => {
-  const rows = req.sm.studio.contentSheet.rows.slice()
-    .sort((a, b) => (a.publishDate || '9999').localeCompare(b.publishDate || '9999') || a.id - b.id);
+  const pageId = SHEET_PAGES.includes(req.query.page) ? req.query.page : SHEET_PAGES[0];
+  const now = new Date();
+  const month = monthOf(req.query.month) || `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+  const [y, m] = month.split('-').map(Number);
+  const iso = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  const rows = req.sm.studio.contentSheet.rows.filter((r) => r.pageId === pageId && (r.publishDate || '').startsWith(month));
+  // One entry per calendar day; a day with no rows gets an empty template row.
+  const days = [];
+  for (let d = 1; d <= new Date(y, m, 0).getDate(); d++) {
+    const date = iso(new Date(y, m - 1, d));
+    days.push({ date, rows: rows.filter((r) => r.publishDate === date).sort((a, b) => a.id - b.id) });
+  }
+  const names = new Map(req.sm.users.map((u) => [u.id, u.name]));
   // Admins pick who else can see the sheet (no Studio access needed).
   const shareable = req.sm.actor && req.sm.actor.isManager
     ? req.sm.users.filter((u) => u.active && u.role !== 'admin').sort((a, b) => a.name.localeCompare(b.name))
     : [];
-  res.render('social/sheet', { rows, OPTS: SHEET_OPTIONS, shareable, viewers: req.sm.studio.contentSheet.viewers });
+  res.render('social/sheet', {
+    days, pageId, month, today: iso(now),
+    prevMonth: iso(new Date(y, m - 2, 1)).slice(0, 7), nextMonth: iso(new Date(y, m, 1)).slice(0, 7),
+    pages: C.PAGES, OPTS: SHEET_OPTIONS, shareable, viewers: req.sm.studio.contentSheet.viewers,
+    nameOf: (id) => names.get(id) || 'Former user'
+  });
 });
 
 sheet.post('/access', (req, res) => {
@@ -1145,37 +1179,43 @@ sheet.post('/access', (req, res) => {
 });
 
 sheet.post('/', (req, res) => {
+  if (!SHEET_PAGES.includes(req.body.pageId)) { flash(req, 'error', 'Pick an Instagram page.'); return res.redirect(303, '/content-sheet'); }
   const parsed = parseSheetRow(req.body);
-  if (parsed.error) { flash(req, 'error', parsed.error); return res.redirect(303, '/content-sheet'); }
+  if (parsed.error) { flash(req, 'error', parsed.error); return res.redirect(303, backTo(req.body)); }
+  if (!SHEET_FIELDS.some((k) => k !== 'publishDate' && parsed.row[k])) { flash(req, 'error', 'Fill in at least one cell before saving.'); return res.redirect(303, backTo(req.body)); }
   const ctx = req.sm;
   const s = ctx.studio.contentSheet;
   s.nextId = Math.max(s.nextId || 1, ...s.rows.map((r) => r.id + 1));
-  const row = { id: s.nextId++, ...parsed.row, updatedAt: new Date().toISOString(), updatedBy: ctx.user.id };
+  const row = { id: s.nextId++, pageId: req.body.pageId, ...parsed.row, createdBy: ctx.user.id, updatedAt: new Date().toISOString(), updatedBy: ctx.user.id };
+  trackEdits(row, {}, ctx);
   lockIfPublished(row, ctx);
   s.rows.push(row);
   save(ctx.db);
-  flash(req, 'success', 'Row added.');
-  res.redirect(303, '/content-sheet');
+  flash(req, 'success', 'Row saved.');
+  res.redirect(303, sheetUrl(row.pageId, row.publishDate.slice(0, 7), 'row-' + row.id));
 });
 
 sheet.post('/:id', (req, res) => {
   const ctx = req.sm;
   const row = ctx.studio.contentSheet.rows.find((r) => String(r.id) === req.params.id);
   if (!row) return res.status(404).render('social/not-found', { crumb: 'Content Sheet', what: 'Row', back: '/content-sheet' });
+  const back = sheetUrl(row.pageId, (row.publishDate || '').slice(0, 7));
   if (req.body.remove === '1') {
     ctx.studio.contentSheet.rows = ctx.studio.contentSheet.rows.filter((r) => r !== row);
     save(ctx.db);
     flash(req, 'success', 'Row deleted.');
-    return res.redirect(303, '/content-sheet');
+    return res.redirect(303, back);
   }
   const body = row.lockedAt ? { ...req.body, publishStatus: row.publishStatus, link: row.link } : req.body;
   const parsed = parseSheetRow(body);
-  if (parsed.error) { flash(req, 'error', parsed.error); return res.redirect(303, '/content-sheet'); }
+  if (parsed.error) { flash(req, 'error', parsed.error); return res.redirect(303, back); }
+  const before = { ...row };
   Object.assign(row, parsed.row, { updatedAt: new Date().toISOString(), updatedBy: ctx.user.id });
+  trackEdits(row, before, ctx);
   lockIfPublished(row, ctx);
   save(ctx.db);
   flash(req, 'success', 'Row saved.');
-  res.redirect(303, '/content-sheet#row-' + row.id);
+  res.redirect(303, sheetUrl(row.pageId, row.publishDate.slice(0, 7), 'row-' + row.id));
 });
 
 module.exports = router;

@@ -45,7 +45,7 @@ Content Planning → Shoot Scheduled (claimed) → Shoot Completed → (raw foot
 
 ## Content Sheet (`/content-sheet`)
 
-A plain planning sheet with its own **Content Sheet** link in the main sidebar menu, outside the Studio. The columns are Publish Date, Name, Shoot Date, Material Ready For Shoot, Shoot Status, Editing Status, Publish Status, Post Link and Add Note.
+A plain planning sheet with its own **Content Sheet** link in the main sidebar menu, outside the Studio. It has one tab per Instagram page (Product, Farma Pattern, Stencil, Butterpaper) and shows every day of the chosen month (Prev / Next). A day with no entry is an empty line with the date filled in; saving it creates the row. "+ Add row" adds a second post on the same day. Each cell records who last wrote it (`row.edits[field] = { by, at }`) and shows that person's initials (first letter of the first and last word of their PMS name); hover for the full name and time. The columns are Publish Date, Name, Shoot Date, Material Ready For Shoot, Shoot Status, Editing Status, Publish Status, Post Link and Add Note.
 
 - **Who sees it:** everyone who could view the Studio (admins, linked Studio members, PMS viewers), even while the Studio access switch is off, plus any PMS user an admin ticks under **Who can see this sheet** on the sheet page (`contentSheet.viewers`). Sharing never gives Studio access. Everyone else gets a 403 and no link.
 - **Who changes it:** admins can do everything. Users ticked under *Who can see this sheet* (except PMS viewers) can also add rows and edit them (Save on each row). Only admins can delete rows or change the sharing list. Everyone else sees it read-only.

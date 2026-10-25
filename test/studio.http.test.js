@@ -679,18 +679,32 @@ test('Content Sheet: admin adds, edits and deletes rows; published link locks; o
   const admin = await as(U.admin);
   const bansi = await as(U.bansi); // token taken while the Studio is open, so the 403s below are the admin-only guard
   await admin.post('/social-media/settings/access', { _csrf: admin.token });
-  await admin.post('/content-sheet', { _csrf: admin.token, publishDate: '2026-10-25', name: 'Discount Reel', shootDate: '2026-10-23', materialReady: 'Yes', shootStatus: 'Done', editingStatus: 'In Progress', publishStatus: 'Pending', note: 'Use new offer' });
-  await admin.post('/content-sheet', { _csrf: admin.token, publishDate: '2026-10-27' });
+  await admin.post('/content-sheet', { _csrf: admin.token, pageId: 'product', publishDate: '2026-10-25', name: 'Discount Reel', shootDate: '2026-10-23', materialReady: 'Yes', shootStatus: 'Done', editingStatus: 'In Progress', publishStatus: 'Pending', note: 'Use new offer' });
+  await admin.post('/content-sheet', { _csrf: admin.token, pageId: 'stencil', publishDate: '2026-10-27', note: 'tbd' });
   let rows = studio().contentSheet.rows;
   assert.equal(rows.length, 2);
+  assert.deepEqual(rows.map((r) => r.pageId), ['product', 'stencil']);
+  // Who wrote each cell is recorded and shown as initials ("Test Admin" → TA).
+  assert.deepEqual(Object.keys(rows[0].edits).sort(), ['editingStatus', 'materialReady', 'name', 'note', 'publishDate', 'publishStatus', 'shootDate', 'shootStatus']);
+  assert.equal(rows[0].edits.name.by, U.admin.id);
+  const month = await admin.get('/content-sheet?page=product&month=2026-10');
+  assert.match(month.text, /class="sm-by" title="Test Admin · [^"]+">TA</);
+  // Full month: every October day is on the Product tab; the Stencil row is not.
+  assert.match(month.text, /Thu 1 Oct/);
+  assert.match(month.text, /Sat 31 Oct/);
+  assert.doesNotMatch(month.text, /value="tbd"/);
+  assert.match((await admin.get('/content-sheet?page=stencil&month=2026-10')).text, /value="tbd"/);
+  assert.match((await admin.get('/content-sheet?page=product&month=2026-11')).text, /Mon 30 Nov/);
   assert.deepEqual([rows[0].name, rows[0].materialReady, rows[0].editingStatus], ['Discount Reel', 'Yes', 'In Progress']);
   // Validation: bad date / empty row / unknown status / bad link / Published without a link.
-  await admin.post('/content-sheet', { _csrf: admin.token, publishDate: '25 Oct' });
-  await admin.post('/content-sheet', { _csrf: admin.token, name: '', publishDate: '' });
-  await admin.post('/content-sheet', { _csrf: admin.token, name: 'x', link: 'javascript:alert(1)' });
+  await admin.post('/content-sheet', { _csrf: admin.token, pageId: 'product', publishDate: '25 Oct', name: 'x' });
+  await admin.post('/content-sheet', { _csrf: admin.token, pageId: 'product', publishDate: '2026-10-28' }); // nothing filled in
+  await admin.post('/content-sheet', { _csrf: admin.token, pageId: 'product', name: 'x' }); // no date
+  await admin.post('/content-sheet', { _csrf: admin.token, pageId: 'nope', publishDate: '2026-10-28', name: 'x' });
+  await admin.post('/content-sheet', { _csrf: admin.token, pageId: 'product', publishDate: '2026-10-28', name: 'x', link: 'javascript:alert(1)' });
   await admin.post('/content-sheet/' + rows[1].id, { _csrf: admin.token, publishDate: '2026-10-27', name: 'Festival post', shootStatus: 'Hacked' });
   await admin.post('/content-sheet/' + rows[0].id, { _csrf: admin.token, name: 'Discount Reel', publishDate: '2026-10-25', publishStatus: 'Published' });
-  assert.match((await admin.get('/content-sheet')).text, /Add the published post link/);
+  assert.match((await admin.get('/content-sheet?page=product&month=2026-10')).text, /Add the published post link/);
   rows = studio().contentSheet.rows;
   assert.equal(rows.length, 2);
   assert.deepEqual([rows[1].name, rows[1].shootStatus], ['Festival post', '']);
@@ -703,7 +717,7 @@ test('Content Sheet: admin adds, edits and deletes rows; published link locks; o
   const locked = studio().contentSheet.rows[0];
   assert.deepEqual([locked.name, locked.publishStatus, locked.link], ['Discount Reel v2', 'Published', link]);
   // Others see it (Studio hidden) but cannot change it.
-  const view = await bansi.get('/content-sheet');
+  const view = await bansi.get('/content-sheet?page=product&month=2026-10');
   assert.equal(view.status, 200);
   assert.match(view.text, /Discount Reel v2/);
   assert.match(view.text, /href="https:\/\/www\.instagram\.com\/reel\/ABC123\/"/);
@@ -713,7 +727,7 @@ test('Content Sheet: admin adds, edits and deletes rows; published link locks; o
   // Delete.
   await admin.post('/content-sheet/' + rows[1].id, { _csrf: admin.token, remove: '1' });
   assert.deepEqual(studio().contentSheet.rows.map((r) => r.name), ['Discount Reel v2']);
-  assert.match((await admin.get('/content-sheet')).text, /value="Discount Reel v2"/);
+  assert.match((await admin.get('/content-sheet?month=2026-10')).text, /value="Discount Reel v2"/);
   // Sharing: a ticked employee can view, add and edit rows (not delete / not re-share), but still not open the Studio.
   const other = new Client();
   await other.login(U.other);
@@ -726,11 +740,14 @@ test('Content Sheet: admin adds, edits and deletes rows; published link locks; o
   assert.match(shared.text, /\+ Add row/);
   assert.doesNotMatch(shared.text, /Who can see this sheet|aria-label="Delete row"/);
   const otherToken = shared.text.match(/name="_csrf" value="([a-f0-9]+)"/)[1];
-  await other.post('/content-sheet', { _csrf: otherToken, publishDate: '2026-11-02', name: 'Team row', shootStatus: 'Pending' });
+  await other.post('/content-sheet', { _csrf: otherToken, pageId: 'product', publishDate: '2026-11-02', name: 'Team row', shootStatus: 'Pending' });
   const teamRow = studio().contentSheet.rows.find((r) => r.name === 'Team row');
   assert.equal(teamRow.updatedBy, U.other.id);
   await other.post('/content-sheet/' + teamRow.id, { _csrf: otherToken, publishDate: '2026-11-02', name: 'Team row', shootStatus: 'Done' });
-  assert.equal(studio().contentSheet.rows.find((r) => r.id === teamRow.id).shootStatus, 'Done');
+  const edited = studio().contentSheet.rows.find((r) => r.id === teamRow.id);
+  assert.equal(edited.shootStatus, 'Done');
+  assert.equal(edited.edits.shootStatus.by, U.other.id);
+  assert.match((await admin.get('/content-sheet?page=product&month=2026-11')).text, /title="Other Employee · [^"]+">OE</);
   assert.equal((await other.post('/content-sheet/' + teamRow.id, { _csrf: otherToken, remove: '1' })).status, 403);
   assert.equal((await other.post('/content-sheet/access', { _csrf: otherToken, viewers: String(U.bansi.id) })).status, 403);
   assert.equal((await other.get('/social-media')).status, 403);

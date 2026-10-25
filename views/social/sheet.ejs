@@ -12,64 +12,89 @@
     if (!r.link) return '';
     return '<a href="' + V.esc(r.link) + '" target="_blank" rel="noopener noreferrer">Open post</a>' + (r.lockedAt ? ' <span class="sm-lock" title="Locked when it was marked Published">🔒 Locked</span>' : '');
   }
+  // Initials of whoever last wrote a cell: first letter of the first and last word of their name.
+  function initials(name) {
+    var w = String(name).split(/\s+/).filter(function (x) { return /[A-Za-z0-9]/.test(x.charAt(0)); });
+    if (!w.length) return '?';
+    return (w[0].charAt(0) + (w.length > 1 ? w[w.length - 1].charAt(0) : '')).toUpperCase();
+  }
+  function by(r, k) {
+    var e = r && r.edits && r.edits[k];
+    if (!e) return '';
+    var n = nameOf(e.by);
+    return '<span class="sm-by" title="' + V.esc(n + ' · ' + V.fmtDateTime(e.at)) + '">' + V.esc(initials(n)) + '</span>';
+  }
   var cols = ['Publish Date', 'Name', 'Shoot Date', 'Material Ready For Shoot', 'Shoot Status', 'Editing Status', 'Publish Status', 'Post Link', 'Add Note'];
+  var pageName = pages.filter(function (p) { return p.id === pageId; })[0].shortName;
+  var url = function (pg, mo) { return '/content-sheet?page=' + pg + '&month=' + mo; };
 %>
 <div class="container container-wide sm">
   <div class="page-head">
     <div>
       <div class="eyebrow-date">SOCIAL MEDIA</div>
       <h1>Content Sheet</h1>
-      <p>Planned posts with the status of each step. When a post is Published, add its link; the link then locks. <%= can ? 'Edit any cell and click Save on that row.' : 'Your access is view-only.' %></p>
+      <p>One sheet per Instagram page with every day of the month. Small initials in a cell show who wrote it (hover for the name and time). When a post is Published, add its link; the link then locks. <%= can ? 'Fill in a row and click Save.' : 'Your access is view-only.' %></p>
     </div>
   </div>
   <% if (sheet.flash) { %><div class="sm-flash <%= sheet.flash.type %>" role="status"><%= sheet.flash.text %></div><% } %>
 
   <div class="list-card sm-section">
-    <div class="sm-scroll"><table class="sm-table sm-sheet min-1100">
+    <div class="sm-pad" style="padding-top:16px;padding-bottom:12px">
+      <div class="tabs sm-tabs">
+        <% pages.forEach(function (p) { %><a class="tab-btn <%= p.id === pageId ? 'active' : '' %>" href="<%= url(p.id, month) %>"><%= p.shortName %></a><% }) %>
+      </div>
+      <div class="sm-sheet-month">
+        <a class="btn small outline" href="<%= url(pageId, prevMonth) %>" aria-label="Previous month">‹ Prev</a>
+        <b><%= V.fmtDate(month + '-01', 'month') %></b>
+        <a class="btn small outline" href="<%= url(pageId, nextMonth) %>" aria-label="Next month">Next ›</a>
+        <% if (month !== today.slice(0, 7)) { %><a class="sm-link-btn" href="<%= url(pageId, today.slice(0, 7)) %>">This month</a><% } %>
+      </div>
+    </div>
+    <div class="sm-scroll"><table class="sm-table sm-sheet min-1100" aria-label="<%= pageName %> content sheet">
       <thead><tr><% cols.forEach(function (c) { %><th><%= c %></th><% }) %><% if (can) { %><th></th><% } %></tr></thead>
       <tbody>
-        <% if (!rows.length) { %><tr><td colspan="<%= can ? 10 : 9 %>" class="muted">No rows yet.<%= can ? ' Add the first one below.' : '' %></td></tr><% } %>
-        <% rows.forEach(function (r) { var f = 'row-form-' + r.id; %>
-          <tr id="row-<%= r.id %>">
+        <% days.forEach(function (day) {
+             var list = day.rows.length ? day.rows : [null];
+             list.forEach(function (r) {
+               var f = r ? 'row-form-' + r.id : 'new-' + day.date;
+               var cls = (day.date === today ? 'sm-today ' : '') + (r ? '' : 'sm-sheet-blank'); %>
+          <tr <% if (r) { %>id="row-<%= r.id %>"<% } %> class="<%= cls %>">
             <% if (can) { %>
-              <td><input class="sm-cell" type="date" name="publishDate" form="<%= f %>" value="<%= r.publishDate || '' %>" aria-label="Publish date"></td>
-              <td><input class="sm-cell" name="name" form="<%= f %>" value="<%= r.name %>" maxlength="150" aria-label="Name"></td>
-              <td><input class="sm-cell" type="date" name="shootDate" form="<%= f %>" value="<%= r.shootDate || '' %>" aria-label="Shoot date"></td>
-              <td><%- select(f, 'materialReady', r.materialReady) %></td>
-              <td><%- select(f, 'shootStatus', r.shootStatus) %></td>
-              <td><%- select(f, 'editingStatus', r.editingStatus) %></td>
-              <% if (r.lockedAt) { %>
-                <td><%- V.badge(r.publishStatus, tone[r.publishStatus] || 'slate') %></td>
-                <td class="nowrap"><%- postLink(r) %></td>
+              <td class="sm-c"><% if (r) { %><input class="sm-cell" type="date" name="publishDate" form="<%= f %>" value="<%= r.publishDate %>" aria-label="Publish date"><% } else { %><span class="nowrap"><%= fmt(day.date) %></span><% } %><%- by(r, 'publishDate') %></td>
+              <td class="sm-c"><input class="sm-cell" name="name" form="<%= f %>" value="<%= r ? r.name : '' %>" maxlength="150" aria-label="Name"><%- by(r, 'name') %></td>
+              <td class="sm-c"><input class="sm-cell" type="date" name="shootDate" form="<%= f %>" value="<%= r && r.shootDate || '' %>" aria-label="Shoot date"><%- by(r, 'shootDate') %></td>
+              <% ['materialReady', 'shootStatus', 'editingStatus'].forEach(function (k) { %><td class="sm-c"><%- select(f, k, r ? r[k] : '') %><%- by(r, k) %></td><% }) %>
+              <% if (r && r.lockedAt) { %>
+                <td class="sm-c"><%- V.badge(r.publishStatus, tone[r.publishStatus] || 'slate') %><%- by(r, 'publishStatus') %></td>
+                <td class="sm-c nowrap"><%- postLink(r) %><%- by(r, 'link') %></td>
               <% } else { %>
-                <td><%- select(f, 'publishStatus', r.publishStatus) %></td>
-                <td><input class="sm-cell sm-link-cell" type="url" name="link" form="<%= f %>" value="<%= r.link || '' %>" maxlength="500" placeholder="https://instagram.com/…" aria-label="Post link"></td>
+                <td class="sm-c"><%- select(f, 'publishStatus', r ? r.publishStatus : '') %><%- by(r, 'publishStatus') %></td>
+                <td class="sm-c"><input class="sm-cell sm-link-cell" type="url" name="link" form="<%= f %>" value="<%= r && r.link || '' %>" maxlength="500" placeholder="https://instagram.com/…" aria-label="Post link"><%- by(r, 'link') %></td>
               <% } %>
-              <td><input class="sm-cell" name="note" form="<%= f %>" value="<%= r.note %>" maxlength="1000" aria-label="Note"></td>
+              <td class="sm-c"><input class="sm-cell" name="note" form="<%= f %>" value="<%= r ? r.note : '' %>" maxlength="1000" aria-label="Note"><%- by(r, 'note') %></td>
               <td class="nowrap">
-                <form id="<%= f %>" method="POST" action="/content-sheet/<%= r.id %>" style="display:inline"><input type="hidden" name="_csrf" value="<%= sheet.csrf %>"><button class="btn small" type="submit">Save</button></form>
-                <% if (sheet.admin) { %><form method="POST" action="/content-sheet/<%= r.id %>" style="display:inline" data-confirm="Delete this row?"><input type="hidden" name="_csrf" value="<%= sheet.csrf %>"><input type="hidden" name="remove" value="1"><button class="btn small ghost" type="submit" aria-label="Delete row">×</button></form><% } %>
+                <form id="<%= f %>" method="POST" action="/content-sheet<%= r ? '/' + r.id : '' %>" style="display:inline">
+                  <input type="hidden" name="_csrf" value="<%= sheet.csrf %>">
+                  <% if (!r) { %><input type="hidden" name="pageId" value="<%= pageId %>"><input type="hidden" name="publishDate" value="<%= day.date %>"><% } %>
+                  <button class="btn small <%= r ? '' : 'outline' %>" type="submit">Save</button>
+                </form>
+                <% if (r && sheet.admin) { %><form method="POST" action="/content-sheet/<%= r.id %>" style="display:inline" data-confirm="Delete this row?"><input type="hidden" name="_csrf" value="<%= sheet.csrf %>"><input type="hidden" name="remove" value="1"><button class="btn small ghost" type="submit" aria-label="Delete row">×</button></form><% } %>
               </td>
             <% } else { %>
-              <td class="nowrap"><%= fmt(r.publishDate) %></td><td><b><%= r.name %></b></td><td class="nowrap"><%= fmt(r.shootDate) %></td>
-              <% ['materialReady', 'shootStatus', 'editingStatus', 'publishStatus'].forEach(function (k) { %><td><%- r[k] ? V.badge(r[k], tone[r[k]] || 'slate') : '' %></td><% }) %>
-              <td class="nowrap"><%- postLink(r) %></td>
-              <td><%= r.note %></td>
+              <td class="sm-c nowrap"><%= fmt(day.date) %><%- by(r, 'publishDate') %></td>
+              <td class="sm-c"><b><%= r ? r.name : '' %></b><%- by(r, 'name') %></td>
+              <td class="sm-c nowrap"><%= r ? fmt(r.shootDate) : '' %><%- by(r, 'shootDate') %></td>
+              <% ['materialReady', 'shootStatus', 'editingStatus', 'publishStatus'].forEach(function (k) { %><td class="sm-c"><%- r && r[k] ? V.badge(r[k], tone[r[k]] || 'slate') : '' %><%- by(r, k) %></td><% }) %>
+              <td class="sm-c nowrap"><%- r ? postLink(r) : '' %><%- by(r, 'link') %></td>
+              <td class="sm-c"><%= r ? r.note : '' %><%- by(r, 'note') %></td>
             <% } %>
           </tr>
-        <% }) %>
+        <% }); }); %>
         <% if (can) { %>
           <tr class="sm-sheet-new">
-            <td><input class="sm-cell" type="date" name="publishDate" form="sheet-add" aria-label="New row publish date"></td>
-            <td><input class="sm-cell" name="name" form="sheet-add" maxlength="150" placeholder="Name" aria-label="New row name"></td>
-            <td><input class="sm-cell" type="date" name="shootDate" form="sheet-add" aria-label="New row shoot date"></td>
-            <td><%- select('sheet-add', 'materialReady', '') %></td>
-            <td><%- select('sheet-add', 'shootStatus', '') %></td>
-            <td><%- select('sheet-add', 'editingStatus', '') %></td>
-            <td><%- select('sheet-add', 'publishStatus', '') %></td>
-            <td><input class="sm-cell sm-link-cell" type="url" name="link" form="sheet-add" maxlength="500" placeholder="Post link" aria-label="New row post link"></td>
-            <td><input class="sm-cell" name="note" form="sheet-add" maxlength="1000" placeholder="Note" aria-label="New row note"></td>
-            <td><form id="sheet-add" method="POST" action="/content-sheet"><input type="hidden" name="_csrf" value="<%= sheet.csrf %>"><button class="btn small" type="submit">+ Add row</button></form></td>
+            <td><input class="sm-cell" type="date" name="publishDate" form="sheet-add" min="<%= month %>-01" max="<%= days[days.length - 1].date %>" required aria-label="Extra row publish date"></td>
+            <td colspan="8" class="sm-muted">Second post on the same day? Pick the date and click + Add row; a new line appears on that day.</td>
+            <td><form id="sheet-add" method="POST" action="/content-sheet"><input type="hidden" name="_csrf" value="<%= sheet.csrf %>"><input type="hidden" name="pageId" value="<%= pageId %>"><input type="hidden" name="name" value="New post"><button class="btn small" type="submit">+ Add row</button></form></td>
           </tr>
         <% } %>
       </tbody>
