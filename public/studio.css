@@ -433,3 +433,6 @@ form.modal-box { margin: 0; }
 .sm-sheet tr.sm-today td { background: var(--warning-soft); }
 .sm-sheet tr.sm-sheet-blank .sm-cell { background: var(--bg); }
 .sm-sheet-month { display: flex; align-items: center; gap: 10px; margin-top: 12px; flex-wrap: wrap; }
+/* The month scrolls inside its own box so the column headers stay in view. */
+.sm-sheet-scroll { max-height: calc(100vh - 150px); overflow: auto; }
+.sm-sheet thead th { position: sticky; top: 0; z-index: 2; }

@@ -1,7 +1,8 @@
 <%- include('../partials/header') %>
 <%
   var can = sheet.can;
-  var fmt = function (d) { return d ? V.fmtDate(d, 'weekday') : ''; };
+  // "1 Oct Thu": day and month first, weekday after.
+  var fmt = function (d) { if (!d) return ''; var p = d.split('-'); return V.fmtDate(d, 'short') + ' ' + new Date(+p[0], p[1] - 1, +p[2]).toLocaleDateString('en-GB', { weekday: 'short' }); };
   var tone = { Yes: 'green', No: 'red', Done: 'green', Published: 'green', 'In Progress': 'blue', Scheduled: 'sky', Pending: 'amber' };
   function select(form, name, value) {
     var html = '<select class="sm-cell" name="' + name + '"' + (form ? ' form="' + form + '"' : '') + ' aria-label="' + name + '"><option value="">—</option>';
@@ -50,7 +51,7 @@
         <% if (month !== today.slice(0, 7)) { %><a class="sm-link-btn" href="<%= url(pageId, today.slice(0, 7)) %>">This month</a><% } %>
       </div>
     </div>
-    <div class="sm-scroll"><table class="sm-table sm-sheet min-1100" aria-label="<%= pageName %> content sheet">
+    <div class="sm-scroll sm-sheet-scroll"><table class="sm-table sm-sheet min-1100" aria-label="<%= pageName %> content sheet">
       <thead><tr><% cols.forEach(function (c) { %><th><%= c %></th><% }) %><% if (can) { %><th></th><% } %></tr></thead>
       <tbody>
         <% days.forEach(function (day) {

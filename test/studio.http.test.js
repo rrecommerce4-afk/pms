@@ -690,11 +690,11 @@ test('Content Sheet: admin adds, edits and deletes rows; published link locks; o
   const month = await admin.get('/content-sheet?page=product&month=2026-10');
   assert.match(month.text, /class="sm-by" title="Test Admin · [^"]+">TA</);
   // Full month: every October day is on the Product tab; the Stencil row is not.
-  assert.match(month.text, /Thu 1 Oct/);
-  assert.match(month.text, /Sat 31 Oct/);
+  assert.match(month.text, /1 Oct Thu/);
+  assert.match(month.text, /31 Oct Sat/);
   assert.doesNotMatch(month.text, /value="tbd"/);
   assert.match((await admin.get('/content-sheet?page=stencil&month=2026-10')).text, /value="tbd"/);
-  assert.match((await admin.get('/content-sheet?page=product&month=2026-11')).text, /Mon 30 Nov/);
+  assert.match((await admin.get('/content-sheet?page=product&month=2026-11')).text, /30 Nov Mon/);
   assert.deepEqual([rows[0].name, rows[0].materialReady, rows[0].editingStatus], ['Discount Reel', 'Yes', 'In Progress']);
   // Validation: bad date / empty row / unknown status / bad link / Published without a link.
   await admin.post('/content-sheet', { _csrf: admin.token, pageId: 'product', publishDate: '25 Oct', name: 'x' });
