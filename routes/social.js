@@ -1079,8 +1079,30 @@ const SHEET_OPTIONS = {
   publishStatus: ['Pending', 'Scheduled', 'Published']
 };
 
-const SHEET_FIELDS = ['publishDate', 'name', 'shootDate', 'materialReady', 'shootStatus', 'editingStatus', 'publishStatus', 'link', 'note'];
+const SHEET_FIELDS = ['publishDate', 'name', 'assignee', 'shootDate', 'materialReady', 'shootStatus', 'editingStatus', 'publishStatus', 'link', 'note'];
 const SHEET_PAGES = C.PAGES.map((p) => p.id);
+
+// Calendar colour of a row, from its Shoot / Editing / Publish status (first match wins).
+const SHEET_STAGES = [
+  { key: 'new', label: 'New Entry' },
+  { key: 'shot', label: 'Shoot Done' },
+  { key: 'editing', label: 'Editing' },
+  { key: 'edited', label: 'Edited' },
+  { key: 'scheduled', label: 'Scheduled' },
+  { key: 'published', label: 'Published' },
+  { key: 'overdue', label: 'Not Completed (date passed)' }
+];
+function sheetStage(r, today) {
+  if (r.publishStatus === 'Published') return 'published';
+  if (r.publishDate < today) return 'overdue';
+  if (r.publishStatus === 'Scheduled') return 'scheduled';
+  if (r.editingStatus === 'Done') return 'edited';
+  if (r.editingStatus === 'In Progress') return 'editing';
+  if (r.shootStatus === 'Done') return 'shot';
+  return 'new';
+}
+// Board counters: Completed = edited and waiting to go out; Uploaded = published.
+const SHEET_BUCKET = { new: 'pending', shot: 'pending', editing: 'pending', edited: 'completed', scheduled: 'completed', published: 'uploaded', overdue: 'notCompleted' };
 
 function parseSheetRow(b) {
   const day = (v) => (typeof v === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(v) && !Number.isNaN(Date.parse(v)) ? v : null);
@@ -1088,6 +1110,7 @@ function parseSheetRow(b) {
   const row = {
     publishDate: day(b.publishDate),
     name: String(b.name || '').trim().slice(0, 150),
+    assignee: C.ROSTER_KEYS.includes(b.assignee) ? b.assignee : '',
     shootDate: day(b.shootDate),
     link: String(b.link || '').trim(),
     note: String(b.note || '').trim().slice(0, 1000)
@@ -1149,6 +1172,34 @@ sheet.get('/', (req, res) => {
   const month = monthOf(req.query.month) || `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
   const [y, m] = month.split('-').map(Number);
   const iso = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  if (req.query.view === 'calendar' || req.query.view === 'board') {
+    const today = iso(now);
+    const page = SHEET_PAGES.includes(req.query.page) ? req.query.page : 'all';
+    // Board filter: one team member's posts ('none' = rows nobody is assigned to).
+    const person = req.query.view === 'board' && (C.ROSTER_KEYS.includes(req.query.person) || req.query.person === 'none') ? req.query.person : 'all';
+    const monthRows = req.sm.studio.contentSheet.rows.filter((r) => (r.publishDate || '').startsWith(month)).sort((a, b) => a.id - b.id);
+    const rows = monthRows.filter((r) => (page === 'all' || r.pageId === page) && (person === 'all' || (r.assignee || 'none') === person));
+    const stageOf = (r) => sheetStage(r, today);
+    const locals = {
+      page, month, today, pages: C.PAGES, monthDays: monthGrid(new Date(y, m - 1, 1), req.sm.studio.settings.display.weekStartsOn), iso,
+      prevMonth: iso(new Date(y, m - 2, 1)).slice(0, 7), nextMonth: iso(new Date(y, m, 1)).slice(0, 7),
+      rowsOn: (date) => rows.filter((r) => r.publishDate === date),
+      sheetRowUrl: (r) => sheetUrl(r.pageId, month, 'row-' + r.id),
+      stageOf, STAGES: SHEET_STAGES, person,
+      personName: (key) => (C.getRosterEntry(key) || {}).name || ''
+    };
+    if (req.query.view === 'calendar') return res.render('social/sheet-calendar', locals);
+    // Board: month counts per assigned person, ranked by Uploaded then Completed (top 3 get a medal).
+    const count = (list) => {
+      const c = { total: list.length, pending: 0, notCompleted: 0, completed: 0, uploaded: 0 };
+      list.forEach((r) => { c[SHEET_BUCKET[stageOf(r)]]++; });
+      return c;
+    };
+    const stats = C.ROSTER.map((p) => ({ person: p, ...count(monthRows.filter((r) => r.assignee === p.key)) }))
+      .sort((a, b) => b.uploaded - a.uploaded || b.completed - a.completed || b.total - a.total);
+    stats.forEach((s, i) => { s.rank = s.uploaded + s.completed > 0 && i < 3 ? i + 1 : null; });
+    return res.render('social/sheet-board', { ...locals, stats, all: count(monthRows), unassigned: count(monthRows.filter((r) => !r.assignee)) });
+  }
   const rows = req.sm.studio.contentSheet.rows.filter((r) => r.pageId === pageId && (r.publishDate || '').startsWith(month));
   // One entry per calendar day; a day with no rows gets an empty template row.
   const days = [];
@@ -1164,7 +1215,7 @@ sheet.get('/', (req, res) => {
   res.render('social/sheet', {
     days, pageId, month, today: iso(now),
     prevMonth: iso(new Date(y, m - 2, 1)).slice(0, 7), nextMonth: iso(new Date(y, m, 1)).slice(0, 7),
-    pages: C.PAGES, OPTS: SHEET_OPTIONS, shareable, viewers: req.sm.studio.contentSheet.viewers,
+    pages: C.PAGES, OPTS: SHEET_OPTIONS, people: C.ROSTER, shareable, viewers: req.sm.studio.contentSheet.viewers,
     nameOf: (id) => names.get(id) || 'Former user'
   });
 });

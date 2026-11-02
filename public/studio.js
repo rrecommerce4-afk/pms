@@ -24,6 +24,16 @@
   }
 
   document.addEventListener('click', function (e) {
+    // Read-only detail modals (Content Sheet calendar): just show the modal with that id.
+    var opener = e.target.closest('[data-sm-open]');
+    if (opener) {
+      var target = document.getElementById(opener.getAttribute('data-sm-open'));
+      if (!target) return;
+      close();
+      target.classList.add('open');
+      openModal = target;
+      return;
+    }
     var trigger = e.target.closest('[data-sm-modal]');
     if (trigger) {
       e.preventDefault();
@@ -67,6 +77,13 @@
       if (sel.value === 'custom') { custom.hidden = false; return; }
       form.submit();
     });
+  });
+
+  // Live clock on the TV board.
+  document.querySelectorAll('[data-clock]').forEach(function (el) {
+    function tick() { el.textContent = new Date().toLocaleTimeString('en-GB'); }
+    tick();
+    setInterval(tick, 1000);
   });
 
   // Filter selects that apply immediately.

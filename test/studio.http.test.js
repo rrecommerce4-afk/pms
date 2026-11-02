@@ -35,6 +35,7 @@ if (seed.socialStudio) {
   seed.socialStudio.reels = [];
   seed.socialStudio.nextReelId = 1;
   seed.socialStudio.scheduleHistory = [];
+  if (seed.socialStudio.contentSheet) seed.socialStudio.contentSheet.rows = [];
   if (seed.socialStudio.settings) delete seed.socialStudio.settings.publishingSchedule;
 }
 const hash = bcrypt.hashSync(PW, 4);
@@ -716,6 +717,26 @@ test('Content Sheet: admin adds, edits and deletes rows; published link locks; o
   await admin.post('/content-sheet/' + rows[0].id, { _csrf: admin.token, name: 'Discount Reel v2', publishDate: '2026-10-25', publishStatus: 'Pending', link: 'https://example.com/other' });
   const locked = studio().contentSheet.rows[0];
   assert.deepEqual([locked.name, locked.publishStatus, locked.link], ['Discount Reel v2', 'Published', link]);
+  // Calendar view: all pages by default, coloured by combined status; page filter narrows it.
+  const cal = (await admin.get('/content-sheet?view=calendar&month=2026-10')).text;
+  assert.match(cal, /class="sm-sc st-published" data-sm-open="sc-row-\d+"><b>Discount Reel v2/);
+  assert.match(cal, /class="sm-sc st-overdue" data-sm-open="sc-row-\d+"><b>Festival post/);
+  assert.match(cal, /class="modal-backdrop" id="sc-row-\d+"[^]*Open in sheet/);
+  // Assigned To: only Studio roster keys are kept.
+  await admin.post('/content-sheet/' + rows[0].id, { _csrf: admin.token, name: 'Discount Reel v2', publishDate: '2026-10-25', assignee: 'bansi' });
+  await admin.post('/content-sheet/' + rows[1].id, { _csrf: admin.token, name: 'Festival post', publishDate: '2026-10-27', assignee: 'hacker' });
+  assert.deepEqual(studio().contentSheet.rows.map((r) => r.assignee), ['bansi', '']);
+  assert.match((await admin.get('/content-sheet?page=product&month=2026-10')).text, /<option value="bansi" selected>Bansi<\/option>/);
+  // TV board: per-person counts (Bansi: 1 uploaded; unassigned: 1 not completed) and the shared calendar.
+  const board = (await admin.get('/content-sheet?view=board&month=2026-10')).text;
+  assert.match(board, /<body class="sm-tv">/);
+  assert.match(board, /sm-podium-item rank-1[^]*?<small>Bansi<\/small>/);
+  assert.match(board, /<b>Bansi<\/b>\s*<span class="sm-tv-count">1<\/span>[^]*?st-published"><b>1<\/b><small>Uploaded/);
+  assert.match(board, /<b>Not assigned<\/b><span class="sm-tv-count">1<\/span>[^]*?st-overdue"><b>1<\/b><small>Not Completed/);
+  assert.match(board, /class="sm-sc st-overdue" data-sm-open/);
+  assert.match(board, /<small>Bansi · @rajarani_product<\/small>/);
+  assert.doesNotMatch((await admin.get('/content-sheet?view=board&month=2026-10&person=bansi')).text, /Festival post/);
+  assert.doesNotMatch((await admin.get('/content-sheet?view=calendar&month=2026-10&page=product')).text, /Festival post/);
   // Others see it (Studio hidden) but cannot change it.
   const view = await bansi.get('/content-sheet?page=product&month=2026-10');
   assert.equal(view.status, 200);

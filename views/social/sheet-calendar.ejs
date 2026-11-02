@@ -1,0 +1,31 @@
+<%- include('../partials/header') %>
+<% var url = function (mo, pg) { return '/content-sheet?view=calendar&month=' + mo + ((pg || page) !== 'all' ? '&page=' + (pg || page) : ''); }; %>
+<div class="container container-wide sm">
+  <div class="page-head">
+    <div>
+      <div class="eyebrow-date">SOCIAL MEDIA</div>
+      <h1>Content Calendar</h1>
+      <p>Every Content Sheet row on its publish date. The colour shows how far it has got through shoot, editing and publishing. Click a card to see its details.</p>
+    </div>
+    <span class="sm-seg"><a href="/content-sheet?page=<%= page === 'all' ? pages[0].id : page %>&month=<%= month %>">Sheet</a><a class="active" href="<%= url(month) %>">Calendar</a><a href="/content-sheet?view=board&month=<%= month %>">TV Board</a></span>
+  </div>
+
+  <div class="list-card sm-section">
+    <form class="sm-filters" method="GET" action="/content-sheet">
+      <input type="hidden" name="view" value="calendar">
+      <input type="hidden" name="month" value="<%= month %>">
+      <a class="btn small outline" href="<%= url(prevMonth) %>" aria-label="Previous month">‹</a>
+      <h2 style="margin:0 6px;font-size:16px;"><%= V.fmtDate(month + '-01', 'month') %></h2>
+      <a class="btn small outline" href="<%= url(nextMonth) %>" aria-label="Next month">›</a>
+      <a class="btn small outline" href="<%= url(today.slice(0, 7)) %>">Today</a>
+      <select class="filter-select" name="page" data-autosubmit aria-label="Page"><option value="all">All pages</option><% pages.forEach(function (p) { %><option value="<%= p.id %>" <%= page === p.id ? 'selected' : '' %>><%= p.shortName %></option><% }) %></select>
+      <noscript><button class="btn small outline" type="submit">Apply</button></noscript>
+      <span class="grow"></span>
+      <span class="sm-legend"><% STAGES.forEach(function (s) { %><span class="st-<%= s.key %>"><i></i><%= s.label %></span><% }) %></span>
+    </form>
+  </div>
+
+  <div class="list-card sm-section"><div class="sm-scroll"><%- include('_sheet-cal') %></div></div>
+</div>
+<script src="/studio.js" defer></script>
+<%- include('../partials/footer') %>

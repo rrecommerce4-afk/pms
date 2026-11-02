@@ -1,0 +1,83 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta http-equiv="refresh" content="300">
+  <title>DM Team · Content Board</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Inter+Tight:wght@600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/style.css" />
+  <link rel="stylesheet" href="/studio.css" />
+</head>
+<body class="sm-tv">
+<%
+  var url = function (over) {
+    var o = Object.assign({ month: month, person: person }, over);
+    return '/content-sheet?view=board&month=' + o.month + (o.person !== 'all' ? '&person=' + o.person : '');
+  };
+  var initials = function (name) { return name.split(' ').map(function (w) { return w.charAt(0); }).join('').slice(0, 2).toUpperCase(); };
+  var CHIPS = [['pending', 'Pending', 'new'], ['notCompleted', 'Not Completed', 'overdue'], ['completed', 'Completed', 'edited'], ['uploaded', 'Uploaded', 'published']];
+  function chips(c, all) {
+    var list = CHIPS.filter(function (x) { return all || c[x[0]]; });
+    if (!list.length) return '<p class="sm-tv-empty">No posts this month</p>';
+    return '<div class="sm-bstats">' + list.map(function (x) { return '<span class="sm-bstat st-' + x[2] + '"><b>' + c[x[0]] + '</b><small>' + x[1] + '</small></span>'; }).join('') + '</div>';
+  }
+  var podium = [2, 1, 3].map(function (n) { return stats.filter(function (s) { return s.rank === n; })[0]; });
+%>
+<div class="sm-tv-wrap sm">
+  <header class="sm-tv-head">
+    <div class="sm-tv-brand">
+      <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 11l15-5v12L3 14v-3z"/><path d="M11.6 16.8a3 3 0 1 1-5.8-1.6"/></svg>
+      <h1>DM Team</h1>
+      <nav class="sm-tv-nav">
+        <a href="<%= url({ month: prevMonth }) %>" aria-label="Previous month">‹</a>
+        <span><%= V.fmtDate(month + '-01', 'month') %></span>
+        <a href="<%= url({ month: nextMonth }) %>" aria-label="Next month">›</a>
+        <% if (month !== today.slice(0, 7)) { %><a href="<%= url({ month: today.slice(0, 7) }) %>">Today</a><% } %>
+        <a href="/content-sheet?view=calendar&month=<%= month %>" title="Leave the TV board">Exit</a>
+      </nav>
+    </div>
+    <div class="sm-tv-time"><span><%= V.fmtDate(today, 'long') %></span><b data-clock></b></div>
+  </header>
+
+  <div class="sm-tv-main">
+    <aside class="sm-tv-side">
+      <div class="sm-tv-side-head"><span>TEAM</span><span><%= V.fmtDate(month + '-01', 'month') %></span></div>
+      <a class="sm-tv-all <%= person === 'all' ? 'active' : '' %>" href="<%= url({ person: 'all' }) %>"><b>Everyone</b><span><%= all.total %></span></a>
+      <div class="sm-podium">
+        <% podium.forEach(function (s) { %>
+          <% if (!s) { %><div></div><% return; } %>
+          <a class="sm-podium-item rank-<%= s.rank %>" href="<%= url({ person: s.person.key }) %>">
+            <span class="sm-crown" aria-hidden="true">👑</span>
+            <span class="sm-avatar"><%= initials(s.person.name) %><em><%= s.rank %></em></span>
+            <small><%= s.person.name %></small>
+          </a>
+        <% }) %>
+      </div>
+      <%- chips(all, true) %>
+      <% stats.forEach(function (s) { %>
+        <a class="sm-tv-page <%= person === s.person.key ? 'active' : '' %>" href="<%= url({ person: s.person.key }) %>">
+          <span class="sm-tv-page-head">
+            <span class="sm-avatar small"><%= initials(s.person.name) %><% if (s.rank) { %><em><%= s.rank %></em><% } %></span>
+            <b><%= s.person.name %></b>
+            <span class="sm-tv-count"><%= s.total %></span>
+          </span>
+          <%- chips(s, false) %>
+        </a>
+      <% }) %>
+      <% if (unassigned.total) { %>
+        <a class="sm-tv-page <%= person === 'none' ? 'active' : '' %>" href="<%= url({ person: 'none' }) %>">
+          <span class="sm-tv-page-head"><span class="sm-avatar small sm-avatar-none">?</span><b>Not assigned</b><span class="sm-tv-count"><%= unassigned.total %></span></span>
+          <%- chips(unassigned, false) %>
+        </a>
+      <% } %>
+      <div class="sm-legend sm-tv-legend"><% STAGES.forEach(function (s) { %><span class="st-<%= s.key %>"><i></i><%= s.label %></span><% }) %></div>
+    </aside>
+    <section class="sm-tv-cal"><%- include('_sheet-cal') %></section>
+  </div>
+</div>
+<script src="/studio.js" defer></script>
+</body>
+</html>
