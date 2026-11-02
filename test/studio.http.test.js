@@ -679,6 +679,7 @@ test('Studio access switch hides the Studio from everyone but admins; the Conten
 test('Content Sheet: admin adds, edits and deletes rows; published link locks; others only view', async () => {
   const admin = await as(U.admin);
   const bansi = await as(U.bansi); // token taken while the Studio is open, so the 403s below are the admin-only guard
+  const dhara = await as(U.dhara);
   await admin.post('/social-media/settings/access', { _csrf: admin.token });
   await admin.post('/content-sheet', { _csrf: admin.token, pageId: 'product', publishDate: '2026-10-25', name: 'Discount Reel', shootDate: '2026-10-23', materialReady: 'Yes', shootStatus: 'Done', editingStatus: 'In Progress', publishStatus: 'Pending', note: 'Use new offer' });
   await admin.post('/content-sheet', { _csrf: admin.token, pageId: 'stencil', publishDate: '2026-10-27', note: 'tbd' });
@@ -722,20 +723,27 @@ test('Content Sheet: admin adds, edits and deletes rows; published link locks; o
   assert.match(cal, /class="sm-sc st-published" data-sm-open="sc-row-\d+"><b>Discount Reel v2/);
   assert.match(cal, /class="sm-sc st-overdue" data-sm-open="sc-row-\d+"><b>Festival post/);
   assert.match(cal, /class="modal-backdrop" id="sc-row-\d+"[^]*Open in sheet/);
-  // Assigned To: only Studio roster keys are kept.
-  await admin.post('/content-sheet/' + rows[0].id, { _csrf: admin.token, name: 'Discount Reel v2', publishDate: '2026-10-25', assignee: 'bansi' });
-  await admin.post('/content-sheet/' + rows[1].id, { _csrf: admin.token, name: 'Festival post', publishDate: '2026-10-27', assignee: 'hacker' });
-  assert.deepEqual(studio().contentSheet.rows.map((r) => r.assignee), ['bansi', '']);
-  assert.match((await admin.get('/content-sheet?page=product&month=2026-10')).text, /<option value="bansi" selected>Bansi<\/option>/);
-  // TV board: per-person counts (Bansi: 1 uploaded; unassigned: 1 not completed) and the shared calendar.
+  // TV board: a row counts for whoever set its statuses (Test Admin: 1 uploaded); a row with no status yet
+  // (Festival post) goes to "No status set yet".
   const board = (await admin.get('/content-sheet?view=board&month=2026-10')).text;
   assert.match(board, /<body class="sm-tv">/);
-  assert.match(board, /sm-podium-item rank-1[^]*?<small>Bansi<\/small>/);
-  assert.match(board, /<b>Bansi<\/b>\s*<span class="sm-tv-count">1<\/span>[^]*?st-published"><b>1<\/b><small>Uploaded/);
-  assert.match(board, /<b>Not assigned<\/b><span class="sm-tv-count">1<\/span>[^]*?st-overdue"><b>1<\/b><small>Not Completed/);
+  assert.match(board, /sm-podium-item rank-1[^]*?<small>Test Admin<\/small>/);
+  assert.match(board, /<b>Test Admin<\/b>\s*<span class="sm-tv-count">1<\/span>[^]*?st-published"><b>1<\/b><small>Uploaded/);
+  assert.match(board, /<b>No status set yet<\/b><span class="sm-tv-count">1<\/span>[^]*?st-overdue"><b>1<\/b><small>Not Completed/);
   assert.match(board, /class="sm-sc st-overdue" data-sm-open/);
-  assert.match(board, /<small>Bansi · @rajarani_product<\/small>/);
-  assert.doesNotMatch((await admin.get('/content-sheet?view=board&month=2026-10&person=bansi')).text, /Festival post/);
+  assert.match(board, /<small>Test Admin · @rajarani_product<\/small>/);
+  assert.match(board, /<small>Publish Status<\/small>[^<]*<span class="sm-badge tone-green">Published<\/span><em class="sm-sc-by">by Test Admin<\/em>/);
+  assert.doesNotMatch((await admin.get('/content-sheet?view=board&month=2026-10&person=' + U.admin.id)).text, /Festival post/);
+  assert.match((await admin.get('/content-sheet?view=board&month=2026-10&person=none')).text, /Festival post/);
+  // Dhara sets a status: the row is hers, but Dhara/Ashmita are never listed on the board.
+  await admin.post('/content-sheet/access', { _csrf: admin.token, viewers: [String(U.dhara.id)] });
+  await dhara.post('/content-sheet/' + rows[1].id, { _csrf: dhara.token, name: 'Festival post', publishDate: '2026-10-27', shootStatus: 'Done' });
+  assert.equal(studio().contentSheet.rows[1].edits.shootStatus.by, U.dhara.id);
+  const board2 = (await admin.get('/content-sheet?view=board&month=2026-10')).text;
+  assert.doesNotMatch(board2, new RegExp('<b>' + U.dhara.name + '</b>|<small>' + U.dhara.name + '</small>'));
+  assert.match(board2, /<b>Everyone<\/b><span>2<\/span>/);
+  assert.match(board2, /<small>Dhara[^<]*· @rajarani_stencil<\/small>/);
+  await admin.post('/content-sheet/access', { _csrf: admin.token });
   assert.doesNotMatch((await admin.get('/content-sheet?view=calendar&month=2026-10&page=product')).text, /Festival post/);
   // Others see it (Studio hidden) but cannot change it.
   const view = await bansi.get('/content-sheet?page=product&month=2026-10');

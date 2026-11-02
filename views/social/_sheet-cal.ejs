@@ -1,10 +1,10 @@
 <%
   // Content Sheet month grid, shared by the Calendar view and the TV board. Clicking a card opens its modal.
   var tone = { Yes: 'green', No: 'red', Done: 'green', Published: 'green', 'In Progress': 'blue', Scheduled: 'sky', Pending: 'amber' };
-  var st = function (label, v) { return '<div class="sm-sc-st"><small>' + label + '</small>' + (v ? V.badge(v, tone[v] || 'slate') : '<span class="sm-muted">—</span>') + '</div>'; };
+  var st = function (label, v, who) { return '<div class="sm-sc-st"><small>' + label + '</small>' + (v ? V.badge(v, tone[v] || 'slate') : '<span class="sm-muted">—</span>') + (who ? '<em class="sm-sc-by">by ' + V.esc(who) + '</em>' : '') + '</div>'; };
   var pageOf = function (r) { return pages.filter(function (x) { return x.id === r.pageId; })[0]; };
   function card(r) {
-    return '<button type="button" class="sm-sc st-' + stageOf(r) + '" data-sm-open="sc-row-' + r.id + '"><b>' + V.esc(r.name || 'Untitled') + '</b><small>' + V.esc((r.assignee ? personName(r.assignee) + ' · ' : '') + pageOf(r).handle) + '</small></button>';
+    return '<button type="button" class="sm-sc st-' + stageOf(r) + '" data-sm-open="sc-row-' + r.id + '"><b>' + V.esc(r.name || 'Untitled') + '</b><small>' + V.esc((ownerName(r) ? ownerName(r) + ' · ' : '') + pageOf(r).handle) + '</small></button>';
   }
   function modal(id, title, sub, body) {
     return '<div class="modal-backdrop" id="' + id + '" role="dialog" aria-modal="true"><div class="modal-box"><div class="modal-head"><div><h3>' + title + '</h3><div class="sm-modal-sub">' + sub + '</div></div><button class="modal-close" type="button" data-close aria-label="Close">&times;</button></div><div class="modal-body">' + body + '</div></div></div>';
@@ -13,7 +13,7 @@
     var s = stageOf(r), label = STAGES.filter(function (x) { return x.key === s; })[0].label, p = pageOf(r);
     return modal('sc-row-' + r.id, V.esc(r.name || 'Untitled'), V.esc(p.name + ' · ' + p.handle),
       '<p><span class="sm-sc-pill st-' + s + '"><i></i>' + V.esc(label) + '</span></p>'
-      + '<div class="sm-sc-grid"><div class="sm-sc-st"><small>Assigned To</small>' + (r.assignee ? '<b>' + V.esc(personName(r.assignee)) + '</b>' : '<span class="sm-muted">Nobody yet</span>') + '</div>' + st('Material Ready', r.materialReady) + st('Shoot Status', r.shootStatus) + st('Editing Status', r.editingStatus) + st('Publish Status', r.publishStatus)
+      + '<div class="sm-sc-grid">' + st('Shoot Status', r.shootStatus, setBy(r, 'shootStatus')) + st('Editing Status', r.editingStatus, setBy(r, 'editingStatus')) + st('Publish Status', r.publishStatus, setBy(r, 'publishStatus')) + st('Material Ready', r.materialReady)
       + '<div class="sm-sc-st"><small>Publish Date</small>' + V.esc(V.fmtDate(r.publishDate, 'weekday')) + '</div>'
       + '<div class="sm-sc-st"><small>Shoot Date</small>' + (r.shootDate ? V.esc(V.fmtDate(r.shootDate, 'weekday')) : '<span class="sm-muted">—</span>') + '</div></div>'
       + (r.note ? '<p class="sm-sc-note"><small>Note</small>' + V.esc(r.note) + '</p>' : '')

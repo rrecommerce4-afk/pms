@@ -69,7 +69,7 @@
       <% }) %>
       <% if (unassigned.total) { %>
         <a class="sm-tv-page <%= person === 'none' ? 'active' : '' %>" href="<%= url({ person: 'none' }) %>">
-          <span class="sm-tv-page-head"><span class="sm-avatar small sm-avatar-none">?</span><b>Not assigned</b><span class="sm-tv-count"><%= unassigned.total %></span></span>
+          <span class="sm-tv-page-head"><span class="sm-avatar small sm-avatar-none">?</span><b>No status set yet</b><span class="sm-tv-count"><%= unassigned.total %></span></span>
           <%- chips(unassigned, false) %>
         </a>
       <% } %>

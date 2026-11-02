@@ -465,6 +465,7 @@ form.modal-box { margin: 0; }
 .sm-sc-st { display: flex; flex-direction: column; gap: 3px; align-items: flex-start; }
 .sm-sc-st small, .sm-sc-note small { font-size: 11px; color: var(--text-faint); text-transform: uppercase; letter-spacing: 0.04em; display: block; }
 .sm-sc-note { white-space: pre-wrap; word-break: break-word; }
+.sm-sc-by { font-style: normal; font-size: 11.5px; color: var(--text-muted); }
 .sm-sc-links { display: flex; gap: 8px; flex-wrap: wrap; margin: 0; }
 .sm-today-tag { font-style: normal; font-size: 10px; font-weight: 800; letter-spacing: 0.08em; text-transform: uppercase; color: var(--primary-dark); }
 
