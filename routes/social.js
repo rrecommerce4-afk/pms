@@ -1229,9 +1229,10 @@ sheet.get('/', (req, res) => {
     const nameOf = (id) => names.get(id) || 'Former user';
     // A row belongs to whoever last set its Shoot / Editing / Publish Status ('none' = no status set yet).
     const ownerKey = (r) => { const id = sheetStatusBy(r); return id == null ? 'none' : String(id); };
-    const person = req.query.view === 'board' && /^(\d+|none)$/.test(req.query.person || '') ? req.query.person : 'all';
-    // A row with only a date is an empty line on the sheet, not a post.
-    const monthRows = req.sm.studio.contentSheet.rows.filter((r) => (r.publishDate || '').startsWith(month) && sheetRowHasContent(r)).sort((a, b) => a.id - b.id);
+    // A person is only ever chosen together with a page, as one list entry; a link with just a person (an old TV address) shows everyone.
+    const person = req.query.view === 'board' && (req.query.person === 'none' || (/^\d+$/.test(req.query.person || '') && page !== 'all')) ? req.query.person : 'all';
+    // A row with only a date is an empty line on the sheet, not a post; a row on a page that no longer exists has no tab or label to show.
+    const monthRows = req.sm.studio.contentSheet.rows.filter((r) => (r.publishDate || '').startsWith(month) && sheetRowHasContent(r) && SHEET_PAGES.includes(r.pageId)).sort((a, b) => a.id - b.id);
     const rows = monthRows.filter((r) => (page === 'all' || r.pageId === page) && (person === 'all' || ownerKey(r) === person));
     const stageOf = (r) => sheetStage(r, today);
     const locals = {
@@ -1259,11 +1260,21 @@ sheet.get('/', (req, res) => {
       const first = String(names.get(id) || '').trim().split(' ')[0].toLowerCase();
       return unranked.some((r) => r.name.toLowerCase() === first);
     };
-    const keys = [...new Set(monthRows.map(ownerKey))].filter((k) => k !== 'none' && !offBoard(Number(k)));
-    const stats = keys.map((k) => ({ person: { key: k, name: nameOf(Number(k)) }, ...count(monthRows.filter((r) => ownerKey(r) === k)) }))
+    // One entry per page and person: someone working on two pages is listed twice, with each page's own counts.
+    const entries = new Map();
+    monthRows.forEach((r) => {
+      const k = ownerKey(r);
+      if (k === 'none' || offBoard(Number(k))) return;
+      const id = r.pageId + ':' + k;
+      if (!entries.has(id)) entries.set(id, { person: { key: k, name: nameOf(Number(k)) }, page: C.getPage(r.pageId), rows: [] });
+      entries.get(id).rows.push(r);
+    });
+    const stats = [...entries.values()].map((e) => ({ person: e.person, page: e.page, ...count(e.rows) }))
       .sort((a, b) => b.uploaded - a.uploaded || b.completed - a.completed || b.total - a.total);
     stats.forEach((s, i) => { s.rank = s.uploaded + s.completed > 0 && i < 3 ? i + 1 : null; });
-    return res.render('social/sheet-board', { ...locals, stats, all: count(monthRows), unassigned: count(monthRows.filter((r) => ownerKey(r) === 'none')) });
+    // The list runs page by page; the ranking above it stays across all pages.
+    const byPage = [...stats].sort((a, b) => SHEET_PAGES.indexOf(a.page.id) - SHEET_PAGES.indexOf(b.page.id));
+    return res.render('social/sheet-board', { ...locals, stats, byPage, all: count(monthRows), unassigned: count(monthRows.filter((r) => ownerKey(r) === 'none')) });
   }
   renderSheet(req, res, pageId, month);
 });

@@ -536,8 +536,21 @@ body.sm-tv {
 .sm-tv-page.active { box-shadow: inset 0 0 0 1px #525252; }
 .sm-tv-page-head { display: flex; align-items: center; gap: 10px; }
 .sm-tv-page-head b { flex: 1; font-size: 14px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* Compact blocks, so more of the team fits on a TV; a longer list moves by itself (studio.js). */
+.sm-tv-page { gap: 5px; padding: 6px 8px; }
+.sm-tv-page .sm-avatar.small { width: 30px; height: 30px; font-size: 12px; }
+.sm-tv-page .sm-avatar.small em { width: 15px; height: 15px; font-size: 9px; }
+.sm-tv-page .sm-bstat { flex-direction: row; justify-content: center; align-items: baseline; gap: 5px; padding: 2px 4px; }
+.sm-tv-page .sm-bstat b { font-size: 14px; }
+.sm-tv-page .sm-bstat small { font-size: 9.5px; line-height: 1.1; }
+.sm-tv-who { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.sm-tv-who small { font-size: 11px; font-weight: 600; color: var(--text-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sm-tv-who b { flex: none; }
+.sm-podium-item .sm-tv-pagename { color: var(--text); font-weight: 700; margin-top: 2px; }
+.sm-podium-item small + small { margin-top: -4px; }
 .sm-tv-count { color: var(--text-muted); font-size: 13px; }
 .sm-tv-empty { margin: 0; font-size: 12px; color: var(--text-faint); }
+.sm-tv-empty a { color: var(--text); text-decoration: underline; }
 .sm-tv-legend { border-top: 1px solid var(--border-soft); padding-top: 10px; margin: auto 0 0; }
 /* Calendar fills the screen; every day tile is the same size and fits 3 cards + "+N more". */
 .sm-tv .sm-cal { border: 0; gap: 6px; min-width: 760px; height: calc(100vh - 86px); grid-template-rows: auto; grid-auto-rows: minmax(152px, 1fr); }

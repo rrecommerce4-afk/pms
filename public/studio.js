@@ -144,6 +144,23 @@
     });
   }
 
+  // TV board: nobody can scroll a TV, so a team list too long for the screen moves by itself. Pauses under the mouse.
+  var tvList = document.querySelector('.sm-tv-side');
+  if (tvList && !window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+    var tvHold = 50; // ticks to wait at the top and the bottom of the list, about 3 seconds
+    var tvMouseOver = false;
+    tvList.addEventListener('mouseenter', function () { tvMouseOver = true; });
+    tvList.addEventListener('mouseleave', function () { tvMouseOver = false; });
+    setInterval(function () {
+      var bottom = tvList.scrollHeight - tvList.clientHeight;
+      if (bottom <= 0 || tvMouseOver) return;
+      if (tvHold > 0) { tvHold--; return; }
+      if (tvList.scrollTop >= bottom - 1) { tvList.scrollTop = 0; tvHold = 50; return; }
+      tvList.scrollTop += 1;
+      if (tvList.scrollTop >= bottom - 1) tvHold = 50;
+    }, 60);
+  }
+
   // Live clock on the TV board.
   document.querySelectorAll('[data-clock]').forEach(function (el) {
     function tick() { el.textContent = new Date().toLocaleTimeString('en-GB'); }

@@ -783,6 +783,40 @@ test('Content Sheet Save: one button saves every changed row; a refused row save
   }
   assert.match((await admin.get('/content-sheet?page=farma&month=2026-12')).text, /view=board&amp;month=2026-12">TV Board/);
   assert.match((await admin.get('/content-sheet?view=board&month=2026-12')).text, new RegExp('<a href="/content-sheet\\?view=board">Today</a>'));
+  // TV board: someone working on two pages is listed once per page, page first, with each page's own counts.
+  const stencilBase = { _csrf: admin.token, pageId: 'stencil', month: '2026-12' };
+  await admin.post('/content-sheet/save', { ...stencilBase, 'd2026-12-24.name': 'Stencil one', 'd2026-12-24.shootStatus': 'Done', 'd2026-12-25.name': 'Stencil two', 'd2026-12-25.shootStatus': 'Done' });
+  await admin.post('/content-sheet/save', { ...base, 'd2026-12-26.name': 'Farma only', 'd2026-12-26.shootStatus': 'Done' });
+  const twoPages = (await admin.get('/content-sheet?view=board&month=2026-12')).text;
+  const listed = twoPages.slice(twoPages.indexOf('sm-bstats')).match(/<span class="sm-tv-who"><small>[^<]+<\/small><b>[^<]+<\/b>/g).map((x) => x.replace(/<[^>]+>/g, ' ').trim().replace(/\s+/g, ' '));
+  assert.deepEqual(listed, ['Farma Pattern Test Admin', 'Stencil Test Admin'], 'same person, once per page, in page order');
+  assert.match(twoPages, /<small>Stencil<\/small><b>Test Admin<\/b><\/span>\s*<span class="sm-tv-count">2<\/span>/);
+  const onePage = (await admin.get('/content-sheet?view=board&month=2026-12&person=' + U.admin.id + '&page=stencil')).text;
+  assert.match(onePage, /Stencil one/);
+  assert.doesNotMatch(onePage, /Farma only/);
+  assert.match(onePage, /sm-tv-page active" href="\/content-sheet\?view=board&amp;month=2026-12&amp;person=\d+&amp;page=stencil"/);
+  assert.match(onePage, /month=2027-01&amp;person=\d+&amp;page=stencil/, 'next month keeps the choice');
+  assert.match(onePage, /view=calendar&month=2026-12&amp;page=stencil" title="Leave the TV board"/, 'Exit keeps the page');
+  assert.doesNotMatch(onePage, /No posts for this choice/);
+  // A choice with nothing in the month shown says so, with a way back, instead of a blank calendar.
+  const nothing = (await admin.get(`/content-sheet?view=board&month=2028-05&page=stencil&person=${U.admin.id}`)).text;
+  assert.match(nothing, /No posts for this choice in May 2028\. <a href="\/content-sheet\?view=board&amp;month=2028-05">Show everyone<\/a>/);
+  assert.doesNotMatch(onePage, /sm-tv-all active/);
+  assert.match(twoPages, /sm-tv-all active/);
+  assert.doesNotMatch((await admin.get('/content-sheet?view=board&month=2026-12&page=stencil')).text, /sm-tv-all active/, 'Everyone is only marked when everything is showing');
+  // A row on a page that no longer exists (hand-edited data, or a page removed later) must not take the views down.
+  const withOldPage = readDb();
+  withOldPage.socialStudio.contentSheet.rows.push({ id: 987650, pageId: 'oldpage', publishDate: '2026-12-27', name: 'Old page row', shootStatus: 'Done', edits: { shootStatus: { by: U.admin.id, at: new Date().toISOString() } } });
+  fs.writeFileSync(DB, JSON.stringify(withOldPage, null, 2));
+  for (const v of ['board', 'calendar']) {
+    const oldPageView = await admin.get(`/content-sheet?view=${v}&month=2026-12`);
+    assert.equal(oldPageView.status, 200, v);
+    assert.doesNotMatch(oldPageView.text, /Old page row/, v);
+  }
+  const withoutOldPage = readDb();
+  withoutOldPage.socialStudio.contentSheet.rows = withoutOldPage.socialStudio.contentSheet.rows.filter((r) => r.id !== 987650);
+  fs.writeFileSync(DB, JSON.stringify(withoutOldPage, null, 2));
+  for (const r of studio().contentSheet.rows.filter((x) => x.name === 'Stencil one' || x.name === 'Stencil two')) await admin.post('/content-sheet/' + r.id, { _csrf: admin.token, remove: '1' });
   // Sharing stays admin-only however the address is written (Express also routes /access/ and /ACCESS here).
   const sharing = () => JSON.stringify(studio().contentSheet.viewers);
   await admin.post('/content-sheet/access', { _csrf: admin.token, viewers: [String(U.other.id)] });
@@ -854,13 +888,17 @@ test('Content Sheet: admin adds, edits and deletes rows; published link locks; o
   // (Festival post) goes to "No status set yet".
   const board = (await admin.get('/content-sheet?view=board&month=2026-10')).text;
   assert.match(board, /<body class="sm-tv">/);
-  assert.match(board, /sm-podium-item rank-1[^]*?<small>Test Admin<\/small>/);
-  assert.match(board, /<b>Test Admin<\/b>\s*<span class="sm-tv-count">1<\/span>[^]*?st-published"><b>1<\/b><small>Uploaded/);
+  assert.match(board, /sm-podium-item rank-1[^]*?<small class="sm-tv-pagename">Product<\/small>\s*<small>Test Admin<\/small>/);
+  assert.match(board, /<small>Product<\/small><b>Test Admin<\/b><\/span>\s*<span class="sm-tv-count">1<\/span>[^]*?st-published"><b>1<\/b><small>Uploaded/);
   assert.match(board, /<b>No status set yet<\/b><span class="sm-tv-count">1<\/span>[^]*?st-overdue"><b>1<\/b><small>Not Completed/);
   assert.match(board, /class="sm-sc st-overdue" data-sm-open/);
   assert.match(board, /<small>Test Admin · @rajarani_product<\/small>/);
   assert.match(board, /<small>Publish Status<\/small>[^<]*<span class="sm-badge tone-green">Published<\/span><em class="sm-sc-by">by Test Admin<\/em>/);
-  assert.doesNotMatch((await admin.get('/content-sheet?view=board&month=2026-10&person=' + U.admin.id)).text, /Festival post/);
+  assert.doesNotMatch((await admin.get('/content-sheet?view=board&month=2026-10&page=product&person=' + U.admin.id)).text, /Festival post/);
+  // An old address with just a person, as a TV may still have open, shows everyone instead of a hidden filter.
+  const oldAddress = (await admin.get('/content-sheet?view=board&month=2026-10&person=' + U.admin.id)).text;
+  assert.match(oldAddress, /Festival post/);
+  assert.match(oldAddress, /sm-tv-all active/);
   assert.match((await admin.get('/content-sheet?view=board&month=2026-10&person=none')).text, /Festival post/);
   // Dhara sets a status: the row is hers, but Dhara/Ashmita are never listed on the board.
   await admin.post('/content-sheet/access', { _csrf: admin.token, viewers: [String(U.dhara.id)] });

@@ -14,9 +14,9 @@
 <body class="sm-tv">
 <%
   var url = function (over) {
-    var o = Object.assign({ month: month, person: person }, over);
+    var o = Object.assign({ month: month, person: person, page: page }, over);
     // No month in the address for the current month, so a TV left on moves to the new month by itself.
-    return '/content-sheet?view=board' + (o.month !== today.slice(0, 7) ? '&month=' + o.month : '') + (o.person !== 'all' ? '&person=' + o.person : '');
+    return '/content-sheet?view=board' + (o.month !== today.slice(0, 7) ? '&month=' + o.month : '') + (o.person !== 'all' ? '&person=' + o.person : '') + (o.page !== 'all' ? '&page=' + o.page : '');
   };
   var initials = function (name) { return name.split(' ').map(function (w) { return w.charAt(0); }).join('').slice(0, 2).toUpperCase(); };
   var CHIPS = [['pending', 'Pending', 'new'], ['notCompleted', 'Not Completed', 'overdue'], ['completed', 'Completed', 'edited'], ['uploaded', 'Uploaded', 'published']];
@@ -37,7 +37,7 @@
         <span><%= V.fmtDate(month + '-01', 'month') %></span>
         <a href="<%= url({ month: nextMonth }) %>" aria-label="Next month">›</a>
         <% if (month !== today.slice(0, 7)) { %><a href="<%= url({ month: today.slice(0, 7) }) %>">Today</a><% } %>
-        <a href="/content-sheet?view=calendar&month=<%= month %>" title="Leave the TV board">Exit</a>
+        <a href="/content-sheet?view=calendar&month=<%= month %><%= page !== 'all' ? '&page=' + page : '' %>" title="Leave the TV board">Exit</a>
       </nav>
     </div>
     <div class="sm-tv-time"><span><%= V.fmtDate(today, 'long') %></span><b data-clock></b></div>
@@ -46,30 +46,32 @@
   <div class="sm-tv-main">
     <aside class="sm-tv-side">
       <div class="sm-tv-side-head"><span>TEAM</span><span><%= V.fmtDate(month + '-01', 'month') %></span></div>
-      <a class="sm-tv-all <%= person === 'all' ? 'active' : '' %>" href="<%= url({ person: 'all' }) %>"><b>Everyone</b><span><%= all.total %></span></a>
+      <a class="sm-tv-all <%= person === 'all' && page === 'all' ? 'active' : '' %>" href="<%= url({ person: 'all', page: 'all' }) %>"><b>Everyone</b><span><%= all.total %></span></a>
+      <% if (person !== 'all' && !monthDays.some(function (d) { return rowsOn(iso(d)).length; })) { %><p class="sm-tv-empty" role="status">No posts for this choice in <%= V.fmtDate(month + '-01', 'month') %>. <a href="<%= url({ person: 'all', page: 'all' }) %>">Show everyone</a></p><% } %>
       <div class="sm-podium">
         <% podium.forEach(function (s) { %>
           <% if (!s) { %><div></div><% return; } %>
-          <a class="sm-podium-item rank-<%= s.rank %>" href="<%= url({ person: s.person.key }) %>">
+          <a class="sm-podium-item rank-<%= s.rank %>" href="<%= url({ person: s.person.key, page: s.page.id }) %>">
             <span class="sm-crown" aria-hidden="true">👑</span>
             <span class="sm-avatar"><%= initials(s.person.name) %><em><%= s.rank %></em></span>
+            <small class="sm-tv-pagename"><%= s.page.shortName %></small>
             <small><%= s.person.name %></small>
           </a>
         <% }) %>
       </div>
       <%- chips(all, true) %>
-      <% stats.forEach(function (s) { %>
-        <a class="sm-tv-page <%= person === s.person.key ? 'active' : '' %>" href="<%= url({ person: s.person.key }) %>">
+      <% byPage.forEach(function (s) { %>
+        <a class="sm-tv-page <%= person === s.person.key && page === s.page.id ? 'active' : '' %>" href="<%= url({ person: s.person.key, page: s.page.id }) %>">
           <span class="sm-tv-page-head">
             <span class="sm-avatar small"><%= initials(s.person.name) %><% if (s.rank) { %><em><%= s.rank %></em><% } %></span>
-            <b><%= s.person.name %></b>
+            <span class="sm-tv-who"><small><%= s.page.shortName %></small><b><%= s.person.name %></b></span>
             <span class="sm-tv-count"><%= s.total %></span>
           </span>
           <%- chips(s, false) %>
         </a>
       <% }) %>
       <% if (unassigned.total) { %>
-        <a class="sm-tv-page <%= person === 'none' ? 'active' : '' %>" href="<%= url({ person: 'none' }) %>">
+        <a class="sm-tv-page <%= person === 'none' ? 'active' : '' %>" href="<%= url({ person: 'none', page: 'all' }) %>">
           <span class="sm-tv-page-head"><span class="sm-avatar small sm-avatar-none">?</span><b>No status set yet</b><span class="sm-tv-count"><%= unassigned.total %></span></span>
           <%- chips(unassigned, false) %>
         </a>
