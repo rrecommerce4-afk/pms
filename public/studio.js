@@ -18,9 +18,12 @@
   }
 
   var openModal = null;
+  var returnFocus = null;
   function close() {
     if (openModal) openModal.classList.remove('open');
     openModal = null;
+    if (returnFocus) returnFocus.focus();
+    returnFocus = null;
   }
 
   document.addEventListener('click', function (e) {
@@ -29,9 +32,14 @@
     if (opener) {
       var target = document.getElementById(opener.getAttribute('data-sm-open'));
       if (!target) return;
+      // A card inside the day popup goes away with it, so focus returns to what opened that popup.
+      var back = opener.closest('.modal-backdrop') ? returnFocus : opener;
+      returnFocus = null;
       close();
       target.classList.add('open');
       openModal = target;
+      returnFocus = back;
+      target.querySelector('[data-close]').focus();
       return;
     }
     var trigger = e.target.closest('[data-sm-modal]');
@@ -78,6 +86,63 @@
       form.submit();
     });
   });
+
+  // Content Sheet: one Save for the whole month. Only changed cells are sent, so an old open tab cannot overwrite
+  // what a colleague saved; rows redrawn after a refused Save (data-draft) are still unsaved, so they go again in full.
+  var sheetForm = document.getElementById('sheet-save');
+  if (sheetForm) {
+    var cells = function () { return Array.prototype.filter.call(sheetForm.elements, function (el) { return el.name.indexOf('.') > 0; }); };
+    var savedValue = function (el) {
+      if (el.tagName !== 'SELECT') return el.defaultValue;
+      var picked = Array.prototype.filter.call(el.options, function (o) { return o.defaultSelected; })[0];
+      return (picked || el.options[0]).value;
+    };
+    var unsaved = function (el) { return el.value !== savedValue(el) || el.closest('tr').hasAttribute('data-draft'); };
+    var unsavedRows = function () { return new Set(cells().filter(unsaved).map(function (el) { return el.closest('tr'); })); };
+    var label = sheetForm.querySelector('[data-sheet-unsaved]');
+    var refreshUnsaved = function () {
+      var rows = unsavedRows();
+      cells().forEach(function (el) { var tr = el.closest('tr'); tr.classList.toggle('sm-unsaved', rows.has(tr)); });
+      label.textContent = rows.size ? rows.size + (rows.size === 1 ? ' row' : ' rows') + ' not saved yet' : '';
+    };
+    // If Save never arrives (logged out by the 12 hour limit or a server restart) the typing would be gone, so a copy
+    // stays in this tab until the sheet next loads: anything the server did not store comes back as unsaved.
+    var draftKey = 'sheet-draft:' + sheetForm.elements.pageId.value + ':' + sheetForm.elements.month.value;
+    var sentCells = null;
+    try { sentCells = JSON.parse(sessionStorage.getItem(draftKey)); sessionStorage.removeItem(draftKey); } catch (e) { /* no storage: no safety copy */ }
+    if (sentCells) {
+      var lost = cells().filter(function (el) { return el.name in sentCells && el.value.trim() !== sentCells[el.name].trim(); });
+      lost.forEach(function (el) { el.value = sentCells[el.name]; });
+      if (lost.length) {
+        var notice = document.createElement('div');
+        notice.className = 'sm-flash error';
+        notice.setAttribute('role', 'alert');
+        notice.textContent = 'Your last Save did not go through, usually because you were logged out. Your changes are back on this page. Click Save to store them.';
+        sheetForm.parentNode.insertBefore(notice, sheetForm);
+      }
+    }
+    var submitting = false;
+    document.addEventListener('input', refreshUnsaved);
+    document.addEventListener('change', refreshUnsaved);
+    sheetForm.addEventListener('formdata', function (e) {
+      cells().forEach(function (el) { if (!unsaved(el)) e.formData.delete(el.name); });
+    });
+    sheetForm.addEventListener('submit', function (e) {
+      // A second click while the first Save is on its way would add every new row twice.
+      if (submitting) { e.preventDefault(); return; }
+      submitting = true;
+      setTimeout(function () { submitting = false; }, 5000);
+      var typed = {};
+      cells().filter(unsaved).forEach(function (el) { typed[el.name] = el.value; });
+      try { sessionStorage.setItem(draftKey, JSON.stringify(typed)); } catch (err) { /* no storage: no safety copy */ }
+    });
+    // Coming back with the browser's Back button: the page is live again and restored values may differ.
+    window.addEventListener('pageshow', function () { submitting = false; refreshUnsaved(); });
+    // Other tabs, months and links would throw away what is typed, so the browser asks first.
+    window.addEventListener('beforeunload', function (e) {
+      if (!submitting && unsavedRows().size) { e.preventDefault(); e.returnValue = ''; }
+    });
+  }
 
   // Live clock on the TV board.
   document.querySelectorAll('[data-clock]').forEach(function (el) {

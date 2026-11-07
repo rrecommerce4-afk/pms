@@ -15,7 +15,8 @@
 <%
   var url = function (over) {
     var o = Object.assign({ month: month, person: person }, over);
-    return '/content-sheet?view=board&month=' + o.month + (o.person !== 'all' ? '&person=' + o.person : '');
+    // No month in the address for the current month, so a TV left on moves to the new month by itself.
+    return '/content-sheet?view=board' + (o.month !== today.slice(0, 7) ? '&month=' + o.month : '') + (o.person !== 'all' ? '&person=' + o.person : '');
   };
   var initials = function (name) { return name.split(' ').map(function (w) { return w.charAt(0); }).join('').slice(0, 2).toUpperCase(); };
   var CHIPS = [['pending', 'Pending', 'new'], ['notCompleted', 'Not Completed', 'overdue'], ['completed', 'Completed', 'edited'], ['uploaded', 'Uploaded', 'published']];

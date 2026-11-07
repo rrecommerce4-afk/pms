@@ -7,7 +7,7 @@
       <h1>Content Calendar</h1>
       <p>Every Content Sheet row on its publish date. The colour shows how far it has got through shoot, editing and publishing. Click a card to see its details.</p>
     </div>
-    <span class="sm-seg"><a href="/content-sheet?page=<%= page === 'all' ? pages[0].id : page %>&month=<%= month %>">Sheet</a><a class="active" href="<%= url(month) %>">Calendar</a><a href="/content-sheet?view=board&month=<%= month %>">TV Board</a></span>
+    <span class="sm-seg"><a href="/content-sheet?page=<%= page === 'all' ? pages[0].id : page %>&month=<%= month %>">Sheet</a><a class="active" href="<%= url(month) %>">Calendar</a><a href="/content-sheet?view=board<%= month !== today.slice(0, 7) ? '&month=' + month : '' %>">TV Board</a></span>
   </div>
 
   <div class="list-card sm-section">

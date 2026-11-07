@@ -1113,9 +1113,11 @@ function sheetStatusBy(r) {
 // Board counters: Completed = edited and waiting to go out; Uploaded = published.
 const SHEET_BUCKET = { new: 'pending', shot: 'pending', editing: 'pending', edited: 'completed', scheduled: 'completed', published: 'uploaded', overdue: 'notCompleted' };
 
+const sheetRowHasContent = (r) => SHEET_FIELDS.some((k) => k !== 'publishDate' && r[k]);
+
 function parseSheetRow(b) {
-  const day = (v) => (typeof v === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(v) && !Number.isNaN(Date.parse(v)) ? v : null);
-  for (const k of ['publishDate', 'shootDate']) if (b[k] && !day(b[k])) return { error: 'Use the date picker for dates.' };
+  const day = (v) => (typeof v === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(v) && v.startsWith('20') && !Number.isNaN(Date.parse(v)) && new Date(v).toISOString().slice(0, 10) === v ? v : null);
+  for (const k of ['publishDate', 'shootDate']) if (b[k] && !day(b[k])) return { error: 'Use the date picker for dates, with the full 4-digit year.' };
   const row = {
     publishDate: day(b.publishDate),
     name: String(b.name || '').trim().slice(0, 150),
@@ -1146,7 +1148,24 @@ function trackEdits(row, before, ctx) {
   }
 }
 
-const monthOf = (v) => (typeof v === 'string' && /^\d{4}-(0[1-9]|1[0-2])$/.test(v) ? v : null);
+function addSheetRow(pageId, parsedRow, ctx) {
+  const s = ctx.studio.contentSheet;
+  s.nextId = Math.max(s.nextId || 1, ...s.rows.map((r) => r.id + 1));
+  const row = { id: s.nextId++, pageId, ...parsedRow, createdBy: ctx.user.id, updatedAt: new Date().toISOString(), updatedBy: ctx.user.id };
+  trackEdits(row, {}, ctx);
+  lockIfPublished(row, ctx);
+  s.rows.push(row);
+  return row;
+}
+
+function updateSheetRow(row, parsedRow, ctx) {
+  const before = { ...row };
+  Object.assign(row, parsedRow, { updatedAt: new Date().toISOString(), updatedBy: ctx.user.id });
+  trackEdits(row, before, ctx);
+  lockIfPublished(row, ctx);
+}
+
+const monthOf = (v) => (typeof v === 'string' && /^20\d{2}-(0[1-9]|1[0-2])$/.test(v) ? v : null);
 const sheetUrl = (pageId, month, hash) => '/content-sheet?page=' + (SHEET_PAGES.includes(pageId) ? pageId : SHEET_PAGES[0]) + (monthOf(month) ? '&month=' + month : '') + (hash ? '#' + hash : '');
 const backTo = (b) => sheetUrl(b.pageId, typeof b.publishDate === 'string' ? b.publishDate.slice(0, 7) : null);
 
@@ -1163,7 +1182,7 @@ sheet.use((req, res, next) => {
   const canEdit = admin || (ctx.user.role !== 'viewer' && ctx.studio.contentSheet.viewers.includes(ctx.user.id));
   if (req.method === 'POST') {
     if (!csrfOk(req)) return forbidden(res, 'This form has expired or did not come from the PMS. Reload the page and try again.');
-    const adminOnly = req.path === '/access' || req.body.remove === '1';
+    const adminOnly = req.body.remove === '1';
     if (adminOnly ? !admin : !canEdit) return forbidden(res, adminOnly ? 'Only an admin can do this on the Content Sheet.' : 'Your Content Sheet access is view-only.');
   }
   if (!req.session.studioCsrf) req.session.studioCsrf = crypto.randomBytes(24).toString('hex');
@@ -1173,6 +1192,29 @@ sheet.use((req, res, next) => {
   delete req.session.studioFlash;
   next();
 });
+
+// `drafts` and `rowErrors` (keyed like the Save fields, see below) redraw a refused Save with what was typed.
+function renderSheet(req, res, pageId, month, drafts = {}, rowErrors = {}) {
+  const [y, m] = month.split('-').map(Number);
+  const rows = req.sm.studio.contentSheet.rows.filter((r) => r.pageId === pageId && (r.publishDate || '').startsWith(month));
+  // One entry per calendar day; a day with no rows gets an empty template row.
+  const days = [];
+  for (let d = 1; d <= new Date(y, m, 0).getDate(); d++) {
+    const date = W.localDay(new Date(y, m - 1, d));
+    days.push({ date, rows: rows.filter((r) => r.publishDate === date).sort((a, b) => a.id - b.id) });
+  }
+  const names = new Map(req.sm.users.map((u) => [u.id, u.name]));
+  // Admins pick who else can see the sheet (no Studio access needed).
+  const shareable = req.sm.actor && req.sm.actor.isManager
+    ? req.sm.users.filter((u) => u.active && u.role !== 'admin').sort((a, b) => a.name.localeCompare(b.name))
+    : [];
+  res.render('social/sheet', {
+    days, pageId, month, today: W.localDay(new Date()), drafts, rowErrors,
+    prevMonth: W.localDay(new Date(y, m - 2, 1)).slice(0, 7), nextMonth: W.localDay(new Date(y, m, 1)).slice(0, 7),
+    pages: C.PAGES, OPTS: SHEET_OPTIONS, shareable, viewers: req.sm.studio.contentSheet.viewers,
+    nameOf: (id) => names.get(id) || 'Former user'
+  });
+}
 
 sheet.get('/', (req, res) => {
   const pageId = SHEET_PAGES.includes(req.query.page) ? req.query.page : SHEET_PAGES[0];
@@ -1188,7 +1230,8 @@ sheet.get('/', (req, res) => {
     // A row belongs to whoever last set its Shoot / Editing / Publish Status ('none' = no status set yet).
     const ownerKey = (r) => { const id = sheetStatusBy(r); return id == null ? 'none' : String(id); };
     const person = req.query.view === 'board' && /^(\d+|none)$/.test(req.query.person || '') ? req.query.person : 'all';
-    const monthRows = req.sm.studio.contentSheet.rows.filter((r) => (r.publishDate || '').startsWith(month)).sort((a, b) => a.id - b.id);
+    // A row with only a date is an empty line on the sheet, not a post.
+    const monthRows = req.sm.studio.contentSheet.rows.filter((r) => (r.publishDate || '').startsWith(month) && sheetRowHasContent(r)).sort((a, b) => a.id - b.id);
     const rows = monthRows.filter((r) => (page === 'all' || r.pageId === page) && (person === 'all' || ownerKey(r) === person));
     const stageOf = (r) => sheetStage(r, today);
     const locals = {
@@ -1222,27 +1265,12 @@ sheet.get('/', (req, res) => {
     stats.forEach((s, i) => { s.rank = s.uploaded + s.completed > 0 && i < 3 ? i + 1 : null; });
     return res.render('social/sheet-board', { ...locals, stats, all: count(monthRows), unassigned: count(monthRows.filter((r) => ownerKey(r) === 'none')) });
   }
-  const rows = req.sm.studio.contentSheet.rows.filter((r) => r.pageId === pageId && (r.publishDate || '').startsWith(month));
-  // One entry per calendar day; a day with no rows gets an empty template row.
-  const days = [];
-  for (let d = 1; d <= new Date(y, m, 0).getDate(); d++) {
-    const date = iso(new Date(y, m - 1, d));
-    days.push({ date, rows: rows.filter((r) => r.publishDate === date).sort((a, b) => a.id - b.id) });
-  }
-  const names = new Map(req.sm.users.map((u) => [u.id, u.name]));
-  // Admins pick who else can see the sheet (no Studio access needed).
-  const shareable = req.sm.actor && req.sm.actor.isManager
-    ? req.sm.users.filter((u) => u.active && u.role !== 'admin').sort((a, b) => a.name.localeCompare(b.name))
-    : [];
-  res.render('social/sheet', {
-    days, pageId, month, today: iso(now),
-    prevMonth: iso(new Date(y, m - 2, 1)).slice(0, 7), nextMonth: iso(new Date(y, m, 1)).slice(0, 7),
-    pages: C.PAGES, OPTS: SHEET_OPTIONS, shareable, viewers: req.sm.studio.contentSheet.viewers,
-    nameOf: (id) => names.get(id) || 'Former user'
-  });
+  renderSheet(req, res, pageId, month);
 });
 
 sheet.post('/access', (req, res) => {
+  // Checked here, not by comparing the path: Express also routes /access/ and /ACCESS to this handler.
+  if (!res.locals.sheet.admin) return forbidden(res, 'Only an admin can do this on the Content Sheet.');
   const ctx = req.sm;
   const picked = [].concat(req.body.viewers || []).map(Number);
   ctx.studio.contentSheet.viewers = ctx.users.filter((u) => u.role !== 'admin' && picked.includes(u.id)).map((u) => u.id);
@@ -1251,18 +1279,74 @@ sheet.post('/access', (req, res) => {
   res.redirect(303, '/content-sheet');
 });
 
+// The one Save button of the sheet. Fields are named <row>.<field>: r12.name for a saved row, d2026-11-04.name for
+// the empty line of a day. A field that is not sent keeps its saved value, and the page only sends changed cells,
+// so an old open tab cannot overwrite what a colleague saved. All or nothing: if any row is refused, nothing is
+// saved and the page comes back with everything still typed in.
+sheet.get('/save', (req, res) => res.redirect('/content-sheet'));
+
+sheet.post('/save', (req, res) => {
+  const ctx = req.sm;
+  const pageId = req.body.pageId;
+  const month = monthOf(req.body.month);
+  if (!SHEET_PAGES.includes(pageId) || !month) { flash(req, 'error', 'Reload the sheet and try again.'); return res.redirect(303, '/content-sheet'); }
+  const posted = new Map();
+  for (const [name, value] of Object.entries(req.body)) {
+    const m = /^(r\d+|d\d{4}-\d{2}-\d{2})\.(\w+)$/.exec(name);
+    if (!m || !SHEET_FIELDS.includes(m[2])) continue;
+    if (!posted.has(m[1])) posted.set(m[1], {});
+    posted.get(m[1])[m[2]] = value;
+  }
+  const updates = [];
+  const creates = [];
+  const rowErrors = {};
+  const refuse = (key, date, text) => { rowErrors[key] = (date ? V.fmtDate(date, 'short') + ': ' : '') + text; };
+  for (const [key, fields] of posted) {
+    if (key[0] === 'd') {
+      const date = key.slice(1);
+      const parsed = parseSheetRow({ ...fields, publishDate: date });
+      if (parsed.error) refuse(key, date, parsed.error);
+      else if (sheetRowHasContent(parsed.row) && !ctx.studio.contentSheet.rows.some((r) => r.pageId === pageId && SHEET_FIELDS.every((k) => String(r[k] || '') === String(parsed.row[k] || '')))) creates.push(parsed.row);
+      continue;
+    }
+    const row = ctx.studio.contentSheet.rows.find((r) => r.id === Number(key.slice(1)));
+    if (!row) { refuse(key, null, 'A row you edited was deleted by someone else, so your changes to it were dropped.'); continue; }
+    const saved = Object.fromEntries(SHEET_FIELDS.map((k) => [k, row[k]]));
+    const locked = row.lockedAt ? { publishStatus: row.publishStatus, link: row.link } : {};
+    const parsed = parseSheetRow({ ...saved, ...fields, ...locked });
+    if (parsed.error) refuse(key, row.publishDate, parsed.error);
+    else if (SHEET_FIELDS.some((k) => String(parsed.row[k] || '') !== String(row[k] || ''))) updates.push([row, parsed.row]);
+  }
+  if (req.body.addRow === '1') {
+    const parsed = parseSheetRow({ publishDate: req.body.addDate, name: 'New post' });
+    if (parsed.error) refuse('add', null, 'To add a row, pick its date first.');
+    else creates.push(parsed.row);
+  }
+  if (Object.keys(rowErrors).length) {
+    res.locals.sheet.flash = { type: 'error', text: 'Nothing was saved. Fix the rows marked in red, then click Save again. ' + Object.values(rowErrors).join(' ') };
+    res.status(422);
+    return renderSheet(req, res, pageId, month, Object.fromEntries(posted), rowErrors);
+  }
+  const count = updates.length + creates.length;
+  if (!count) { flash(req, 'info', 'No changes to save.'); return res.redirect(303, sheetUrl(pageId, month)); }
+  updates.forEach(([row, parsedRow]) => updateSheetRow(row, parsedRow, ctx));
+  const savedRows = updates.map(([row]) => row).concat(creates.map((parsedRow) => addSheetRow(pageId, parsedRow, ctx)));
+  save(ctx.db);
+  const moved = savedRows.filter((r) => !r.publishDate.startsWith(month));
+  const movedText = moved.map((r) => ` "${r.name || 'Untitled'}" moved to ${V.fmtDate(r.publishDate)}.`).join('');
+  flash(req, 'success', (count === 1 ? '1 row saved.' : count + ' rows saved.') + movedText);
+  // Back to the latest row saved (the one just added, for + Add row), so the next row is right there.
+  const here = savedRows.filter((r) => r.publishDate.startsWith(month)).sort((a, b) => a.publishDate.localeCompare(b.publishDate) || a.id - b.id).pop();
+  res.redirect(303, sheetUrl(pageId, month, here && 'row-' + here.id));
+});
+
 sheet.post('/', (req, res) => {
   if (!SHEET_PAGES.includes(req.body.pageId)) { flash(req, 'error', 'Pick an Instagram page.'); return res.redirect(303, '/content-sheet'); }
   const parsed = parseSheetRow(req.body);
   if (parsed.error) { flash(req, 'error', parsed.error); return res.redirect(303, backTo(req.body)); }
-  if (!SHEET_FIELDS.some((k) => k !== 'publishDate' && parsed.row[k])) { flash(req, 'error', 'Fill in at least one cell before saving.'); return res.redirect(303, backTo(req.body)); }
+  if (!sheetRowHasContent(parsed.row)) { flash(req, 'error', 'Fill in at least one cell before saving.'); return res.redirect(303, backTo(req.body)); }
   const ctx = req.sm;
-  const s = ctx.studio.contentSheet;
-  s.nextId = Math.max(s.nextId || 1, ...s.rows.map((r) => r.id + 1));
-  const row = { id: s.nextId++, pageId: req.body.pageId, ...parsed.row, createdBy: ctx.user.id, updatedAt: new Date().toISOString(), updatedBy: ctx.user.id };
-  trackEdits(row, {}, ctx);
-  lockIfPublished(row, ctx);
-  s.rows.push(row);
+  const row = addSheetRow(req.body.pageId, parsed.row, ctx);
   save(ctx.db);
   flash(req, 'success', 'Row saved.');
   res.redirect(303, sheetUrl(row.pageId, row.publishDate.slice(0, 7), 'row-' + row.id));
@@ -1282,10 +1366,7 @@ sheet.post('/:id', (req, res) => {
   const body = row.lockedAt ? { ...req.body, publishStatus: row.publishStatus, link: row.link } : req.body;
   const parsed = parseSheetRow(body);
   if (parsed.error) { flash(req, 'error', parsed.error); return res.redirect(303, back); }
-  const before = { ...row };
-  Object.assign(row, parsed.row, { updatedAt: new Date().toISOString(), updatedBy: ctx.user.id });
-  trackEdits(row, before, ctx);
-  lockIfPublished(row, ctx);
+  updateSheetRow(row, parsed.row, ctx);
   save(ctx.db);
   flash(req, 'success', 'Row saved.');
   res.redirect(303, sheetUrl(row.pageId, row.publishDate.slice(0, 7), 'row-' + row.id));

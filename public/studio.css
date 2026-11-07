@@ -420,8 +420,8 @@ form.modal-box { margin: 0; }
 .sm-cell { width: 100%; min-width: 90px; border: 1px solid var(--border-soft); border-radius: 5px; padding: 6px 7px; font: inherit; font-size: 13px; background: var(--surface); }
 .sm-cell:focus { border-color: var(--primary); outline: none; }
 .sm-sheet-new td { background: var(--bg); }
-.sm-sheet input[name="name"] { min-width: 190px; }
-.sm-sheet input[name="note"] { min-width: 220px; }
+.sm-sheet input[name$=".name"] { min-width: 190px; }
+.sm-sheet input[name$=".note"] { min-width: 220px; }
 .sm-sheet .sm-link-cell { min-width: 200px; }
 .sm-lock { font-size: 12px; color: var(--text-muted); }
 .sm-sheet td a { color: var(--primary); font-weight: 600; }
@@ -433,6 +433,13 @@ form.modal-box { margin: 0; }
 .sm-sheet tr.sm-today td { background: var(--warning-soft); }
 .sm-sheet tr.sm-sheet-blank .sm-cell { background: var(--bg); }
 .sm-sheet-month { display: flex; align-items: center; gap: 10px; margin-top: 12px; flex-wrap: wrap; }
+/* The one Save button stays on screen while the page scrolls. */
+.sm-sheet-savebar { position: sticky; top: 0; z-index: 5; display: flex; justify-content: flex-end; align-items: center; gap: 12px; padding: 8px 0; margin: 0 0 4px; background: var(--bg); }
+.sm-sheet-unsaved { font-size: 13px; font-weight: 600; color: var(--primary-dark); }
+/* Landing on a row after Save: keep it clear of the sticky Save bar and the sticky table header. */
+.sm-sheet tbody tr { scroll-margin-top: 110px; }
+.sm-sheet tr.sm-unsaved td { background: var(--primary-soft); }
+.sm-sheet tr.sm-sheet-err td { background: var(--danger-soft); }
 /* The month scrolls inside its own box so the column headers stay in view. */
 .sm-sheet-scroll { max-height: calc(100vh - 150px); overflow: auto; }
 .sm-sheet thead th { position: sticky; top: 0; z-index: 2; }
@@ -550,11 +557,23 @@ body.sm-tv {
 .sm-tv .sm-sc-more { color: var(--text-muted); }
 .sm-tv .sm-sc-more:hover { color: var(--text); }
 .sm-tv .sm-sc-list .sm-sc { height: 44px; }
+@media (max-height: 1060px) {
+  .sm-tv .sm-cal { grid-auto-rows: minmax(134px, 1fr); }
+  .sm-tv .sm-sheet-cal .sm-cal-day { gap: 3px; padding: 4px 6px; }
+  .sm-tv .sm-cal-num { font-size: 13px; }
+  .sm-tv .sm-sc { height: 26px; padding: 0 6px; }
+  .sm-tv .sm-sc b { font-size: 10.5px; line-height: 1.2; }
+  .sm-tv .sm-sc small { font-size: 9px; line-height: 1.1; }
+}
 .sm-tv .modal-backdrop { background: rgba(0, 0, 0, 0.75); }
 .sm-tv .modal-box { border: 1px solid var(--border); }
 @media (max-width: 1100px) {
-  .sm-tv-head { flex-wrap: wrap; }
-  .sm-tv-main { grid-template-columns: 1fr; }
+  .sm-tv-head, .sm-tv-brand, .sm-tv-nav { flex-wrap: wrap; }
+  .sm-tv-nav { margin-left: 0; }
+  .sm-tv-time { flex-wrap: wrap; gap: 4px 16px; white-space: normal; }
+  .sm-tv-time span { font-size: 18px; }
+  .sm-tv-time b { font-size: 22px; }
+  .sm-tv-main { grid-template-columns: minmax(0, 1fr); }
   .sm-tv-side { height: auto; }
   .sm-tv-cal { overflow-x: auto; }
   .sm-tv .sm-cal { height: auto; }

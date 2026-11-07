@@ -676,6 +676,133 @@ test('Studio access switch hides the Studio from everyone but admins; the Conten
   assert.equal((await (await as(U.bansi)).get('/social-media')).status, 200);
 });
 
+test('Content Sheet Save: one button saves every changed row; a refused row saves nothing and keeps what was typed', async () => {
+  const admin = await as(U.admin);
+  const dhara = await as(U.dhara);
+  const base = { _csrf: admin.token, pageId: 'farma', month: '2026-12' };
+  const farma = () => studio().contentSheet.rows.filter((r) => r.pageId === 'farma' && r.publishDate.startsWith('2026-12')).sort((a, b) => a.id - b.id);
+  const before = studio().contentSheet.rows.length;
+  // The page has one Save at the top, no per-row Save, and cells named by row.
+  const empty = (await admin.get('/content-sheet?page=farma&month=2026-12')).text;
+  assert.equal((empty.match(/>Save<\/button>/g) || []).length, 1);
+  assert.match(empty, /id="sheet-save"[^]*name="d2026-12-05\.name" form="sheet-save"/);
+  // Two empty days filled in, one touched but blank: two rows, nothing for the blank one.
+  const r1 = await admin.post('/content-sheet/save', { ...base, 'd2026-12-05.name': 'First', 'd2026-12-05.shootStatus': 'Done', 'd2026-12-06.name': 'Second', 'd2026-12-07.name': '   ' });
+  assert.equal(r1.status, 303);
+  assert.deepEqual(farma().map((r) => [r.publishDate, r.name, r.shootStatus]), [['2026-12-05', 'First', 'Done'], ['2026-12-06', 'Second', '']]);
+  assert.equal(studio().contentSheet.rows.length, before + 2);
+  assert.match((await flashOf(admin, '/content-sheet?page=farma&month=2026-12')).text, /2 rows saved/);
+  const [a, b] = farma();
+  assert.equal(a.edits.shootStatus.by, U.admin.id, 'who wrote the cell is still recorded');
+  // A field that is not sent keeps its saved value (an old open tab must not overwrite a colleague's edit).
+  await admin.post('/content-sheet/save', { ...base, [`r${a.id}.editingStatus`]: 'Done', [`r${b.id}.note`]: 'hello' });
+  assert.deepEqual([farma()[0].name, farma()[0].shootStatus, farma()[0].editingStatus, farma()[1].note], ['First', 'Done', 'Done', 'hello']);
+  // Nothing changed: no write, no new timestamp.
+  const stamp = farma()[0].updatedAt;
+  await admin.post('/content-sheet/save', { ...base, [`r${a.id}.name`]: 'First' });
+  assert.equal(farma()[0].updatedAt, stamp);
+  assert.match((await flashOf(admin, '/content-sheet?page=farma&month=2026-12')).text, /No changes to save/);
+  // One bad row: nothing is saved, the row is marked and everything typed is still on the page.
+  const bad = await admin.post('/content-sheet/save', { ...base, [`r${a.id}.name`]: 'Renamed', [`r${b.id}.publishStatus`]: 'Published', 'd2026-12-08.name': 'Third <b>' });
+  assert.equal(bad.status, 422);
+  assert.match(bad.text, /Nothing was saved/);
+  assert.match(bad.text, /6 Dec: Add the published post link/);
+  assert.match(bad.text, /sm-sheet-err" data-draft/);
+  assert.match(bad.text, /value="Renamed"/);
+  assert.match(bad.text, /value="Third &lt;b&gt;"/);
+  assert.match(bad.text, new RegExp(`name="r${b.id}\\.publishStatus"[^]*?<option selected>Published</option>`));
+  assert.deepEqual(farma().map((r) => r.name), ['First', 'Second']);
+  // Fixing it saves all of it; Published + link locks as before, and later saves cannot unlock it.
+  const link = 'https://www.instagram.com/reel/SAVEALL/';
+  await admin.post('/content-sheet/save', { ...base, [`r${a.id}.name`]: 'Renamed', [`r${b.id}.publishStatus`]: 'Published', [`r${b.id}.link`]: link, 'd2026-12-08.name': 'Third' });
+  assert.deepEqual(farma().map((r) => r.name), ['Renamed', 'Second', 'Third']);
+  assert.ok(farma()[1].lockedAt);
+  await admin.post('/content-sheet/save', { ...base, [`r${b.id}.publishStatus`]: 'Pending', [`r${b.id}.link`]: 'https://example.com/x', [`r${b.id}.name`]: 'Second v2' });
+  assert.deepEqual([farma()[1].name, farma()[1].publishStatus, farma()[1].link], ['Second v2', 'Published', link]);
+  // + Add row saves what is typed and adds the line; without a date it is refused and nothing is lost.
+  const noDate = await admin.post('/content-sheet/save', { ...base, addRow: '1', addDate: '', [`r${a.id}.note`]: 'kept' });
+  assert.equal(noDate.status, 422);
+  assert.match(noDate.text, /To add a row, pick its date first/);
+  assert.match(noDate.text, /value="kept"/);
+  await admin.post('/content-sheet/save', { ...base, addRow: '1', addDate: '2026-12-05', [`r${a.id}.note`]: 'kept' });
+  assert.deepEqual(farma().filter((r) => r.publishDate === '2026-12-05').map((r) => [r.name, r.note]), [['Renamed', 'kept'], ['New post', '']]);
+  // A row someone else deleted is reported once; the retry from the redrawn page saves the rest.
+  const gone = await admin.post('/content-sheet/save', { ...base, 'r999999.name': 'x', [`r${a.id}.note`]: 'still here' });
+  assert.equal(gone.status, 422);
+  assert.match(gone.text, /deleted by someone else/);
+  // Bad input: unknown page / month / status / field names are ignored or refused, never stored.
+  assert.equal((await admin.post('/content-sheet/save', { ...base, pageId: 'nope', 'd2026-12-09.name': 'x' })).status, 303);
+  assert.equal((await admin.post('/content-sheet/save', { ...base, month: 'x', 'd2026-12-09.name': 'x' })).status, 303);
+  await admin.post('/content-sheet/save', { ...base, 'd2026-12-09.name': 'Safe', 'd2026-12-09.shootStatus': 'Hacked', 'd2026-12-09.pageId': 'product', 'd2026-12-09.createdBy': '1', '__proto__.name': 'x' });
+  const safe = farma().find((r) => r.name === 'Safe');
+  assert.deepEqual([safe.pageId, safe.shootStatus, safe.createdBy], ['farma', '', U.admin.id]);
+  // After Save you land on the latest row saved; a row moved to another month says where it went.
+  const land = await admin.post('/content-sheet/save', { ...base, 'd2026-12-20.name': 'Land here', [`r${a.id}.note`]: 'x' });
+  assert.match(land.location, new RegExp(`page=farma&month=2026-12#row-${farma().find((r) => r.name === 'Land here').id}$`));
+  const leaving = farma().find((r) => r.name === 'Land here');
+  await admin.post('/content-sheet/save', { ...base, [`r${leaving.id}.publishDate`]: '2027-01-15' });
+  assert.match((await flashOf(admin, '/content-sheet?page=farma&month=2026-12')).text, /&#34;Land here&#34; moved to 15 Jan 2027/);
+  await admin.post('/content-sheet/' + leaving.id, { _csrf: admin.token, remove: '1' });
+  // An impossible date is refused, on Save and on the single-row route: 31 Feb would never show on any day.
+  const count31 = studio().contentSheet.rows.length;
+  assert.equal((await admin.post('/content-sheet/save', { ...base, month: '2027-02', 'd2027-02-31.name': 'Ghost' })).status, 422);
+  await admin.post('/content-sheet', { _csrf: admin.token, pageId: 'farma', publishDate: '2027-02-31', name: 'Ghost' });
+  assert.equal(studio().contentSheet.rows.length, count31);
+  // A refused Save keeps the typing even if a colleague filled that day in the meantime.
+  await admin.post('/content-sheet/save', { ...base, 'd2026-12-21.name': 'Colleague' });
+  const clash = await admin.post('/content-sheet/save', { ...base, 'd2026-12-21.name': 'Mine', 'd2026-12-21.publishStatus': 'Published' });
+  assert.equal(clash.status, 422);
+  assert.match(clash.text, /value="Colleague"/);
+  assert.match(clash.text, /value="Mine"/);
+  // A row with only a date is an empty line, not a post: not on the calendar, not in the TV board counts.
+  const counted = (await admin.get('/content-sheet?view=board&month=2026-12')).text.match(/<b>Everyone<\/b><span>(\d+)<\/span>/)[1];
+  const emptied = farma().find((r) => r.name === 'Colleague');
+  await admin.post('/content-sheet/save', { ...base, [`r${emptied.id}.name`]: '' });
+  assert.equal(farma().find((r) => r.id === emptied.id).name, '', 'the line itself stays on the sheet');
+  const after = (await admin.get('/content-sheet?view=board&month=2026-12')).text;
+  assert.equal(after.match(/<b>Everyone<\/b><span>(\d+)<\/span>/)[1], String(Number(counted) - 1));
+  assert.doesNotMatch(after, new RegExp(`data-sm-open="sc-row-${emptied.id}"`));
+  assert.doesNotMatch((await admin.get('/content-sheet?view=calendar&month=2026-12')).text, /<b>Untitled<\/b>/);
+  // A mistyped year (0026) would store a row no screen can reach: refused, on dates and in the month address.
+  const countYear = studio().contentSheet.rows.length;
+  assert.equal((await admin.post('/content-sheet/save', { ...base, 'd2026-12-22.name': 'Old', 'd2026-12-22.shootDate': '0026-12-01' })).status, 422);
+  await admin.post('/content-sheet', { _csrf: admin.token, pageId: 'farma', publishDate: '0026-12-22', name: 'Old' });
+  assert.equal(studio().contentSheet.rows.length, countYear);
+  // Save, browser Back, Save again sends the same empty-day cells twice: only one row comes of it.
+  const again = { ...base, 'd2026-12-23.name': 'Once', 'd2026-12-23.note': 'same' };
+  await admin.post('/content-sheet/save', again);
+  await admin.post('/content-sheet/save', again);
+  assert.equal(farma().filter((r) => r.name === 'Once').length, 1);
+  // The address of a refused Save is safe to open again.
+  const reopened = await admin.get('/content-sheet/save');
+  assert.equal(reopened.status, 302);
+  assert.equal(reopened.location, '/content-sheet');
+  // The TV Board link follows the calendar: this month's link has no month in it, so a wall TV moves on by itself.
+  for (const p of ['/content-sheet?page=farma', '/content-sheet?view=calendar']) {
+    assert.match((await admin.get(p)).text, /href="\/content-sheet\?view=board">TV Board/, p);
+  }
+  assert.match((await admin.get('/content-sheet?page=farma&month=2026-12')).text, /view=board&amp;month=2026-12">TV Board/);
+  assert.match((await admin.get('/content-sheet?view=board&month=2026-12')).text, new RegExp('<a href="/content-sheet\\?view=board">Today</a>'));
+  // Sharing stays admin-only however the address is written (Express also routes /access/ and /ACCESS here).
+  const sharing = () => JSON.stringify(studio().contentSheet.viewers);
+  await admin.post('/content-sheet/access', { _csrf: admin.token, viewers: [String(U.other.id)] });
+  const shared = await as(U.other);
+  const sharedToken = (await shared.get('/content-sheet')).text.match(/name="_csrf" value="([a-f0-9]+)"/)[1];
+  const allowed = sharing();
+  for (const p of ['/content-sheet/access', '/content-sheet/access/', '/content-sheet/ACCESS', '/content-sheet/Access/']) {
+    assert.equal((await shared.post(p, { _csrf: sharedToken, viewers: [String(U.bansi.id)] })).status, 403, p);
+    assert.equal(sharing(), allowed, p);
+  }
+  await admin.post('/content-sheet/access', { _csrf: admin.token });
+  // Permissions: the Save button is only for people who can edit; a bad token is refused.
+  assert.doesNotMatch((await dhara.get('/content-sheet?page=farma&month=2026-12')).text, /id="sheet-save"/);
+  assert.equal((await dhara.post('/content-sheet/save', { ...base, _csrf: dhara.token, [`r${a.id}.name`]: 'Hacked' })).status, 403);
+  assert.equal((await admin.post('/content-sheet/save', { ...base, _csrf: 'bad', [`r${a.id}.name`]: 'Hacked' })).status, 403);
+  assert.equal(farma()[0].name, 'Renamed');
+  // Leave no rows behind for the tests that count them.
+  for (const r of farma()) await admin.post('/content-sheet/' + r.id, { _csrf: admin.token, remove: '1' });
+});
+
 test('Content Sheet: admin adds, edits and deletes rows; published link locks; others only view', async () => {
   const admin = await as(U.admin);
   const bansi = await as(U.bansi); // token taken while the Studio is open, so the 403s below are the admin-only guard
