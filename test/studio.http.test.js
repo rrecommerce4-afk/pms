@@ -717,8 +717,14 @@ test('Content Sheet Save: one button saves every changed row; a refused row save
   await admin.post('/content-sheet/save', { ...base, [`r${a.id}.name`]: 'Renamed', [`r${b.id}.publishStatus`]: 'Published', [`r${b.id}.link`]: link, 'd2026-12-08.name': 'Third' });
   assert.deepEqual(farma().map((r) => r.name), ['Renamed', 'Second', 'Third']);
   assert.ok(farma()[1].lockedAt);
-  await admin.post('/content-sheet/save', { ...base, [`r${b.id}.publishStatus`]: 'Pending', [`r${b.id}.link`]: 'https://example.com/x', [`r${b.id}.name`]: 'Second v2' });
-  assert.deepEqual([farma()[1].name, farma()[1].publishStatus, farma()[1].link], ['Second v2', 'Published', link]);
+  const lockedStamp = farma()[1].updatedAt;
+  await admin.post('/content-sheet/save', { ...base, [`r${b.id}.publishStatus`]: 'Pending', [`r${b.id}.link`]: 'https://example.com/x', [`r${b.id}.name`]: 'Second v2', [`r${b.id}.note`]: 'x', [`r${b.id}.shootStatus`]: 'Done' });
+  assert.deepEqual([farma()[1].name, farma()[1].publishStatus, farma()[1].link, farma()[1].note, farma()[1].shootStatus, farma()[1].updatedAt], ['Second', 'Published', link, 'hello', '', lockedStamp]);
+  assert.match((await flashOf(admin, '/content-sheet?page=farma&month=2026-12')).text, /Nothing saved\. Published rows are locked/);
+  // On the page the locked row has no cells to type in, only its values; admins still get delete.
+  const lockedPage = (await admin.get('/content-sheet?page=farma&month=2026-12')).text;
+  assert.doesNotMatch(lockedPage, new RegExp(`name="r${b.id}\\.`));
+  assert.match(lockedPage, new RegExp(`id="row-${b.id}" class="[^"]*"  title="Published and locked">[^]*?<b>Second</b>[^]*?Locked[^]*?aria-label="Delete row"`));
   // + Add row saves what is typed and adds the line; without a date it is refused and nothing is lost.
   const noDate = await admin.post('/content-sheet/save', { ...base, addRow: '1', addDate: '', [`r${a.id}.note`]: 'kept' });
   assert.equal(noDate.status, 422);
@@ -878,10 +884,11 @@ test('Content Sheet: admin adds, edits and deletes rows; published link locks; o
   assert.ok(studio().contentSheet.rows[0].lockedAt);
   await admin.post('/content-sheet/' + rows[0].id, { _csrf: admin.token, name: 'Discount Reel v2', publishDate: '2026-10-25', publishStatus: 'Pending', link: 'https://example.com/other' });
   const locked = studio().contentSheet.rows[0];
-  assert.deepEqual([locked.name, locked.publishStatus, locked.link], ['Discount Reel v2', 'Published', link]);
+  assert.deepEqual([locked.name, locked.publishStatus, locked.link], ['Discount Reel', 'Published', link]);
+  assert.match((await flashOf(admin, '/content-sheet?page=product&month=2026-10')).text, /published and locked/);
   // Calendar view: all pages by default, coloured by combined status; page filter narrows it.
   const cal = (await admin.get('/content-sheet?view=calendar&month=2026-10')).text;
-  assert.match(cal, /class="sm-sc st-published" data-sm-open="sc-row-\d+"><b>Discount Reel v2/);
+  assert.match(cal, /class="sm-sc st-published" data-sm-open="sc-row-\d+"><b>Discount Reel</);
   assert.match(cal, /class="sm-sc st-overdue" data-sm-open="sc-row-\d+"><b>Festival post/);
   assert.match(cal, /class="modal-backdrop" id="sc-row-\d+"[^]*Open in sheet/);
   // TV board: a row counts for whoever set its statuses (Test Admin: 1 uploaded); a row with no status yet
@@ -913,15 +920,15 @@ test('Content Sheet: admin adds, edits and deletes rows; published link locks; o
   // Others see it (Studio hidden) but cannot change it.
   const view = await bansi.get('/content-sheet?page=product&month=2026-10');
   assert.equal(view.status, 200);
-  assert.match(view.text, /Discount Reel v2/);
+  assert.match(view.text, /<b>Discount Reel<\/b>/);
   assert.match(view.text, /href="https:\/\/www\.instagram\.com\/reel\/ABC123\/"/);
   assert.doesNotMatch(view.text, /\+ Add row/);
   assert.equal((await bansi.post('/content-sheet', { _csrf: bansi.token, name: 'x' })).status, 403);
   assert.equal((await bansi.post('/content-sheet/' + rows[0].id, { _csrf: bansi.token, remove: '1' })).status, 403);
   // Delete.
   await admin.post('/content-sheet/' + rows[1].id, { _csrf: admin.token, remove: '1' });
-  assert.deepEqual(studio().contentSheet.rows.map((r) => r.name), ['Discount Reel v2']);
-  assert.match((await admin.get('/content-sheet?month=2026-10')).text, /value="Discount Reel v2"/);
+  assert.deepEqual(studio().contentSheet.rows.map((r) => r.name), ['Discount Reel']);
+  assert.match((await admin.get('/content-sheet?month=2026-10')).text, /<b>Discount Reel<\/b>/);
   // Sharing: a ticked employee can view, add and edit rows (not delete / not re-share), but still not open the Studio.
   const other = new Client();
   await other.login(U.other);

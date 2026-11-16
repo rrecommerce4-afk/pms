@@ -118,7 +118,8 @@
         notice.className = 'sm-flash error';
         notice.setAttribute('role', 'alert');
         notice.textContent = 'Your last Save did not go through, usually because you were logged out. Your changes are back on this page. Click Save to store them.';
-        sheetForm.parentNode.insertBefore(notice, sheetForm);
+        var bar = sheetForm.closest('.sm-sheet-toolbar') || sheetForm;
+        bar.parentNode.insertBefore(notice, bar);
       }
     }
     var submitting = false;

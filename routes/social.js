@@ -1132,7 +1132,7 @@ function parseSheetRow(b) {
   return { row };
 }
 
-// Once a row is saved as Published with its link, the link and the Published status are locked.
+// Once a row is saved as Published with its link, the whole row is locked: no cell can change. Admins can still delete it.
 function lockIfPublished(row, ctx) {
   if (!row.lockedAt && row.publishStatus === 'Published' && row.link) Object.assign(row, { lockedAt: new Date().toISOString(), lockedBy: ctx.user.id });
 }
@@ -1311,6 +1311,7 @@ sheet.post('/save', (req, res) => {
   const updates = [];
   const creates = [];
   const rowErrors = {};
+  let lockedSkipped = 0;
   const refuse = (key, date, text) => { rowErrors[key] = (date ? V.fmtDate(date, 'short') + ': ' : '') + text; };
   for (const [key, fields] of posted) {
     if (key[0] === 'd') {
@@ -1322,9 +1323,10 @@ sheet.post('/save', (req, res) => {
     }
     const row = ctx.studio.contentSheet.rows.find((r) => r.id === Number(key.slice(1)));
     if (!row) { refuse(key, null, 'A row you edited was deleted by someone else, so your changes to it were dropped.'); continue; }
+    // Only an old open tab can still send a locked row; it is left exactly as it is.
+    if (row.lockedAt) { lockedSkipped++; continue; }
     const saved = Object.fromEntries(SHEET_FIELDS.map((k) => [k, row[k]]));
-    const locked = row.lockedAt ? { publishStatus: row.publishStatus, link: row.link } : {};
-    const parsed = parseSheetRow({ ...saved, ...fields, ...locked });
+    const parsed = parseSheetRow({ ...saved, ...fields });
     if (parsed.error) refuse(key, row.publishDate, parsed.error);
     else if (SHEET_FIELDS.some((k) => String(parsed.row[k] || '') !== String(row[k] || ''))) updates.push([row, parsed.row]);
   }
@@ -1339,13 +1341,14 @@ sheet.post('/save', (req, res) => {
     return renderSheet(req, res, pageId, month, Object.fromEntries(posted), rowErrors);
   }
   const count = updates.length + creates.length;
-  if (!count) { flash(req, 'info', 'No changes to save.'); return res.redirect(303, sheetUrl(pageId, month)); }
+  const lockedText = lockedSkipped ? ' Published rows are locked, so changes to them were not saved.' : '';
+  if (!count) { flash(req, 'info', (lockedSkipped ? 'Nothing saved.' : 'No changes to save.') + lockedText); return res.redirect(303, sheetUrl(pageId, month)); }
   updates.forEach(([row, parsedRow]) => updateSheetRow(row, parsedRow, ctx));
   const savedRows = updates.map(([row]) => row).concat(creates.map((parsedRow) => addSheetRow(pageId, parsedRow, ctx)));
   save(ctx.db);
   const moved = savedRows.filter((r) => !r.publishDate.startsWith(month));
   const movedText = moved.map((r) => ` "${r.name || 'Untitled'}" moved to ${V.fmtDate(r.publishDate)}.`).join('');
-  flash(req, 'success', (count === 1 ? '1 row saved.' : count + ' rows saved.') + movedText);
+  flash(req, 'success', (count === 1 ? '1 row saved.' : count + ' rows saved.') + movedText + lockedText);
   // Back to the latest row saved (the one just added, for + Add row), so the next row is right there.
   const here = savedRows.filter((r) => r.publishDate.startsWith(month)).sort((a, b) => a.publishDate.localeCompare(b.publishDate) || a.id - b.id).pop();
   res.redirect(303, sheetUrl(pageId, month, here && 'row-' + here.id));
@@ -1374,8 +1377,8 @@ sheet.post('/:id', (req, res) => {
     flash(req, 'success', 'Row deleted.');
     return res.redirect(303, back);
   }
-  const body = row.lockedAt ? { ...req.body, publishStatus: row.publishStatus, link: row.link } : req.body;
-  const parsed = parseSheetRow(body);
+  if (row.lockedAt) { flash(req, 'error', 'This row is published and locked, so it cannot be changed.'); return res.redirect(303, back); }
+  const parsed = parseSheetRow(req.body);
   if (parsed.error) { flash(req, 'error', parsed.error); return res.redirect(303, back); }
   updateSheetRow(row, parsed.row, ctx);
   save(ctx.db);

@@ -432,9 +432,23 @@ form.modal-box { margin: 0; }
 .sm-by { position: absolute; top: 1px; right: 2px; z-index: 1; font-size: 9px; font-weight: 700; line-height: 13px; padding: 0 3px; border-radius: 3px; background: var(--primary-soft); color: var(--primary-dark); cursor: default; }
 .sm-sheet tr.sm-today td { background: var(--warning-soft); }
 .sm-sheet tr.sm-sheet-blank .sm-cell { background: var(--bg); }
-.sm-sheet-month { display: flex; align-items: center; gap: 10px; margin-top: 12px; flex-wrap: wrap; }
+/* Content Sheet top: a slim title, then one toolbar line that stays on screen while scrolling. */
+.sm-sheet-head { display: flex; align-items: baseline; gap: 6px 14px; flex-wrap: wrap; margin-bottom: 10px; }
+.sm-sheet-head h1 { font-family: var(--font-serif); font-size: 22px; font-weight: 700; margin: 0; letter-spacing: -0.01em; }
+.sm-sheet-head p { margin: 0; color: var(--text-muted); font-size: 13px; }
+.sm-sheet-toolbar { position: sticky; top: 0; z-index: 5; display: flex; align-items: center; gap: 10px 16px; flex-wrap: wrap; padding: 8px 0; margin-bottom: 8px; background: var(--bg); }
+.sm-sheet-toolbar .sm-tabs { margin: 0; }
+.sm-sheet-month { display: flex; align-items: center; gap: 8px; white-space: nowrap; }
 /* The one Save button stays on screen while the page scrolls. */
-.sm-sheet-savebar { position: sticky; top: 0; z-index: 5; display: flex; justify-content: flex-end; align-items: center; gap: 12px; padding: 8px 0; margin: 0 0 4px; background: var(--bg); }
+.sm-sheet-savebar { display: flex; align-items: center; gap: 12px; margin-left: auto; }
+/* Phone: one line that scrolls sideways, with Save pinned at its right end. */
+@media (max-width: 700px) {
+  .sm-sheet-toolbar { flex-wrap: nowrap; overflow-x: auto; }
+  .sm-sheet-toolbar > * { flex-shrink: 0; }
+  .sm-sheet-toolbar .sm-tabs { flex-wrap: nowrap; }
+  .sm-sheet-toolbar .tab-btn { white-space: nowrap; }
+  .sm-sheet-savebar { position: sticky; right: 0; padding-left: 8px; background: var(--bg); }
+}
 .sm-sheet-unsaved { font-size: 13px; font-weight: 600; color: var(--primary-dark); }
 /* Landing on a row after Save: keep it clear of the sticky Save bar and the sticky table header. */
 .sm-sheet tbody tr { scroll-margin-top: 110px; }
