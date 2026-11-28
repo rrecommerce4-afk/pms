@@ -413,6 +413,25 @@ function settingsRedirect(tab, error) {
   return '/admin/settings' + (qs ? '?' + qs : '');
 }
 
+// Employee photo, shown on the TV board. The form is multipart, so multer also fills req.body.
+function photoUpload(req, res, next) {
+  upload.single('photo')(req, res, (err) => {
+    if (err) return res.redirect(settingsRedirect('employees', 'Photo upload failed: ' + err.message));
+    if (req.file && !/^image\/(png|jpeg|webp|gif)$/.test(req.file.mimetype)) {
+      fs.unlink(req.file.path, () => {});
+      return res.redirect(settingsRedirect('employees', 'Photo must be a PNG, JPG, WEBP or GIF image.'));
+    }
+    next();
+  });
+}
+
+// Points the user at the newly uploaded photo and deletes the one it replaces.
+function setPhoto(user, file) {
+  if (!file) return;
+  if (user.photo) fs.unlink(path.join(__dirname, '..', 'uploads', path.basename(user.photo)), () => {});
+  user.photo = '/uploads/' + file.filename;
+}
+
 router.get('/settings', (req, res) => {
   const db = load();
   const tab = req.query.tab === 'departments' ? 'departments' : 'employees';
@@ -429,7 +448,7 @@ router.get('/settings', (req, res) => {
   });
 });
 
-router.post('/settings/employees', (req, res) => {
+router.post('/settings/employees', photoUpload, (req, res) => {
   const { name, email, password, role, departmentId, roleTitle, color } = req.body;
   const db = load();
   const finalRole = role === 'admin' || role === 'viewer' ? role : 'employee';
@@ -461,12 +480,13 @@ router.post('/settings/employees', (req, res) => {
     isDeptHead: finalRole === 'employee' && !!req.body.isDeptHead,
     active: true
   });
+  setPhoto(db.users[db.users.length - 1], req.file);
   logActivity(db, `<b>${T.escapeHtml(req.session.name)}</b> added ${T.escapeHtml(name)} to the team`);
   save(db);
   res.redirect('/admin/settings');
 });
 
-router.post('/settings/employees/:id/edit', (req, res) => {
+router.post('/settings/employees/:id/edit', photoUpload, (req, res) => {
   const { name, email, password, role, departmentId, roleTitle, color } = req.body;
   const db = load();
   const targetId = Number(req.params.id);
@@ -504,6 +524,7 @@ router.post('/settings/employees/:id/edit', (req, res) => {
     user.isDeptHead = false;
   }
   if (password) user.passwordHash = bcrypt.hashSync(password, 10);
+  setPhoto(user, req.file);
 
   logActivity(db, `<b>${T.escapeHtml(req.session.name)}</b> updated ${T.escapeHtml(name)}'s profile`);
   save(db);

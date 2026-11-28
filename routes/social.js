@@ -1266,7 +1266,7 @@ sheet.get('/', (req, res) => {
       const k = ownerKey(r);
       if (k === 'none' || offBoard(Number(k))) return;
       const id = r.pageId + ':' + k;
-      if (!entries.has(id)) entries.set(id, { person: { key: k, name: nameOf(Number(k)) }, page: C.getPage(r.pageId), rows: [] });
+      if (!entries.has(id)) entries.set(id, { person: { key: k, name: nameOf(Number(k)), photo: (req.sm.users.find((u) => u.id === Number(k)) || {}).photo }, page: C.getPage(r.pageId), rows: [] });
       entries.get(id).rows.push(r);
     });
     const stats = [...entries.values()].map((e) => ({ person: e.person, page: e.page, ...count(e.rows) }))

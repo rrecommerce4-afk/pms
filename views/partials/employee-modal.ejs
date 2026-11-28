@@ -6,10 +6,14 @@
     </div>
     <div class="modal-body">
       <% if (typeof error !== 'undefined' && error) { %><div class="error"><%= error %></div><% } %>
-      <form method="POST" action="/admin/settings/employees" id="employeeForm">
+      <form method="POST" action="/admin/settings/employees" id="employeeForm" enctype="multipart/form-data">
         <div class="field">
           <label>Full Name</label>
           <input type="text" name="name" id="em-name" placeholder="e.g. Priya Nair" required>
+        </div>
+        <div class="field">
+          <label for="em-photo">Photo <span style="font-weight:400;color:var(--text-faint);text-transform:none;">&mdash; shown on the TV board. Leave empty to keep the current one.</span></label>
+          <input type="file" name="photo" id="em-photo" accept="image/png,image/jpeg,image/webp,image/gif">
         </div>
         <div class="field">
           <label>Email Address</label>
@@ -146,6 +150,7 @@
       document.getElementById('em-name').value = btn.dataset.name;
       document.getElementById('em-email').value = btn.dataset.email;
       passwordInput.value = '';
+      document.getElementById('em-photo').value = '';
       passwordInput.required = false;
       passwordInput.placeholder = 'Leave blank to keep current password';
       passwordLabel.textContent = 'New password (optional)';
