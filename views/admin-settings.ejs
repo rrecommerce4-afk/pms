@@ -34,7 +34,7 @@
               <tr>
                 <td>
                   <div class="name-cell">
-                    <div class="mini-avatar" style="width:28px;height:28px;font-size:11px;background:<%= u.color || 'var(--text-faint)' %>;color:#fff;"><%= u.name.trim().split(/\s+/).map(function (w) { return w[0]; }).join('').slice(0, 2).toUpperCase() %></div>
+                    <div class="mini-avatar" style="width:28px;height:28px;font-size:11px;background:<%= u.color || 'var(--text-faint)' %>;color:#fff;overflow:hidden;"><% if (u.photo) { %><img src="<%= u.photo %>" alt="" style="width:100%;height:100%;object-fit:cover;"><% } else { %><%= u.name.trim().split(/\s+/).map(function (w) { return w[0]; }).join('').slice(0, 2).toUpperCase() %><% } %></div>
                     <%= u.name %>
                   </div>
                 </td>

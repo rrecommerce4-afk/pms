@@ -93,8 +93,10 @@ test('suggested slots leave 24 h for editing after the shoot until editing is do
 // ---------------------------------------------------------------- 24-hour deadline
 test('editing deadline is exactly 24 hours before the saved publishing time, and absent without one', () => {
   const { ctx } = fixture();
-  const r = A.createReel(ctx(1), { title: 'x', pageId: 'stencil', shootAt: local(HOUR), publishAt: '2026-11-25T18:00' }).reel;
-  assert.equal(r.editingDeadline, new Date(2026, 10, 24, 18, 0).toISOString(), '25 Nov 6:00 PM → 24 Nov 6:00 PM');
+  // Next year's 25 Nov, so the publishing time is always after the shoot (a fixed date ends up in the past).
+  const year = new Date().getFullYear() + 1;
+  const r = A.createReel(ctx(1), { title: 'x', pageId: 'stencil', shootAt: local(HOUR), publishAt: `${year}-11-25T18:00` }).reel;
+  assert.equal(r.editingDeadline, new Date(year, 10, 24, 18, 0).toISOString(), '25 Nov 6:00 PM → 24 Nov 6:00 PM');
   assert.equal(Date.parse(r.publishAt) - Date.parse(r.editingDeadline), 24 * HOUR);
   const none = A.createReel(ctx(1), { title: 'y', pageId: 'stencil', shootAt: local(HOUR) }).reel;
   assert.equal(none.editingDeadline, null);
